@@ -10,7 +10,6 @@
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
-/* all styles unchanged */
 body {
   font-family: 'Inter', sans-serif;
   background-color: #050505;
@@ -74,22 +73,6 @@ body {
 .input-error {
   border-color: #f87171 !important;
 }
-.recurrence-option {
-  background: #1a1a1a;
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 0.5rem;
-  padding: 0.75rem;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.recurrence-option.selected {
-  background: #ffffff;
-  color: #000000;
-  border-color: #ffffff;
-}
-.recurrence-option input[type="radio"] {
-  display: none;
-}
 .loader {
   border: 2px solid rgba(0,0,0,0.2);
   border-top: 2px solid black;
@@ -145,7 +128,7 @@ body {
 </style>
 </head>
 <body class="antialiased min-h-screen flex flex-col">
-<!-- Navigation (unchanged) -->
+<!-- Navigation -->
 <nav class="fixed w-full z-50 glass-panel border-b border-white/5">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="flex items-center justify-between h-20">
@@ -171,7 +154,7 @@ body {
   </div>
 </nav>
 
-<!-- Hero Section (unchanged) -->
+<!-- Hero Section -->
 <div class="relative pt-32 pb-20 sm:pt-48 sm:pb-32 overflow-hidden flex items-center justify-center min-h-screen">
   <div class="absolute inset-0 z-0">
     <img src="https://image.qwenlm.ai/public_source/8b83e0df-dcfb-4b73-8354-600aa9e2a523/119177668-855f-445f-ab06-226cba680ca9.png" alt="Barber Background" class="w-full h-full object-cover opacity-40">
@@ -196,7 +179,7 @@ body {
   </div>
 </div>
 
-<!-- Features Section (unchanged) -->
+<!-- Features Section -->
 <section class="py-20 border-t border-white/5 bg-[#080808]">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="grid grid-cols-1 md:grid-cols-2 gap-12 text-center max-w-3xl mx-auto">
@@ -218,7 +201,7 @@ body {
   </div>
 </section>
 
-<!-- Account Modal (unchanged) -->
+<!-- Account Modal -->
 <div id="account-modal" class="fixed inset-0 z-[200] hidden">
   <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity" onclick="closeAccountModal()"></div>
   <div class="relative min-h-full flex items-center justify-center p-4">
@@ -266,7 +249,7 @@ body {
   </div>
 </div>
 
-<!-- Booking Modal (unchanged) -->
+<!-- Booking Modal -->
 <div id="booking-modal" class="fixed inset-0 z-[100] hidden">
   <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity" onclick="closeBooking()"></div>
   <div class="relative min-h-full flex items-center justify-center p-4">
@@ -347,7 +330,7 @@ body {
             <button onclick="goToStep('details')" id="btn-service-next" class="bg-white text-black px-8 py-3 rounded-full font-bold uppercase text-sm hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>Continue to Details</button>
           </div>
         </div>
-        <!-- Step 4: Contact Details + Recurrence + Policy -->
+        <!-- Step 4: Contact Details + Policy -->
         <div id="step-details" class="step-view hidden fade-in">
           <button onclick="goToStep('service')" class="mb-4 text-xs text-gray-500 hover:text-white flex items-center gap-1"><i data-lucide="arrow-left" class="w-3 h-3"></i> Back to Services</button>
           <h2 class="text-3xl font-bold mb-6">Your Information</h2>
@@ -370,23 +353,6 @@ body {
               <input type="tel" id="customer-phone" placeholder="+27 12 345 6789" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
               <div id="phone-error" class="error-message">Please enter a valid phone number (minimum 10 digits).</div>
             </div>
-            <div class="pt-4">
-              <label class="block text-sm text-gray-400 mb-3">Repeat appointment</label>
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div class="recurrence-option selected" id="recur-none-label">
-                  <input type="radio" name="recurrence" value="none" checked>
-                  <span class="block text-center">One‑time</span>
-                </div>
-                <div class="recurrence-option" id="recur-weekly-label">
-                  <input type="radio" name="recurrence" value="weekly">
-                  <span class="block text-center">Weekly (4 weeks)</span>
-                </div>
-                <div class="recurrence-option" id="recur-monthly-label">
-                  <input type="radio" name="recurrence" value="monthly">
-                  <span class="block text-center">Monthly (3 months)</span>
-                </div>
-              </div>
-            </div>
             <div class="policy-box">
               <p><strong>⏱️ Late Policy</strong> – R10 per every 10 minutes you are late.</p>
               <p><strong>❌ Cancellation Policy</strong> – If you cancel within 24 hours of your appointment, you will receive <strong>20% off your next cut</strong>.</p>
@@ -406,7 +372,7 @@ body {
             </button>
           </div>
         </div>
-        <!-- Step 5: Success with PDF Download -->
+        <!-- Step 5: Success -->
         <div id="step-success" class="step-view hidden fade-in text-center py-10">
           <div class="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(34,197,94,0.4)]"><i data-lucide="check" class="w-10 h-10 text-black"></i></div>
           <h2 class="text-3xl font-bold mb-2">Booking Confirmed</h2>
@@ -435,7 +401,7 @@ body {
   </div>
 </div>
 
-<!-- Footer (Instagram link added) -->
+<!-- Footer -->
 <footer class="bg-black py-12 border-t border-white/5 mt-auto">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6">
     <div class="text-center md:text-left">
@@ -454,7 +420,6 @@ body {
 </footer>
 
 <script>
-// All JavaScript remains exactly as in the previous version (no changes needed)
 lucide.createIcons();
 
 // ========== USER ACCOUNT SYSTEM ==========
@@ -595,7 +560,6 @@ let currentDate = new Date();
 let selectedDate = null;
 let selectedTime = null;
 let selectedService = null;
-let recurrence = 'none';
 let isProcessing = false;
 
 // DOM elements
@@ -618,37 +582,6 @@ const confirmBtn = document.getElementById('confirm-btn');
 const confirmBtnText = document.getElementById('confirm-btn-text');
 const confirmSpinner = document.getElementById('confirm-spinner');
 const whatsappLink = document.getElementById('whatsapp-link');
-
-// Recurrence
-const recurNone = document.querySelector('input[value="none"]');
-const recurWeekly = document.querySelector('input[value="weekly"]');
-const recurMonthly = document.querySelector('input[value="monthly"]');
-const recurLabels = {
-  none: document.getElementById('recur-none-label'),
-  weekly: document.getElementById('recur-weekly-label'),
-  monthly: document.getElementById('recur-monthly-label')
-};
-
-function setRecurrence(value) {
-  recurrence = value;
-  Object.keys(recurLabels).forEach(key => {
-    if (key === value) {
-      recurLabels[key].classList.add('selected');
-    } else {
-      recurLabels[key].classList.remove('selected');
-    }
-  });
-}
-
-document.querySelectorAll('.recurrence-option').forEach(option => {
-  option.addEventListener('click', function(e) {
-    const radio = this.querySelector('input[type="radio"]');
-    if (radio) {
-      radio.checked = true;
-      setRecurrence(radio.value);
-    }
-  });
-});
 
 // ========== PRE-FILL ==========
 function loadCustomerInfo() {
@@ -756,11 +689,6 @@ function resetSelection() {
   selectedDate = null;
   selectedTime = null;
   selectedService = null;
-  recurrence = 'none';
-  setRecurrence('none');
-  recurNone.checked = true;
-  recurWeekly.checked = false;
-  recurMonthly.checked = false;
   updateSummary();
   document.querySelectorAll('.calendar-day.selected, .time-slot-btn.selected, .service-btn.selected').forEach(el => el.classList.remove('selected'));
   document.getElementById('btn-calendar-next').disabled = true;
@@ -943,65 +871,28 @@ function confirmBooking() {
     const phone = phoneInput.value.trim();
     const finalPrice = getFinalPrice(selectedService.price, selectedTime);
     
-    let datesToBook = [selectedDate];
-    if (recurrence === 'weekly') {
-      for (let i = 1; i <= 3; i++) {
-        const nextDate = new Date(selectedDate);
-        nextDate.setDate(selectedDate.getDate() + i * 7);
-        datesToBook.push(nextDate);
-      }
-    } else if (recurrence === 'monthly') {
-      for (let i = 1; i <= 2; i++) {
-        const nextDate = new Date(selectedDate);
-        nextDate.setMonth(selectedDate.getMonth() + i);
-        datesToBook.push(nextDate);
-      }
-    }
-    
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    datesToBook = datesToBook.filter(d => d >= today);
-    
-    const availableDates = datesToBook.filter(d => isSlotAvailable(d, selectedTime));
-    const unavailableCount = datesToBook.length - availableDates.length;
-    
-    availableDates.forEach(date => {
-      const booking = {
-        date: date.toISOString().split('T')[0],
-        time: selectedTime,
-        service: selectedService.name,
-        price: finalPrice,
-        basePrice: selectedService.price,
-        eveningSurcharge: getTimeSurcharge(selectedTime),
-        name,
-        email,
-        phone,
-        bookedAt: new Date().toISOString()
-      };
-      saveBooking(booking);
-    });
+    const booking = {
+      date: selectedDate.toISOString().split('T')[0],
+      time: selectedTime,
+      service: selectedService.name,
+      price: finalPrice,
+      basePrice: selectedService.price,
+      eveningSurcharge: getTimeSurcharge(selectedTime),
+      name,
+      email,
+      phone,
+      bookedAt: new Date().toISOString()
+    };
+    saveBooking(booking);
     
     saveCustomerInfo();
     
-    let successMsg = '';
-    if (recurrence === 'none') {
-      successMsg = 'Your slot is reserved.';
-    } else {
-      const total = availableDates.length;
-      const requested = datesToBook.length;
-      if (total === requested) {
-        successMsg = `All ${total} recurring appointments have been booked.`;
-      } else {
-        successMsg = `${total} out of ${requested} recurring appointments were booked. ${unavailableCount} slot(s) were unavailable.`;
-      }
-    }
-    document.getElementById('success-message').innerText = successMsg;
+    document.getElementById('success-message').innerText = 'Your slot is reserved.';
     const firstDateStr = selectedDate.toLocaleDateString();
     document.getElementById('success-details').innerHTML = `${selectedService.name}<br>${firstDateStr} at ${selectedTime}<br>Total: R${finalPrice}`;
     
     const barberPhone = "27768502521";
-    const message = `New booking: ${selectedService.name} on ${selectedDate.toLocaleDateString()} at ${selectedTime}. Client: ${name} (${phone}) - Total: R${finalPrice}` +
-      (availableDates.length > 1 ? ` (plus ${availableDates.length-1} recurring)` : '');
+    const message = `New booking: ${selectedService.name} on ${selectedDate.toLocaleDateString()} at ${selectedTime}. Client: ${name} (${phone}) - Total: R${finalPrice}`;
     const whatsappUrl = `https://wa.me/${barberPhone}?text=${encodeURIComponent(message)}`;
     whatsappLink.href = whatsappUrl;
     
@@ -1042,10 +933,7 @@ window.addEventListener('storage', (e) => {
   }
 });
 
-// Attach confirm button listener
 confirmBtn.addEventListener('click', confirmBooking);
-
-// Initialize
 updateAccountUI();
 </script>
 </body>

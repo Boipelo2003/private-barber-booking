@@ -1,379 +1,436 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Barber Admin | Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #0a0a0a;
-            color: #ffffff;
-        }
-        .glass-panel {
-            background: rgba(20, 20, 20, 0.8);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        .hidden {
-            display: none !important;
-        }
-        .slot-btn.closed {
-            background-color: #2d2d2d;
-            color: #888;
-            border-color: #444;
-        }
-        .slot-btn.open {
-            background-color: #1a1a1a;
-            border-color: #333;
-        }
-        .btn-disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            pointer-events: none;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Barber Admin | Dashboard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #0a0a0a;
+  color: #ffffff;
+}
+.glass-panel {
+  background: rgba(20, 20, 20, 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.hidden {
+  display: none !important;
+}
+.slot-btn.closed {
+  background-color: #2d2d2d;
+  color: #888;
+  border-color: #444;
+}
+.slot-btn.open {
+  background-color: #1a1a1a;
+  border-color: #333;
+}
+.btn-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.evening-badge {
+  background: #ff6b6b20;
+  border: 1px solid #ff6b6b;
+  color: #ffb3b3;
+  border-radius: 20px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.7rem;
+  margin-left: 0.5rem;
+}
+.user-card {
+  transition: all 0.2s;
+}
+.user-card:hover {
+  background: rgba(255,255,255,0.05);
+}
+</style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
 
-    <!-- Login Container -->
-    <div id="login-container" class="glass-panel rounded-2xl p-8 w-full max-w-md">
-        <div class="text-center mb-8">
-            <img src="https://image.qwenlm.ai/public_source/553aff0e-e70d-4625-9778-1e3f0a132b81/114154e01-1dec-4a89-9641-05c87544b7c7.png" alt="Logo" class="h-16 w-16 rounded-full border border-white/20 mx-auto mb-4">
-            <h1 class="text-2xl font-bold">Barber Admin</h1>
-            <p class="text-gray-400 text-sm mt-2">Enter password to access dashboard</p>
-        </div>
+<!-- Login Container -->
+<div id="login-container" class="glass-panel rounded-2xl p-8 w-full max-w-md">
+  <div class="text-center mb-8">
+    <img src="https://image.qwenlm.ai/public_source/8b83e0df-dcfb-4b73-8354-600aa9e2a523/1beedd3c3-727f-4ecf-9df2-28663b4efe0b.png" alt="Logo" class="h-16 w-16 rounded-full border border-white/20 mx-auto mb-4">
+    <h1 class="text-2xl font-bold">Barber Admin</h1>
+    <p class="text-gray-400 text-sm mt-2">Enter password to access dashboard</p>
+  </div>
+  <div class="space-y-4">
+    <div>
+      <label class="block text-sm text-gray-400 mb-1">Password</label>
+      <input type="password" id="admin-password" placeholder="••••••••" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
+    </div>
+    <button onclick="checkPassword()" class="w-full bg-white text-black hover:bg-gray-200 font-bold py-3 rounded-lg transition-colors">
+      Login
+    </button>
+    <p id="login-error" class="text-red-500 text-sm text-center hidden">Incorrect password</p>
+  </div>
+  <p class="text-xs text-gray-600 text-center mt-6">(Password: voka2026)</p>
+</div>
 
-        <div class="space-y-4">
-            <div>
-                <label class="block text-sm text-gray-400 mb-1">Password</label>
-                <input type="password" id="admin-password" placeholder="••••••••" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
-            </div>
-            <button onclick="checkPassword()" class="w-full bg-white text-black hover:bg-gray-200 font-bold py-3 rounded-lg transition-colors">
-                Login
-            </button>
-            <p id="login-error" class="text-red-500 text-sm text-center hidden">Incorrect password</p>
-        </div>
-
-        <p class="text-xs text-gray-600 text-center mt-6">(Password set by barber)</p>
+<!-- Admin Panel (hidden until login) -->
+<div id="admin-panel" class="hidden w-full">
+  <div class="max-w-7xl mx-auto">
+    <!-- Header with logout -->
+    <div class="flex items-center justify-between mb-8">
+      <div class="flex items-center gap-3">
+        <img src="https://image.qwenlm.ai/public_source/8b83e0df-dcfb-4b73-8354-600aa9e2a523/1beedd3c3-727f-4ecf-9df2-28663b4efe0b.png" alt="Logo" class="h-12 w-12 rounded-full border border-white/20">
+        <h1 class="text-3xl font-bold tracking-tight">Barber Admin</h1>
+      </div>
+      <div class="flex items-center gap-4">
+        <a href="index.html" target="_blank" class="text-sm text-gray-400 hover:text-white underline underline-offset-4">← Back to Public Site</a>
+        <button onclick="logout()" class="text-sm text-red-400 hover:text-red-300 flex items-center gap-1">
+          <i data-lucide="log-out" class="w-4 h-4"></i> Logout
+        </button>
+      </div>
     </div>
 
-    <!-- Admin Panel (hidden until login) -->
-    <div id="admin-panel" class="hidden w-full">
-        <div class="max-w-7xl mx-auto">
-            <!-- Header with logout -->
-            <div class="flex items-center justify-between mb-8">
-                <div class="flex items-center gap-3">
-                    <img src="https://image.qwenlm.ai/public_source/553aff0e-e70d-4625-9778-1e3f0a132b81/114154e01-1dec-4a89-9641-05c87544b7c7.png" alt="Logo" class="h-12 w-12 rounded-full border border-white/20">
-                    <h1 class="text-3xl font-bold tracking-tight">Barber Admin</h1>
-                </div>
-                <div class="flex items-center gap-4">
-                    <a href="index.html" target="_blank" class="text-sm text-gray-400 hover:text-white underline underline-offset-4">← Back to Public Site</a>
-                    <button onclick="logout()" class="text-sm text-red-400 hover:text-red-300 flex items-center gap-1">
-                        <i data-lucide="log-out" class="w-4 h-4"></i> Logout
-                    </button>
-                </div>
-            </div>
-
-            <!-- Two Column Layout -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <!-- LEFT: Manage Slots -->
-                <div class="glass-panel rounded-2xl p-6">
-                    <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><i data-lucide="calendar-x" class="w-5 h-5"></i> Close / Open Slots</h2>
-                    <p class="text-sm text-gray-400 mb-6">Select a date and toggle individual slots, or use the buttons below to close/open the whole day.</p>
-
-                    <div class="mb-6">
-                        <label class="block text-xs uppercase text-gray-500 mb-2">Select Date</label>
-                        <input type="date" id="slot-date" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white">
-                    </div>
-
-                    <!-- Bulk action buttons -->
-                    <div class="flex gap-3 mb-6">
-                        <button id="close-all-btn" onclick="closeAllSlots()" class="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 px-4 rounded-lg transition-colors">
-                            Close All Available
-                        </button>
-                        <button id="open-all-btn" onclick="openAllSlots()" class="flex-1 bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 px-4 rounded-lg transition-colors">
-                            Open All Closed
-                        </button>
-                    </div>
-
-                    <div id="admin-slots-container" class="grid grid-cols-2 sm:grid-cols-4 gap-3 min-h-[200px]">
-                        <!-- Filled by JS -->
-                    </div>
-                    <p id="no-slots-message" class="text-sm text-gray-500 mt-4 hidden">Select a date to manage slots.</p>
-                </div>
-
-                <!-- RIGHT: Upcoming Bookings -->
-                <div class="glass-panel rounded-2xl p-6">
-                    <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><i data-lucide="calendar-check" class="w-5 h-5"></i> Upcoming Bookings</h2>
-                    <p class="text-sm text-gray-400 mb-6">Click the ✕ to cancel a booking.</p>
-
-                    <div id="bookings-list" class="space-y-3 max-h-[500px] overflow-y-auto pr-2">
-                        <!-- Filled by JS -->
-                    </div>
-                    <p id="no-bookings" class="text-sm text-gray-500 mt-4">No bookings yet.</p>
-                </div>
-            </div>
-
-            <p class="text-center text-xs text-gray-600 mt-10">Changes reflect immediately on the public booking site.</p>
+    <!-- Three Column Layout (now with Users) -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <!-- LEFT: Manage Slots -->
+      <div class="glass-panel rounded-2xl p-6">
+        <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><i data-lucide="calendar-x" class="w-5 h-5"></i> Close / Open Slots</h2>
+        <p class="text-sm text-gray-400 mb-6">Select a date and toggle individual slots. Slots after 6 PM include a <span class="evening-badge inline-block">+R20</span> surcharge.</p>
+        <div class="mb-6">
+          <label class="block text-xs uppercase text-gray-500 mb-2">Select Date</label>
+          <input type="date" id="slot-date" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white">
         </div>
+        <div class="flex gap-3 mb-6">
+          <button id="close-all-btn" onclick="closeAllSlots()" class="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 px-4 rounded-lg transition-colors">Close All Available</button>
+          <button id="open-all-btn" onclick="openAllSlots()" class="flex-1 bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 px-4 rounded-lg transition-colors">Open All Closed</button>
+        </div>
+        <div id="admin-slots-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 min-h-[200px]"></div>
+        <p id="no-slots-message" class="text-sm text-gray-500 mt-4 hidden">Select a date to manage slots.</p>
+      </div>
+
+      <!-- MIDDLE: Upcoming Bookings -->
+      <div class="glass-panel rounded-2xl p-6">
+        <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><i data-lucide="calendar-check" class="w-5 h-5"></i> Upcoming Bookings</h2>
+        <p class="text-sm text-gray-400 mb-6">Click the ✕ to cancel a booking.</p>
+        <div id="bookings-list" class="space-y-3 max-h-[500px] overflow-y-auto pr-2"></div>
+        <p id="no-bookings" class="text-sm text-gray-500 mt-4">No bookings yet.</p>
+      </div>
+
+      <!-- RIGHT: Registered Users -->
+      <div class="glass-panel rounded-2xl p-6">
+        <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><i data-lucide="users" class="w-5 h-5"></i> Registered Users</h2>
+        <p class="text-sm text-gray-400 mb-6">Toggle "Late" flag to remind user on next booking.</p>
+        <div id="users-list" class="space-y-3 max-h-[500px] overflow-y-auto pr-2"></div>
+        <p id="no-users" class="text-sm text-gray-500 mt-4">No registered users yet.</p>
+      </div>
     </div>
 
-    <script>
-        lucide.createIcons();
+    <p class="text-center text-xs text-gray-600 mt-10">Changes reflect immediately on the public booking site.</p>
+  </div>
+</div>
 
-        // ========== PASSWORD ==========
-        const CORRECT_PASSWORD = "voka2026";
+<script>
+lucide.createIcons();
 
-        function checkPassword() {
-            const input = document.getElementById('admin-password').value;
-            const error = document.getElementById('login-error');
-            if (input === CORRECT_PASSWORD) {
-                document.getElementById('login-container').classList.add('hidden');
-                document.getElementById('admin-panel').classList.remove('hidden');
-                lucide.createIcons();
-                renderSlotManager();
-                renderBookings();
-            } else {
-                error.classList.remove('hidden');
-            }
-        }
+// ========== PASSWORD ==========
+const CORRECT_PASSWORD = "voka2026";
 
-        function logout() {
-            document.getElementById('admin-panel').classList.add('hidden');
-            document.getElementById('login-container').classList.remove('hidden');
-            document.getElementById('admin-password').value = '';
-            document.getElementById('login-error').classList.add('hidden');
-        }
+function checkPassword() {
+  const input = document.getElementById('admin-password').value;
+  const error = document.getElementById('login-error');
+  if (input === CORRECT_PASSWORD) {
+    document.getElementById('login-container').classList.add('hidden');
+    document.getElementById('admin-panel').classList.remove('hidden');
+    lucide.createIcons();
+    renderSlotManager();
+    renderBookings();
+    renderUsers();
+  } else {
+    error.classList.remove('hidden');
+  }
+}
 
-        // ========== DATA HELPERS ==========
-        const TIME_SLOTS = ["09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM", "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM"];
+function logout() {
+  document.getElementById('admin-panel').classList.add('hidden');
+  document.getElementById('login-container').classList.remove('hidden');
+  document.getElementById('admin-password').value = '';
+  document.getElementById('login-error').classList.add('hidden');
+}
 
-        function getClosedSlots() {
-            return JSON.parse(localStorage.getItem('barberClosedSlots') || '[]');
-        }
+// ========== DATA HELPERS ==========
+const TIME_SLOTS = [
+  "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
+  "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM",
+  "05:00 PM", "06:00 PM", "07:00 PM", "08:00 PM"
+];
 
-        function setClosedSlots(slots) {
-            localStorage.setItem('barberClosedSlots', JSON.stringify(slots));
-        }
+function getClosedSlots() {
+  return JSON.parse(localStorage.getItem('barberClosedSlots') || '[]');
+}
+function setClosedSlots(slots) {
+  localStorage.setItem('barberClosedSlots', JSON.stringify(slots));
+}
+function getBookings() {
+  return JSON.parse(localStorage.getItem('barberBookings') || '[]');
+}
+function setBookings(bookings) {
+  localStorage.setItem('barberBookings', JSON.stringify(bookings));
+}
+function getUsers() {
+  return JSON.parse(localStorage.getItem('barberUsers') || '[]');
+}
+function saveUsers(users) {
+  localStorage.setItem('barberUsers', JSON.stringify(users));
+}
 
-        function getBookings() {
-            return JSON.parse(localStorage.getItem('barberBookings') || '[]');
-        }
+function ensureBookingIds() {
+  let bookings = getBookings();
+  let changed = false;
+  bookings = bookings.map(booking => {
+    if (!booking.id) {
+      booking.id = Date.now() + '-' + Math.random().toString(36).substr(2, 8);
+      changed = true;
+    }
+    return booking;
+  });
+  if (changed) setBookings(bookings);
+}
 
-        function setBookings(bookings) {
-            localStorage.setItem('barberBookings', JSON.stringify(bookings));
-        }
+// ========== DOM ELEMENTS ==========
+const dateInput = document.getElementById('slot-date');
+const slotsContainer = document.getElementById('admin-slots-container');
+const noSlotsMsg = document.getElementById('no-slots-message');
+const bookingsList = document.getElementById('bookings-list');
+const noBookingsMsg = document.getElementById('no-bookings');
+const usersList = document.getElementById('users-list');
+const noUsersMsg = document.getElementById('no-users');
 
-        // Ensure every booking has a unique ID (for older data)
-        function ensureBookingIds() {
-            let bookings = getBookings();
-            let changed = false;
-            bookings = bookings.map(booking => {
-                if (!booking.id) {
-                    booking.id = Date.now() + '-' + Math.random().toString(36).substr(2, 8);
-                    changed = true;
-                }
-                return booking;
-            });
-            if (changed) setBookings(bookings);
-        }
+const today = new Date().toISOString().split('T')[0];
+if (dateInput) {
+  dateInput.value = today;
+  dateInput.min = today;
+  dateInput.addEventListener('change', renderSlotManager);
+}
 
-        // ========== DOM ELEMENTS ==========
-        const dateInput = document.getElementById('slot-date');
-        const slotsContainer = document.getElementById('admin-slots-container');
-        const noSlotsMsg = document.getElementById('no-slots-message');
-        const bookingsList = document.getElementById('bookings-list');
-        const noBookingsMsg = document.getElementById('no-bookings');
+function isEvening(time) {
+  return ["06:00 PM", "07:00 PM", "08:00 PM"].includes(time);
+}
 
-        // Set min date to today
-        const today = new Date().toISOString().split('T')[0];
-        if (dateInput) {
-            dateInput.value = today;
-            dateInput.min = today;
-            // Attach event listener ONCE
-            dateInput.addEventListener('change', renderSlotManager);
-        }
+// ========== SLOT MANAGEMENT ==========
+function renderSlotManager() {
+  if (!dateInput) return;
+  const date = dateInput.value;
+  if (!date) {
+    slotsContainer.innerHTML = '';
+    noSlotsMsg.classList.remove('hidden');
+    return;
+  }
+  noSlotsMsg.classList.add('hidden');
 
-        // ========== RENDER SLOTS ==========
-        function renderSlotManager() {
-            if (!dateInput) return;
-            const date = dateInput.value;
-            if (!date) {
-                slotsContainer.innerHTML = '';
-                noSlotsMsg.classList.remove('hidden');
-                return;
-            }
-            noSlotsMsg.classList.add('hidden');
+  const closedSlots = getClosedSlots().filter(s => s.date === date).map(s => s.time);
+  const bookingsOnDate = getBookings().filter(b => b.date === date).map(b => b.time);
 
-            const closedSlots = getClosedSlots().filter(s => s.date === date).map(s => s.time);
-            const bookingsOnDate = getBookings().filter(b => b.date === date).map(b => b.time);
+  slotsContainer.innerHTML = '';
+  TIME_SLOTS.forEach(time => {
+    const isClosed = closedSlots.includes(time);
+    const isBooked = bookingsOnDate.includes(time);
+    const evening = isEvening(time);
+    
+    const btn = document.createElement('button');
+    btn.className = `slot-btn p-4 rounded-lg border text-left transition-all ${isClosed ? 'closed bg-[#2d2d2d] text-gray-400' : 'open bg-[#1a1a1a] hover:bg-[#252525]'}`;
+    btn.innerHTML = `
+      <div class="font-medium flex items-center justify-between">
+        ${time}
+        ${evening ? '<span class="evening-badge">+R20</span>' : ''}
+      </div>
+      <div class="text-xs mt-1 ${isClosed ? 'text-gray-500' : 'text-gray-400'}">${isClosed ? '🔴 Closed' : '🟢 Open'}</div>
+      ${isBooked ? '<div class="text-xs text-yellow-500 mt-1">⚠️ Has booking</div>' : ''}
+    `;
+    btn.onclick = () => toggleSlot(date, time, isClosed, isBooked);
+    slotsContainer.appendChild(btn);
+  });
+}
 
-            slotsContainer.innerHTML = '';
-            TIME_SLOTS.forEach(time => {
-                const isClosed = closedSlots.includes(time);
-                const isBooked = bookingsOnDate.includes(time);
-                
-                const btn = document.createElement('button');
-                btn.className = `slot-btn p-4 rounded-lg border text-left transition-all ${isClosed ? 'closed bg-[#2d2d2d] text-gray-400' : 'open bg-[#1a1a1a] hover:bg-[#252525]'}`;
-                btn.innerHTML = `
-                    <div class="font-medium">${time}</div>
-                    <div class="text-xs mt-1 ${isClosed ? 'text-gray-500' : 'text-gray-400'}">${isClosed ? '🔴 Closed' : '🟢 Open'}</div>
-                    ${isBooked ? '<div class="text-xs text-yellow-500 mt-1">⚠️ Has booking</div>' : ''}
-                `;
+function toggleSlot(date, time, currentlyClosed, hasBooking) {
+  if (hasBooking) {
+    alert('Cannot close this slot – there is a booking already.');
+    return;
+  }
+  let closedSlots = getClosedSlots();
+  if (currentlyClosed) {
+    closedSlots = closedSlots.filter(s => !(s.date === date && s.time === time));
+  } else {
+    closedSlots.push({ date, time });
+  }
+  setClosedSlots(closedSlots);
+  renderSlotManager();
+}
 
-                btn.onclick = () => toggleSlot(date, time, isClosed, isBooked);
-                slotsContainer.appendChild(btn);
-            });
-        }
+let processing = false;
 
-        function toggleSlot(date, time, currentlyClosed, hasBooking) {
-            if (hasBooking) {
-                alert('Cannot close this slot – there is a booking already.');
-                return;
-            }
+async function closeAllSlots() {
+  if (processing) return;
+  const date = dateInput.value;
+  if (!date) { alert('Please select a date first.'); return; }
+  if (!confirm(`Close ALL available slots on ${new Date(date).toLocaleDateString()}?`)) return;
 
-            let closedSlots = getClosedSlots();
-            if (currentlyClosed) {
-                closedSlots = closedSlots.filter(s => !(s.date === date && s.time === time));
-            } else {
-                closedSlots.push({ date, time });
-            }
-            setClosedSlots(closedSlots);
-            renderSlotManager();
-        }
+  processing = true;
+  const closeBtn = document.getElementById('close-all-btn');
+  const openBtn = document.getElementById('open-all-btn');
+  closeBtn.classList.add('btn-disabled');
+  openBtn.classList.add('btn-disabled');
 
-        // ========== BULK ACTIONS with disable protection ==========
-        let processing = false;
+  try {
+    const closedSlots = getClosedSlots();
+    const bookingsOnDate = getBookings().filter(b => b.date === date).map(b => b.time);
+    const newClosed = [...closedSlots];
+    TIME_SLOTS.forEach(time => {
+      if (closedSlots.some(s => s.date === date && s.time === time)) return;
+      if (bookingsOnDate.includes(time)) return;
+      newClosed.push({ date, time });
+    });
+    setClosedSlots(newClosed);
+    renderSlotManager();
+    alert('All available slots closed.');
+  } finally {
+    processing = false;
+    closeBtn.classList.remove('btn-disabled');
+    openBtn.classList.remove('btn-disabled');
+  }
+}
 
-        async function closeAllSlots() {
-            if (processing) return;
-            const date = dateInput.value;
-            if (!date) {
-                alert('Please select a date first.');
-                return;
-            }
+async function openAllSlots() {
+  if (processing) return;
+  const date = dateInput.value;
+  if (!date) { alert('Please select a date first.'); return; }
+  if (!confirm(`Open all closed slots on ${new Date(date).toLocaleDateString()}?`)) return;
 
-            if (!confirm(`Are you sure you want to close ALL available slots on ${new Date(date).toLocaleDateString()}?`)) return;
+  processing = true;
+  const closeBtn = document.getElementById('close-all-btn');
+  const openBtn = document.getElementById('open-all-btn');
+  closeBtn.classList.add('btn-disabled');
+  openBtn.classList.add('btn-disabled');
 
-            processing = true;
-            const closeBtn = document.getElementById('close-all-btn');
-            const openBtn = document.getElementById('open-all-btn');
-            closeBtn.classList.add('btn-disabled');
-            openBtn.classList.add('btn-disabled');
+  try {
+    const closedSlots = getClosedSlots();
+    const newClosed = closedSlots.filter(s => s.date !== date);
+    setClosedSlots(newClosed);
+    renderSlotManager();
+    alert('All closed slots opened.');
+  } finally {
+    processing = false;
+    closeBtn.classList.remove('btn-disabled');
+    openBtn.classList.remove('btn-disabled');
+  }
+}
 
-            try {
-                const closedSlots = getClosedSlots();
-                const bookingsOnDate = getBookings().filter(b => b.date === date).map(b => b.time);
-                const newClosed = [...closedSlots];
+// ========== BOOKINGS ==========
+function renderBookings() {
+  ensureBookingIds();
+  let bookings = getBookings().sort((a, b) => {
+    if (a.date !== b.date) return a.date.localeCompare(b.date);
+    return a.time.localeCompare(b.time);
+  });
+  if (bookings.length === 0) {
+    bookingsList.innerHTML = '';
+    noBookingsMsg.classList.remove('hidden');
+    return;
+  }
+  noBookingsMsg.classList.add('hidden');
+  bookingsList.innerHTML = bookings.map(b => `
+    <div class="bg-[#1a1a1a] border border-white/5 rounded-xl p-4 relative group" data-id="${b.id}">
+      <div class="flex justify-between items-start">
+        <div>
+          <h3 class="font-bold">${b.service}</h3>
+          <p class="text-sm text-gray-300">${b.name} · ${b.phone}</p>
+          <p class="text-xs text-gray-500">${b.email}</p>
+        </div>
+        <div class="text-right">
+          <div class="text-sm font-medium">${new Date(b.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+          <div class="text-sm text-gray-400">${b.time}</div>
+          <div class="text-xs text-gray-500 mt-1">R${b.price}</div>
+        </div>
+      </div>
+      <button onclick="cancelBooking('${b.id}')" class="cancel-btn absolute top-2 right-2 text-red-400 hover:text-red-300 transition-colors" title="Cancel booking">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+  `).join('');
+  lucide.createIcons();
+}
 
-                TIME_SLOTS.forEach(time => {
-                    if (closedSlots.some(s => s.date === date && s.time === time)) return;
-                    if (bookingsOnDate.includes(time)) return;
-                    newClosed.push({ date, time });
-                });
+window.cancelBooking = function(bookingId) {
+  if (!confirm('Cancel this booking? This cannot be undone.')) return;
+  const bookings = getBookings();
+  const newBookings = bookings.filter(b => b.id !== bookingId);
+  setBookings(newBookings);
+  renderBookings();
+  renderSlotManager();
+};
 
-                setClosedSlots(newClosed);
-                renderSlotManager();
-                alert('All available slots have been closed.');
-            } finally {
-                processing = false;
-                closeBtn.classList.remove('btn-disabled');
-                openBtn.classList.remove('btn-disabled');
-            }
-        }
+// ========== USERS ==========
+function renderUsers() {
+  const users = getUsers();
+  if (users.length === 0) {
+    usersList.innerHTML = '';
+    noUsersMsg.classList.remove('hidden');
+    return;
+  }
+  noUsersMsg.classList.add('hidden');
+  usersList.innerHTML = users.map(user => `
+    <div class="bg-[#1a1a1a] border border-white/5 rounded-xl p-4 user-card">
+      <div class="flex justify-between items-start">
+        <div>
+          <p class="font-bold">${escapeHtml(user.name)}</p>
+          <p class="text-sm text-gray-300">${escapeHtml(user.email)}</p>
+          <p class="text-xs text-gray-400">${escapeHtml(user.phone)}</p>
+        </div>
+        <div class="flex flex-col items-end">
+          <button onclick="toggleLateFlag('${user.email}')" class="text-xs px-3 py-1 rounded-full ${user.late ? 'bg-yellow-600 text-white' : 'bg-gray-700 text-gray-300'} hover:bg-yellow-500 transition-colors">
+            ${user.late ? '⚠️ Late' : '✓ On Time'}
+          </button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+  lucide.createIcons();
+}
 
-        async function openAllSlots() {
-            if (processing) return;
-            const date = dateInput.value;
-            if (!date) {
-                alert('Please select a date first.');
-                return;
-            }
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/[&<>]/g, function(m) {
+    if (m === '&') return '&amp;';
+    if (m === '<') return '&lt;';
+    if (m === '>') return '&gt;';
+    return m;
+  });
+}
 
-            if (!confirm(`Are you sure you want to OPEN all closed slots on ${new Date(date).toLocaleDateString()}?`)) return;
+window.toggleLateFlag = function(userEmail) {
+  const users = getUsers();
+  const userIndex = users.findIndex(u => u.email === userEmail);
+  if (userIndex !== -1) {
+    users[userIndex].late = !users[userIndex].late;
+    saveUsers(users);
+    renderUsers();
+    // Also update any open booking modal in other tabs via storage event
+  }
+};
 
-            processing = true;
-            const closeBtn = document.getElementById('close-all-btn');
-            const openBtn = document.getElementById('open-all-btn');
-            closeBtn.classList.add('btn-disabled');
-            openBtn.classList.add('btn-disabled');
-
-            try {
-                const closedSlots = getClosedSlots();
-                const newClosed = closedSlots.filter(s => s.date !== date);
-                setClosedSlots(newClosed);
-                renderSlotManager();
-                alert('All closed slots for this date have been opened.');
-            } finally {
-                processing = false;
-                closeBtn.classList.remove('btn-disabled');
-                openBtn.classList.remove('btn-disabled');
-            }
-        }
-
-        // ========== RENDER BOOKINGS ==========
-        function renderBookings() {
-            ensureBookingIds(); // ensure all have IDs
-            let bookings = getBookings().sort((a, b) => {
-                if (a.date !== b.date) return a.date.localeCompare(b.date);
-                return a.time.localeCompare(b.time);
-            });
-
-            if (bookings.length === 0) {
-                bookingsList.innerHTML = '';
-                noBookingsMsg.classList.remove('hidden');
-                return;
-            }
-            noBookingsMsg.classList.add('hidden');
-
-            bookingsList.innerHTML = bookings.map((b, idx) => `
-                <div class="bg-[#1a1a1a] border border-white/5 rounded-xl p-4 relative group" data-id="${b.id}">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <h3 class="font-bold">${b.service}</h3>
-                            <p class="text-sm text-gray-300">${b.name} · ${b.phone}</p>
-                            <p class="text-xs text-gray-500">${b.email}</p>
-                        </div>
-                        <div class="text-right">
-                            <div class="text-sm font-medium">${new Date(b.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
-                            <div class="text-sm text-gray-400">${b.time}</div>
-                            <div class="text-xs text-gray-500 mt-1">R${b.price}</div>
-                        </div>
-                    </div>
-                    <button onclick="cancelBooking('${b.id}')" class="cancel-btn absolute top-2 right-2 text-red-400 hover:text-red-300 transition-colors" title="Cancel booking">
-                        <i data-lucide="x" class="w-5 h-5"></i>
-                    </button>
-                </div>
-            `).join('');
-
-            lucide.createIcons();
-        }
-
-        // Cancel booking by unique ID
-        window.cancelBooking = function(bookingId) {
-            if (!confirm('Are you sure you want to cancel this booking? This cannot be undone.')) return;
-
-            const bookings = getBookings();
-            const newBookings = bookings.filter(b => b.id !== bookingId);
-            setBookings(newBookings);
-            renderBookings();
-            renderSlotManager(); // in case the slot becomes free
-        };
-
-        // ========== SYNC WITH OTHER TABS ==========
-        window.addEventListener('storage', (e) => {
-            if (e.key === 'barberBookings') {
-                renderBookings();
-                renderSlotManager();
-            }
-            if (e.key === 'barberClosedSlots') {
-                renderSlotManager();
-            }
-        });
-    </script>
+// ========== SYNC ==========
+window.addEventListener('storage', (e) => {
+  if (e.key === 'barberBookings') {
+    renderBookings();
+    renderSlotManager();
+  }
+  if (e.key === 'barberClosedSlots') {
+    renderSlotManager();
+  }
+  if (e.key === 'barberUsers') {
+    renderUsers();
+  }
+});
+</script>
 </body>
 </html>

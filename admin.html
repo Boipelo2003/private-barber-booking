@@ -128,6 +128,44 @@ body {
 <script>
 lucide.createIcons();
 
+// ========== HELPER FUNCTIONS ==========
+function formatDateISO(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function parseLocalDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function parseLocalDateTime(dateStr, timeStr) {
+  const date = parseLocalDate(dateStr);
+  const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!match) return new Date(NaN);
+
+  let hour = parseInt(match[1], 10);
+  const minute = parseInt(match[2], 10);
+  const period = match[3].toUpperCase();
+
+  if (period === 'PM' && hour !== 12) hour += 12;
+  if (period === 'AM' && hour === 12) hour = 0;
+
+  date.setHours(hour, minute, 0, 0);
+  return date;
+}
+
+function escapeHtml(str = '') {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ========== FIREBASE CONFIG ==========
 const firebaseConfig = {
   apiKey: "AIzaSyB05r9ei92egPbcnbFKQNK0mso25DHcBss",
@@ -236,10 +274,11 @@ const noBookingsMsg = document.getElementById('no-bookings');
 const usersList = document.getElementById('users-list');
 const noUsersMsg = document.getElementById('no-users');
 
-const today = new Date().toISOString().split('T')[0];
+const today = new Date();
+const todayStr = formatDateISO(today);
 if (dateInput) {
-  dateInput.value = today;
-  dateInput.min = today;
+  dateInput.value = todayStr;
+  dateInput.min = todayStr;
   dateInput.addEventListener('change', renderSlotManager);
 }
 
@@ -369,7 +408,7 @@ async function renderBookings() {
   noBookingsMsg.classList.add('hidden');
   bookingsList.innerHTML = bookings.map(b => {
     const now = new Date();
-    const apptDateTime = new Date(b.date + ' ' + b.time);
+    const apptDateTime = parseLocalDateTime(b.date, b.time);
     const isPast = apptDateTime < now;
     const canArrive = !b.arrivalConfirmed && !isPast;
     const canComplete = (b.arrivalConfirmed || isPast) && b.status !== 'completed';
@@ -446,16 +485,6 @@ async function renderUsers() {
     </div>
   `).join('');
   lucide.createIcons();
-}
-
-function escapeHtml(str) {
-  if (!str) return '';
-  return str.replace(/[&<>]/g, function(m) {
-    if (m === '&') return '&amp;';
-    if (m === '<') return '&lt;';
-    if (m === '>') return '&gt;';
-    return m;
-  });
 }
 
 window.toggleLateFlag = async function(userEmail) {

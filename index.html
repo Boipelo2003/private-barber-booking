@@ -8,11 +8,11 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<!-- Firebase v9 compat (global, no modules) -->
+<!-- Firebase v9 compat -->
 <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 <style>
-/* all styles unchanged from earlier working version */
+/* all styles (same as before) */
 body {
   font-family: 'Inter', sans-serif;
   background-color: #050505;
@@ -137,6 +137,18 @@ body {
   font-size: 0.7rem;
   margin-left: 0.5rem;
 }
+.rating-stars {
+  display: inline-flex;
+  gap: 0.25rem;
+  cursor: pointer;
+}
+.rating-stars i {
+  color: #888;
+  transition: color 0.2s;
+}
+.rating-stars i.filled {
+  color: #fbbf24;
+}
 </style>
 </head>
 <body class="antialiased min-h-screen flex flex-col">
@@ -166,7 +178,7 @@ body {
   </div>
 </nav>
 
-<!-- Hero Section (unchanged) -->
+<!-- Hero Section -->
 <div class="relative pt-32 pb-20 sm:pt-48 sm:pb-32 overflow-hidden flex items-center justify-center min-h-screen">
   <div class="absolute inset-0 z-0">
     <img src="https://image.qwenlm.ai/public_source/8b83e0df-dcfb-4b73-8354-600aa9e2a523/119177668-855f-445f-ab06-226cba680ca9.png" alt="Barber Background" class="w-full h-full object-cover opacity-40">
@@ -191,7 +203,7 @@ body {
   </div>
 </div>
 
-<!-- Features Section (unchanged) -->
+<!-- Features Section -->
 <section class="py-20 border-t border-white/5 bg-[#080808]">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="grid grid-cols-1 md:grid-cols-2 gap-12 text-center max-w-3xl mx-auto">
@@ -213,7 +225,7 @@ body {
   </div>
 </section>
 
-<!-- Account Modal (unchanged) -->
+<!-- Account Modal -->
 <div id="account-modal" class="fixed inset-0 z-[200] hidden">
   <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity" onclick="closeAccountModal()"></div>
   <div class="relative min-h-full flex items-center justify-center p-4">
@@ -257,7 +269,6 @@ body {
         </div>
       </div>
       <p id="account-message" class="text-red-400 text-xs text-center mt-3 hidden"></p>
-      <!-- New: My Bookings button when logged in -->
       <div id="my-bookings-button" class="mt-4 hidden">
         <button onclick="openMyBookings()" class="w-full bg-gray-800 hover:bg-gray-700 text-white font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-2">
           <i data-lucide="calendar" class="w-4 h-4"></i> My Bookings
@@ -267,7 +278,7 @@ body {
   </div>
 </div>
 
-<!-- My Bookings Modal (new) -->
+<!-- My Bookings Modal -->
 <div id="my-bookings-modal" class="fixed inset-0 z-[250] hidden">
   <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity" onclick="closeMyBookings()"></div>
   <div class="relative min-h-full flex items-center justify-center p-4">
@@ -275,16 +286,43 @@ body {
       <button onclick="closeMyBookings()" class="absolute top-4 right-4 text-gray-500 hover:text-white">
         <i data-lucide="x" class="w-5 h-5"></i>
       </button>
-      <h2 class="text-2xl font-bold mb-4">My Upcoming Bookings</h2>
+      <h2 class="text-2xl font-bold mb-4">My Bookings</h2>
       <div id="my-bookings-list" class="space-y-3">
-        <!-- populated by JS -->
         <div class="loading-spinner"></div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Booking Modal (unchanged except surcharge display) -->
+<!-- Review Modal -->
+<div id="review-modal" class="fixed inset-0 z-[300] hidden">
+  <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity" onclick="closeReviewModal()"></div>
+  <div class="relative min-h-full flex items-center justify-center p-4">
+    <div class="relative w-full max-w-md bg-[#111] border border-white/10 rounded-2xl shadow-2xl p-6">
+      <button onclick="closeReviewModal()" class="absolute top-4 right-4 text-gray-500 hover:text-white">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+      <h3 class="text-xl font-bold mb-4">Rate Your Experience</h3>
+      <div class="mb-4">
+        <label class="block text-sm text-gray-400 mb-2">Rating</label>
+        <div id="rating-stars" class="rating-stars">
+          <i data-lucide="star" class="w-6 h-6 cursor-pointer"></i>
+          <i data-lucide="star" class="w-6 h-6 cursor-pointer"></i>
+          <i data-lucide="star" class="w-6 h-6 cursor-pointer"></i>
+          <i data-lucide="star" class="w-6 h-6 cursor-pointer"></i>
+          <i data-lucide="star" class="w-6 h-6 cursor-pointer"></i>
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm text-gray-400 mb-2">Comment (optional)</label>
+        <textarea id="review-comment" rows="3" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white"></textarea>
+      </div>
+      <button onclick="submitReview()" class="w-full bg-white text-black font-bold py-2 rounded-lg hover:bg-gray-200 transition">Submit Review</button>
+    </div>
+  </div>
+</div>
+
+<!-- Booking Modal (full structure) -->
 <div id="booking-modal" class="fixed inset-0 z-[100] hidden">
   <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity" onclick="closeBooking()"></div>
   <div class="relative min-h-full flex items-center justify-center p-4">
@@ -393,7 +431,7 @@ body {
               <p><strong>❌ Cancellation Policy</strong> – If you cancel within 5 hours of your appointment, a <strong>R20 cancellation fee</strong> will apply.</p>
               <p><strong>🚫 No‑Show Policy</strong> – Failure to show up without notice may result in a late flag on your account and a reminder for future bookings.</p>
               <p><strong>👤 Single Seat</strong> – Each booking is for one person only. If you wish to book for multiple people, please make separate bookings.</p>
-              <p><strong>🌙 After‑Hours Surcharge</strong> – Appointments after 7:00 PM include an additional <strong>R50</strong>.</p>
+              <p><strong>🌙 After‑Hours Surcharge</strong> – Appointments after 7:00 PM include an additional <strong>R50</strong> (on top of the R20 evening fee).</p>
               <p class="text-xs text-gray-500 mt-1">By booking, you agree to these terms.</p>
             </div>
             <label class="flex items-center gap-2 text-xs text-gray-400 cursor-pointer mt-4">
@@ -469,7 +507,6 @@ const firebaseConfig = {
   measurementId: "G-KNCJ003KNP"
 };
 
-// Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
@@ -605,67 +642,6 @@ function checkLateReminder() {
   }
 }
 
-// ========== NEW: My Bookings ==========
-async function openMyBookings() {
-  if (!currentUser) return;
-  const modal = document.getElementById('my-bookings-modal');
-  modal.classList.remove('hidden');
-  const container = document.getElementById('my-bookings-list');
-  container.innerHTML = '<div class="loading-spinner"></div>';
-  try {
-    const bookings = await getBookings();
-    const userBookings = bookings.filter(b => b.email === currentUser.email && b.date >= new Date().toISOString().split('T')[0]);
-    if (userBookings.length === 0) {
-      container.innerHTML = '<p class="text-gray-500">No upcoming bookings.</p>';
-      return;
-    }
-    container.innerHTML = userBookings.map(b => `
-      <div class="bg-[#1a1a1a] border border-white/5 rounded-xl p-4">
-        <div class="flex justify-between items-start">
-          <div>
-            <p class="font-bold">${escapeHtml(b.service)}</p>
-            <p class="text-sm text-gray-300">${new Date(b.date).toLocaleDateString()} at ${b.time}</p>
-            <p class="text-xs text-gray-400">Price: R${b.price}</p>
-          </div>
-          <button onclick="cancelMyBooking('${b.id}')" class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded-full text-xs font-bold">Cancel</button>
-        </div>
-      </div>
-    `).join('');
-    lucide.createIcons();
-  } catch (err) {
-    console.error(err);
-    container.innerHTML = '<p class="text-red-500">Error loading bookings.</p>';
-  }
-}
-
-function closeMyBookings() {
-  document.getElementById('my-bookings-modal').classList.add('hidden');
-}
-
-window.cancelMyBooking = async function(bookingId) {
-  const booking = (await getBookings()).find(b => b.id === bookingId);
-  if (!booking) return;
-  const now = new Date();
-  const appointmentDateTime = new Date(booking.date + ' ' + booking.time);
-  const diffHours = (appointmentDateTime - now) / (1000 * 60 * 60);
-  let warning = '';
-  if (diffHours <= 5 && diffHours > 0) {
-    warning = '\n\n⚠️ WARNING: Cancelling within 5 hours of your appointment will incur a R20 cancellation fee.';
-  }
-  if (!confirm(`Are you sure you want to cancel this booking?${warning}`)) return;
-  if (diffHours <= 5 && diffHours > 0) {
-    // Record a cancellation fee note in the database or just alert
-    alert('A R20 cancellation fee will be charged. Please contact the barber for payment.');
-  }
-  await deleteBooking(bookingId);
-  closeMyBookings();
-  openMyBookings(); // refresh list
-  // Also refresh time slots if the booking modal is open
-  if (!modal.classList.contains('hidden') && selectedDate && selectedDate.toISOString().split('T')[0] === booking.date) {
-    renderTimeSlots(selectedDate);
-  }
-};
-
 // ========== DATA LAYER ==========
 const TIME_SLOTS = [
   "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
@@ -673,7 +649,6 @@ const TIME_SLOTS = [
   "05:00 PM", "06:00 PM", "07:00 PM", "08:00 PM"
 ];
 
-// Updated surcharge: R20 for 6 PM and later, plus extra R50 for 7 PM and later.
 function getTimeSurcharge(time) {
   let surcharge = 0;
   if (["06:00 PM", "07:00 PM", "08:00 PM"].includes(time)) {
@@ -684,7 +659,6 @@ function getTimeSurcharge(time) {
   }
   return surcharge;
 }
-
 function getFinalPrice(basePrice, time) {
   return basePrice + getTimeSurcharge(time);
 }
@@ -713,6 +687,9 @@ async function saveBooking(booking) {
 async function deleteBooking(bookingId) {
   await db.collection('bookings').doc(bookingId).delete();
 }
+async function updateBooking(bookingId, data) {
+  await db.collection('bookings').doc(bookingId).update(data);
+}
 
 // ========== STATE ==========
 let currentDate = new Date();
@@ -720,6 +697,7 @@ let selectedDate = null;
 let selectedTime = null;
 let selectedService = null;
 let isProcessing = false;
+let rescheduleOldBookingId = null;
 
 // ========== PRE-FILL ==========
 function loadCustomerInfo() {
@@ -889,7 +867,7 @@ async function renderTimeSlots(date) {
   const isToday = dateStr === now.toISOString().split('T')[0];
   
   TIME_SLOTS.forEach(time => {
-    // Check if slot is already in the past for today
+    // Skip past slots for today
     if (isToday) {
       const [hour, minute, period] = time.match(/(\d+):(\d+) (\w+)/).slice(1);
       let hour24 = parseInt(hour);
@@ -897,10 +875,7 @@ async function renderTimeSlots(date) {
       if (period === 'AM' && hour24 === 12) hour24 = 0;
       const slotTime = new Date(now);
       slotTime.setHours(hour24, parseInt(minute), 0, 0);
-      if (slotTime < now) {
-        // Skip past slots (they are no longer available)
-        return;
-      }
+      if (slotTime < now) return;
     }
     
     const btn = document.createElement('button');
@@ -958,7 +933,7 @@ async function isSlotAvailable(date, time) {
   return !closedSlots.includes(time) && !bookedSlots.includes(time);
 }
 
-// ========== PDF GENERATION (unchanged) ==========
+// ========== PDF GENERATION ==========
 function downloadReceipt() {
   if (typeof window.jspdf === 'undefined') {
     alert('PDF library not loaded. Please try again.');
@@ -1011,7 +986,7 @@ async function confirmBooking() {
     return;
   }
 
-  // Final check: is the slot still available?
+  // Final slot availability check
   const stillAvailable = await isSlotAvailable(selectedDate, selectedTime);
   if (!stillAvailable) {
     alert('Sorry, this slot is no longer available. Please choose another time.');
@@ -1041,10 +1016,20 @@ async function confirmBooking() {
       name,
       email,
       phone,
-      bookedAt: new Date().toISOString()
+      bookedAt: new Date().toISOString(),
+      status: 'upcoming',
+      arrivalConfirmed: false,
+      reviewGiven: false
     };
     await saveBooking(booking);
     await saveCustomerInfo();
+
+    // If this was a reschedule, delete the old booking
+    if (rescheduleOldBookingId) {
+      await deleteBooking(rescheduleOldBookingId);
+      rescheduleOldBookingId = null;
+      alert('Original booking cancelled. Reschedule complete.');
+    }
 
     document.getElementById('success-message').innerText = 'Your slot is reserved.';
     const firstDateStr = selectedDate.toLocaleDateString();
@@ -1065,6 +1050,154 @@ async function confirmBooking() {
     confirmBtnText.innerText = 'Confirm Booking';
     confirmSpinner.classList.add('hidden');
   }
+}
+
+// ========== MY BOOKINGS (with Reschedule, Cancel, Review) ==========
+async function openMyBookings() {
+  if (!currentUser) return;
+  const modal = document.getElementById('my-bookings-modal');
+  modal.classList.remove('hidden');
+  const container = document.getElementById('my-bookings-list');
+  container.innerHTML = '<div class="loading-spinner"></div>';
+  try {
+    const bookings = await getBookings();
+    const now = new Date();
+    const userBookings = bookings.filter(b => b.email === currentUser.email).sort((a,b) => a.date.localeCompare(b.date));
+    if (userBookings.length === 0) {
+      container.innerHTML = '<p class="text-gray-500">No bookings found.</p>';
+      return;
+    }
+    container.innerHTML = userBookings.map(b => {
+      const apptDateTime = new Date(b.date + ' ' + b.time);
+      const isPast = apptDateTime < now;
+      const isUpcoming = !isPast;
+      const hoursDiff = (apptDateTime - now) / (1000*60*60);
+      const canReschedule = isUpcoming && hoursDiff >= 5;
+      const canReview = isPast && !b.reviewGiven && b.status === 'completed';
+      
+      return `
+        <div class="bg-[#1a1a1a] border border-white/5 rounded-xl p-4">
+          <div class="flex justify-between items-start">
+            <div>
+              <p class="font-bold">${escapeHtml(b.service)}</p>
+              <p class="text-sm text-gray-300">${new Date(b.date).toLocaleDateString()} at ${b.time}</p>
+              <p class="text-xs text-gray-400">Price: R${b.price}</p>
+              <p class="text-xs text-gray-500 mt-1">Status: ${b.status || 'Upcoming'}</p>
+            </div>
+            <div class="flex gap-2">
+              ${canReschedule ? `<button onclick="rescheduleBooking('${b.id}')" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-full text-xs font-bold">Reschedule</button>` : ''}
+              ${isUpcoming ? `<button onclick="cancelMyBooking('${b.id}')" class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded-full text-xs font-bold">Cancel</button>` : ''}
+              ${canReview ? `<button onclick="openReviewModal('${b.id}')" class="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 rounded-full text-xs font-bold">Rate</button>` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+    lucide.createIcons();
+  } catch (err) {
+    console.error(err);
+    container.innerHTML = '<p class="text-red-500">Error loading bookings.</p>';
+  }
+}
+
+function closeMyBookings() {
+  document.getElementById('my-bookings-modal').classList.add('hidden');
+}
+
+async function rescheduleBooking(bookingId) {
+  const bookings = await getBookings();
+  const booking = bookings.find(b => b.id === bookingId);
+  if (!booking) return;
+  
+  const now = new Date();
+  const appointmentDateTime = new Date(booking.date + ' ' + booking.time);
+  const hoursDiff = (appointmentDateTime - now) / (1000*60*60);
+  if (hoursDiff < 5) {
+    alert('Rescheduling is only allowed at least 5 hours before your appointment.');
+    return;
+  }
+  
+  closeMyBookings();
+  // Prefill the booking modal with the existing service, date, time
+  const serviceName = booking.service;
+  const servicePrice = booking.basePrice || (serviceName.includes('Dye') ? 100 : 80);
+  selectedService = { name: serviceName, price: servicePrice };
+  selectedDate = new Date(booking.date);
+  selectedTime = booking.time;
+  updateSummary();
+  openBooking();
+  goToStep('details');
+  rescheduleOldBookingId = bookingId;
+}
+
+window.cancelMyBooking = async function(bookingId) {
+  const booking = (await getBookings()).find(b => b.id === bookingId);
+  if (!booking) return;
+  const now = new Date();
+  const appointmentDateTime = new Date(booking.date + ' ' + booking.time);
+  const diffHours = (appointmentDateTime - now) / (1000 * 60 * 60);
+  let warning = '';
+  if (diffHours <= 5 && diffHours > 0) {
+    warning = '\n\n⚠️ WARNING: Cancelling within 5 hours of your appointment will incur a R20 cancellation fee.';
+  }
+  if (!confirm(`Are you sure you want to cancel this booking?${warning}`)) return;
+  if (diffHours <= 5 && diffHours > 0) {
+    alert('A R20 cancellation fee will be charged. Please contact the barber for payment.');
+  }
+  await deleteBooking(bookingId);
+  closeMyBookings();
+  openMyBookings(); // refresh
+  if (!modal.classList.contains('hidden') && selectedDate && selectedDate.toISOString().split('T')[0] === booking.date) {
+    renderTimeSlots(selectedDate);
+  }
+};
+
+// ========== REVIEW ==========
+let currentReviewBooking = null;
+
+function openReviewModal(bookingId) {
+  currentReviewBooking = bookingId;
+  document.getElementById('review-modal').classList.remove('hidden');
+  // Reset stars
+  const stars = document.querySelectorAll('#rating-stars i');
+  stars.forEach((star, idx) => {
+    star.classList.remove('filled');
+    star.onclick = () => setRating(idx+1);
+  });
+  document.getElementById('review-comment').value = '';
+}
+
+function setRating(rating) {
+  const stars = document.querySelectorAll('#rating-stars i');
+  stars.forEach((star, idx) => {
+    if (idx < rating) star.classList.add('filled');
+    else star.classList.remove('filled');
+  });
+  window.selectedRating = rating;
+}
+
+async function submitReview() {
+  if (!window.selectedRating) {
+    alert('Please select a rating.');
+    return;
+  }
+  const comment = document.getElementById('review-comment').value.trim();
+  await db.collection('reviews').doc(currentReviewBooking).set({
+    bookingId: currentReviewBooking,
+    rating: window.selectedRating,
+    comment: comment,
+    createdAt: new Date().toISOString()
+  });
+  await updateBooking(currentReviewBooking, { reviewGiven: true });
+  closeReviewModal();
+  alert('Thank you for your review!');
+  openMyBookings(); // refresh list
+}
+
+function closeReviewModal() {
+  document.getElementById('review-modal').classList.add('hidden');
+  currentReviewBooking = null;
+  window.selectedRating = null;
 }
 
 // ========== REAL-TIME UPDATES ==========

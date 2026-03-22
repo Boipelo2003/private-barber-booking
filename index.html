@@ -8,11 +8,11 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<!-- Firebase v9 Compat (global, no modules) -->
+<!-- Firebase v9 compat (global, no modules) -->
 <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 <style>
-/* all styles unchanged – same as before */
+/* all styles unchanged from earlier working version */
 body {
   font-family: 'Inter', sans-serif;
   background-color: #050505;
@@ -128,10 +128,19 @@ body {
   font-size: 0.7rem;
   margin-left: 0.5rem;
 }
+.after-hours-badge {
+  background: #ff450020;
+  border: 1px solid #ff4500;
+  color: #ffb3b3;
+  border-radius: 20px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.7rem;
+  margin-left: 0.5rem;
+}
 </style>
 </head>
 <body class="antialiased min-h-screen flex flex-col">
-<!-- Navigation (unchanged) -->
+<!-- Navigation -->
 <nav class="fixed w-full z-50 glass-panel border-b border-white/5">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="flex items-center justify-between h-20">
@@ -248,11 +257,34 @@ body {
         </div>
       </div>
       <p id="account-message" class="text-red-400 text-xs text-center mt-3 hidden"></p>
+      <!-- New: My Bookings button when logged in -->
+      <div id="my-bookings-button" class="mt-4 hidden">
+        <button onclick="openMyBookings()" class="w-full bg-gray-800 hover:bg-gray-700 text-white font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-2">
+          <i data-lucide="calendar" class="w-4 h-4"></i> My Bookings
+        </button>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- Booking Modal (unchanged) -->
+<!-- My Bookings Modal (new) -->
+<div id="my-bookings-modal" class="fixed inset-0 z-[250] hidden">
+  <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity" onclick="closeMyBookings()"></div>
+  <div class="relative min-h-full flex items-center justify-center p-4">
+    <div class="relative w-full max-w-2xl bg-[#111] border border-white/10 rounded-2xl shadow-2xl p-6 max-h-[80vh] overflow-y-auto">
+      <button onclick="closeMyBookings()" class="absolute top-4 right-4 text-gray-500 hover:text-white">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+      <h2 class="text-2xl font-bold mb-4">My Upcoming Bookings</h2>
+      <div id="my-bookings-list" class="space-y-3">
+        <!-- populated by JS -->
+        <div class="loading-spinner"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Booking Modal (unchanged except surcharge display) -->
 <div id="booking-modal" class="fixed inset-0 z-[100] hidden">
   <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity" onclick="closeBooking()"></div>
   <div class="relative min-h-full flex items-center justify-center p-4">
@@ -358,9 +390,10 @@ body {
             </div>
             <div class="policy-box">
               <p><strong>⏱️ Late Policy</strong> – R10 per every 10 minutes you are late.</p>
-              <p><strong>❌ Cancellation Policy</strong> – If you cancel within 24 hours of your appointment, you will receive <strong>20% off your next cut</strong>.</p>
+              <p><strong>❌ Cancellation Policy</strong> – If you cancel within 5 hours of your appointment, a <strong>R20 cancellation fee</strong> will apply.</p>
               <p><strong>🚫 No‑Show Policy</strong> – Failure to show up without notice may result in a late flag on your account and a reminder for future bookings.</p>
               <p><strong>👤 Single Seat</strong> – Each booking is for one person only. If you wish to book for multiple people, please make separate bookings.</p>
+              <p><strong>🌙 After‑Hours Surcharge</strong> – Appointments after 7:00 PM include an additional <strong>R50</strong>.</p>
               <p class="text-xs text-gray-500 mt-1">By booking, you agree to these terms.</p>
             </div>
             <label class="flex items-center gap-2 text-xs text-gray-400 cursor-pointer mt-4">
@@ -436,11 +469,11 @@ const firebaseConfig = {
   measurementId: "G-KNCJ003KNP"
 };
 
-// Initialize Firebase (using compat version, so firebase.initializeApp works)
+// Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-// ========== DOM ELEMENTS (defined early, before any usage) ==========
+// ========== DOM ELEMENTS ==========
 const modal = document.getElementById('booking-modal');
 const calendarDays = document.getElementById('calendar-days');
 const monthYearLabel = document.getElementById('calendar-month-year');
@@ -492,6 +525,7 @@ async function login() {
       phoneInput.value = user.phone;
     }
     checkLateReminder();
+    document.getElementById('my-bookings-button').classList.remove('hidden');
   } else {
     const msgDiv = document.getElementById('account-message');
     msgDiv.innerText = 'Invalid email or password.';
@@ -525,6 +559,7 @@ async function register() {
     phoneInput.value = phone;
   }
   checkLateReminder();
+  document.getElementById('my-bookings-button').classList.remove('hidden');
 }
 
 function updateAccountUI() {
@@ -536,6 +571,7 @@ function updateAccountUI() {
   } else {
     statusSpan.innerText = 'Sign In';
     statusSpan.onclick = () => openAccountModal();
+    document.getElementById('my-bookings-button').classList.add('hidden');
   }
 }
 
@@ -569,6 +605,67 @@ function checkLateReminder() {
   }
 }
 
+// ========== NEW: My Bookings ==========
+async function openMyBookings() {
+  if (!currentUser) return;
+  const modal = document.getElementById('my-bookings-modal');
+  modal.classList.remove('hidden');
+  const container = document.getElementById('my-bookings-list');
+  container.innerHTML = '<div class="loading-spinner"></div>';
+  try {
+    const bookings = await getBookings();
+    const userBookings = bookings.filter(b => b.email === currentUser.email && b.date >= new Date().toISOString().split('T')[0]);
+    if (userBookings.length === 0) {
+      container.innerHTML = '<p class="text-gray-500">No upcoming bookings.</p>';
+      return;
+    }
+    container.innerHTML = userBookings.map(b => `
+      <div class="bg-[#1a1a1a] border border-white/5 rounded-xl p-4">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="font-bold">${escapeHtml(b.service)}</p>
+            <p class="text-sm text-gray-300">${new Date(b.date).toLocaleDateString()} at ${b.time}</p>
+            <p class="text-xs text-gray-400">Price: R${b.price}</p>
+          </div>
+          <button onclick="cancelMyBooking('${b.id}')" class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded-full text-xs font-bold">Cancel</button>
+        </div>
+      </div>
+    `).join('');
+    lucide.createIcons();
+  } catch (err) {
+    console.error(err);
+    container.innerHTML = '<p class="text-red-500">Error loading bookings.</p>';
+  }
+}
+
+function closeMyBookings() {
+  document.getElementById('my-bookings-modal').classList.add('hidden');
+}
+
+window.cancelMyBooking = async function(bookingId) {
+  const booking = (await getBookings()).find(b => b.id === bookingId);
+  if (!booking) return;
+  const now = new Date();
+  const appointmentDateTime = new Date(booking.date + ' ' + booking.time);
+  const diffHours = (appointmentDateTime - now) / (1000 * 60 * 60);
+  let warning = '';
+  if (diffHours <= 5 && diffHours > 0) {
+    warning = '\n\n⚠️ WARNING: Cancelling within 5 hours of your appointment will incur a R20 cancellation fee.';
+  }
+  if (!confirm(`Are you sure you want to cancel this booking?${warning}`)) return;
+  if (diffHours <= 5 && diffHours > 0) {
+    // Record a cancellation fee note in the database or just alert
+    alert('A R20 cancellation fee will be charged. Please contact the barber for payment.');
+  }
+  await deleteBooking(bookingId);
+  closeMyBookings();
+  openMyBookings(); // refresh list
+  // Also refresh time slots if the booking modal is open
+  if (!modal.classList.contains('hidden') && selectedDate && selectedDate.toISOString().split('T')[0] === booking.date) {
+    renderTimeSlots(selectedDate);
+  }
+};
+
 // ========== DATA LAYER ==========
 const TIME_SLOTS = [
   "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
@@ -576,11 +673,18 @@ const TIME_SLOTS = [
   "05:00 PM", "06:00 PM", "07:00 PM", "08:00 PM"
 ];
 
+// Updated surcharge: R20 for 6 PM and later, plus extra R50 for 7 PM and later.
 function getTimeSurcharge(time) {
-  const hourMap = { "06:00 PM": 18, "07:00 PM": 19, "08:00 PM": 20 };
-  if (hourMap[time] && hourMap[time] >= 18) return 20;
-  return 0;
+  let surcharge = 0;
+  if (["06:00 PM", "07:00 PM", "08:00 PM"].includes(time)) {
+    surcharge += 20;
+  }
+  if (["07:00 PM", "08:00 PM"].includes(time)) {
+    surcharge += 50;
+  }
+  return surcharge;
 }
+
 function getFinalPrice(basePrice, time) {
   return basePrice + getTimeSurcharge(time);
 }
@@ -605,6 +709,9 @@ async function getBookings() {
 }
 async function saveBooking(booking) {
   await db.collection('bookings').doc(booking.id).set(booking);
+}
+async function deleteBooking(bookingId) {
+  await db.collection('bookings').doc(bookingId).delete();
 }
 
 // ========== STATE ==========
@@ -778,12 +885,32 @@ async function renderTimeSlots(date) {
   const dateStr = date.toISOString().split('T')[0];
   const closedSlots = (await getClosedSlots()).filter(slot => slot.date === dateStr).map(slot => slot.time);
   const bookedSlots = (await getBookings()).filter(b => b.date === dateStr).map(b => b.time);
+  const now = new Date();
+  const isToday = dateStr === now.toISOString().split('T')[0];
   
   TIME_SLOTS.forEach(time => {
+    // Check if slot is already in the past for today
+    if (isToday) {
+      const [hour, minute, period] = time.match(/(\d+):(\d+) (\w+)/).slice(1);
+      let hour24 = parseInt(hour);
+      if (period === 'PM' && hour24 !== 12) hour24 += 12;
+      if (period === 'AM' && hour24 === 12) hour24 = 0;
+      const slotTime = new Date(now);
+      slotTime.setHours(hour24, parseInt(minute), 0, 0);
+      if (slotTime < now) {
+        // Skip past slots (they are no longer available)
+        return;
+      }
+    }
+    
     const btn = document.createElement('button');
     const surcharge = getTimeSurcharge(time);
     const isEvening = surcharge > 0;
-    btn.innerHTML = `<div class="flex items-center justify-between w-full">${time}${isEvening ? '<span class="evening-badge">+R20</span>' : ''}</div>`;
+    const afterHours = surcharge >= 50;
+    let badgeHtml = '';
+    if (afterHours) badgeHtml = '<span class="after-hours-badge">+R70</span>';
+    else if (isEvening) badgeHtml = '<span class="evening-badge">+R20</span>';
+    btn.innerHTML = `<div class="flex items-center justify-between w-full">${time}${badgeHtml}</div>`;
     btn.classList.add('time-slot-btn', 'p-4', 'border', 'border-white/10', 'rounded-lg', 'hover:bg-white', 'hover:text-black', 'transition-all', 'text-sm', 'font-medium');
     if (closedSlots.includes(time) || bookedSlots.includes(time)) {
       btn.classList.add('closed', 'opacity-30', 'pointer-events-none');
@@ -831,7 +958,7 @@ async function isSlotAvailable(date, time) {
   return !closedSlots.includes(time) && !bookedSlots.includes(time);
 }
 
-// ========== PDF GENERATION ==========
+// ========== PDF GENERATION (unchanged) ==========
 function downloadReceipt() {
   if (typeof window.jspdf === 'undefined') {
     alert('PDF library not loaded. Please try again.');
@@ -859,13 +986,13 @@ function downloadReceipt() {
   doc.text(`Appointment: ${dateStr} at ${timeStr}`, 20, 65);
   doc.text(`Price: ${price}`, 20, 70);
   if (selectedTime && getTimeSurcharge(selectedTime) > 0) {
-    doc.text(`(Includes R20 evening surcharge)`, 20, 75);
+    doc.text(`(Includes evening/after‑hours surcharge)`, 20, 75);
   }
   doc.setFontSize(10);
   doc.setTextColor(100);
   doc.text('Policies:', 20, 90);
   doc.text('• Late fee: R10 per 10 minutes late.', 20, 95);
-  doc.text('• Cancellation within 24h: 20% off next cut.', 20, 100);
+  doc.text('• Cancellation within 5h: R20 fee.', 20, 100);
   doc.text('• No‑show may result in a late flag on your account.', 20, 105);
   doc.text('• Each booking is for one person only.', 20, 110);
   doc.text('Thank you for choosing Private Barber.', 20, 125);

@@ -7,7 +7,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/lucide@latest"></script>
-<!-- Firebase SDK (v8) -->
+<!-- Firebase v8 (global, non‑module) -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 <style>
@@ -36,6 +36,19 @@ body {
 }
 .user-card { transition: all 0.2s; }
 .user-card:hover { background: rgba(255,255,255,0.05); }
+.loading-spinner {
+  border: 2px solid rgba(255,255,255,0.2);
+  border-top: 2px solid #fff;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  animation: spin 0.8s linear infinite;
+  margin: 20px auto;
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
 </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
@@ -87,7 +100,9 @@ body {
           <button id="close-all-btn" onclick="closeAllSlots()" class="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 px-4 rounded-lg transition-colors">Close All Available</button>
           <button id="open-all-btn" onclick="openAllSlots()" class="flex-1 bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 px-4 rounded-lg transition-colors">Open All Closed</button>
         </div>
-        <div id="admin-slots-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 min-h-[200px]"></div>
+        <div id="admin-slots-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 min-h-[200px]">
+          <div class="loading-spinner"></div>
+        </div>
         <p id="no-slots-message" class="text-sm text-gray-500 mt-4 hidden">Select a date to manage slots.</p>
       </div>
 
@@ -95,16 +110,20 @@ body {
       <div class="glass-panel rounded-2xl p-6">
         <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><i data-lucide="calendar-check" class="w-5 h-5"></i> Upcoming Bookings</h2>
         <p class="text-sm text-gray-400 mb-6">Click the ✕ to cancel a booking.</p>
-        <div id="bookings-list" class="space-y-3 max-h-[500px] overflow-y-auto pr-2"></div>
-        <p id="no-bookings" class="text-sm text-gray-500 mt-4">No bookings yet.</p>
+        <div id="bookings-list" class="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+          <div class="loading-spinner"></div>
+        </div>
+        <p id="no-bookings" class="text-sm text-gray-500 mt-4 hidden">No bookings yet.</p>
       </div>
 
       <!-- RIGHT: Registered Users -->
       <div class="glass-panel rounded-2xl p-6">
         <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><i data-lucide="users" class="w-5 h-5"></i> Registered Users</h2>
         <p class="text-sm text-gray-400 mb-6">Toggle "Late" flag to remind user on next booking.</p>
-        <div id="users-list" class="space-y-3 max-h-[500px] overflow-y-auto pr-2"></div>
-        <p id="no-users" class="text-sm text-gray-500 mt-4">No registered users yet.</p>
+        <div id="users-list" class="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+          <div class="loading-spinner"></div>
+        </div>
+        <p id="no-users" class="text-sm text-gray-500 mt-4 hidden">No registered users yet.</p>
       </div>
     </div>
 
@@ -126,8 +145,15 @@ const firebaseConfig = {
   measurementId: "G-KNCJ003KNP"
 };
 
+// Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+
+// Test Firestore connection (optional)
+db.collection('test').limit(1).get().catch(err => {
+  console.warn('Firestore connection test failed:', err);
+  // Display a friendly message in the admin panel if needed
+});
 
 // ========== PASSWORD ==========
 const CORRECT_PASSWORD = "voka2026";
@@ -144,11 +170,17 @@ function checkPassword() {
     document.getElementById('admin-panel').classList.remove('hidden');
     lucide.createIcons();
 
+    // Show loading spinners
+    document.getElementById('admin-slots-container').innerHTML = '<div class="loading-spinner"></div>';
+    document.getElementById('bookings-list').innerHTML = '<div class="loading-spinner"></div>';
+    document.getElementById('users-list').innerHTML = '<div class="loading-spinner"></div>';
+
+    // Load data
     renderSlotManager();
     renderBookings();
     renderUsers();
 
-    // Real‑time listeners
+    // Set up real‑time listeners
     if (unsubBookings) unsubBookings();
     if (unsubClosedSlots) unsubClosedSlots();
     if (unsubUsers) unsubUsers();
@@ -156,9 +188,16 @@ function checkPassword() {
     unsubBookings = db.collection('bookings').onSnapshot(() => {
       renderBookings();
       renderSlotManager();
+    }, (err) => {
+      console.error('Bookings listener error:', err);
+      alert('Error listening to bookings: ' + err.message);
     });
-    unsubClosedSlots = db.collection('closedSlots').onSnapshot(() => renderSlotManager());
-    unsubUsers = db.collection('users').onSnapshot(() => renderUsers());
+    unsubClosedSlots = db.collection('closedSlots').onSnapshot(() => renderSlotManager(), (err) => {
+      console.error('ClosedSlots listener error:', err);
+    });
+    unsubUsers = db.collection('users').onSnapshot(() => renderUsers(), (err) => {
+      console.error('Users listener error:', err);
+    });
   } else {
     error.classList.remove('hidden');
   }
@@ -243,28 +282,33 @@ async function renderSlotManager() {
   }
   noSlotsMsg.classList.add('hidden');
 
-  const closedSlots = (await getClosedSlots()).filter(s => s.date === date).map(s => s.time);
-  const bookingsOnDate = (await getBookings()).filter(b => b.date === date).map(b => b.time);
+  try {
+    const closedSlots = (await getClosedSlots()).filter(s => s.date === date).map(s => s.time);
+    const bookingsOnDate = (await getBookings()).filter(b => b.date === date).map(b => b.time);
 
-  slotsContainer.innerHTML = '';
-  TIME_SLOTS.forEach(time => {
-    const isClosed = closedSlots.includes(time);
-    const isBooked = bookingsOnDate.includes(time);
-    const evening = isEvening(time);
-    
-    const btn = document.createElement('button');
-    btn.className = `slot-btn p-4 rounded-lg border text-left transition-all ${isClosed ? 'closed bg-[#2d2d2d] text-gray-400' : 'open bg-[#1a1a1a] hover:bg-[#252525]'}`;
-    btn.innerHTML = `
-      <div class="font-medium flex items-center justify-between">
-        ${time}
-        ${evening ? '<span class="evening-badge">+R20</span>' : ''}
-      </div>
-      <div class="text-xs mt-1 ${isClosed ? 'text-gray-500' : 'text-gray-400'}">${isClosed ? '🔴 Closed' : '🟢 Open'}</div>
-      ${isBooked ? '<div class="text-xs text-yellow-500 mt-1">⚠️ Has booking</div>' : ''}
-    `;
-    btn.onclick = () => toggleSlot(date, time, isClosed, isBooked);
-    slotsContainer.appendChild(btn);
-  });
+    slotsContainer.innerHTML = '';
+    TIME_SLOTS.forEach(time => {
+      const isClosed = closedSlots.includes(time);
+      const isBooked = bookingsOnDate.includes(time);
+      const evening = isEvening(time);
+      
+      const btn = document.createElement('button');
+      btn.className = `slot-btn p-4 rounded-lg border text-left transition-all ${isClosed ? 'closed bg-[#2d2d2d] text-gray-400' : 'open bg-[#1a1a1a] hover:bg-[#252525]'}`;
+      btn.innerHTML = `
+        <div class="font-medium flex items-center justify-between">
+          ${time}
+          ${evening ? '<span class="evening-badge">+R20</span>' : ''}
+        </div>
+        <div class="text-xs mt-1 ${isClosed ? 'text-gray-500' : 'text-gray-400'}">${isClosed ? '🔴 Closed' : '🟢 Open'}</div>
+        ${isBooked ? '<div class="text-xs text-yellow-500 mt-1">⚠️ Has booking</div>' : ''}
+      `;
+      btn.onclick = () => toggleSlot(date, time, isClosed, isBooked);
+      slotsContainer.appendChild(btn);
+    });
+  } catch (err) {
+    console.error('Error rendering slots:', err);
+    slotsContainer.innerHTML = '<div class="text-red-500 col-span-full text-center">Error loading slots. Check console.</div>';
+  }
 }
 
 async function toggleSlot(date, time, currentlyClosed, hasBooking) {
@@ -308,6 +352,9 @@ async function closeAllSlots() {
     await setClosedSlots(newClosed);
     await renderSlotManager();
     alert('All available slots closed.');
+  } catch (err) {
+    console.error(err);
+    alert('Error closing slots. Check console.');
   } finally {
     processing = false;
     closeBtn.classList.remove('btn-disabled');
@@ -333,6 +380,9 @@ async function openAllSlots() {
     await setClosedSlots(newClosed);
     await renderSlotManager();
     alert('All closed slots opened.');
+  } catch (err) {
+    console.error(err);
+    alert('Error opening slots. Check console.');
   } finally {
     processing = false;
     closeBtn.classList.remove('btn-disabled');
@@ -342,71 +392,86 @@ async function openAllSlots() {
 
 // ========== BOOKINGS ==========
 async function renderBookings() {
-  let bookings = (await getBookings()).sort((a, b) => {
-    if (a.date !== b.date) return a.date.localeCompare(b.date);
-    return a.time.localeCompare(b.time);
-  });
-  if (bookings.length === 0) {
-    bookingsList.innerHTML = '';
-    noBookingsMsg.classList.remove('hidden');
-    return;
-  }
-  noBookingsMsg.classList.add('hidden');
-  bookingsList.innerHTML = bookings.map(b => `
-    <div class="bg-[#1a1a1a] border border-white/5 rounded-xl p-4 relative group">
-      <div class="flex justify-between items-start">
-        <div>
-          <h3 class="font-bold">${escapeHtml(b.service)}</h3>
-          <p class="text-sm text-gray-300">${escapeHtml(b.name)} · ${escapeHtml(b.phone)}</p>
-          <p class="text-xs text-gray-500">${escapeHtml(b.email)}</p>
+  try {
+    let bookings = (await getBookings()).sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      return a.time.localeCompare(b.time);
+    });
+    if (bookings.length === 0) {
+      bookingsList.innerHTML = '';
+      noBookingsMsg.classList.remove('hidden');
+      return;
+    }
+    noBookingsMsg.classList.add('hidden');
+    bookingsList.innerHTML = bookings.map(b => `
+      <div class="bg-[#1a1a1a] border border-white/5 rounded-xl p-4 relative group">
+        <div class="flex justify-between items-start">
+          <div>
+            <h3 class="font-bold">${escapeHtml(b.service)}</h3>
+            <p class="text-sm text-gray-300">${escapeHtml(b.name)} · ${escapeHtml(b.phone)}</p>
+            <p class="text-xs text-gray-500">${escapeHtml(b.email)}</p>
+          </div>
+          <div class="text-right">
+            <div class="text-sm font-medium">${new Date(b.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+            <div class="text-sm text-gray-400">${b.time}</div>
+            <div class="text-xs text-gray-500 mt-1">R${b.price}</div>
+          </div>
         </div>
-        <div class="text-right">
-          <div class="text-sm font-medium">${new Date(b.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
-          <div class="text-sm text-gray-400">${b.time}</div>
-          <div class="text-xs text-gray-500 mt-1">R${b.price}</div>
-        </div>
+        <button onclick="cancelBooking('${b.id}')" class="cancel-btn absolute top-2 right-2 text-red-400 hover:text-red-300 transition-colors" title="Cancel booking">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
       </div>
-      <button onclick="cancelBooking('${b.id}')" class="cancel-btn absolute top-2 right-2 text-red-400 hover:text-red-300 transition-colors" title="Cancel booking">
-        <i data-lucide="x" class="w-5 h-5"></i>
-      </button>
-    </div>
-  `).join('');
-  lucide.createIcons();
+    `).join('');
+    lucide.createIcons();
+  } catch (err) {
+    console.error('Error rendering bookings:', err);
+    bookingsList.innerHTML = '<div class="text-red-500">Error loading bookings.</div>';
+  }
 }
 
 window.cancelBooking = async function(bookingId) {
   if (!confirm('Cancel this booking? This cannot be undone.')) return;
-  await deleteBooking(bookingId);
-  await renderBookings();
-  await renderSlotManager();
+  try {
+    await deleteBooking(bookingId);
+    await renderBookings();
+    await renderSlotManager();
+  } catch (err) {
+    console.error(err);
+    alert('Error cancelling booking. Check console.');
+  }
 };
 
 // ========== USERS ==========
 async function renderUsers() {
-  const users = await getUsers();
-  if (users.length === 0) {
-    usersList.innerHTML = '';
-    noUsersMsg.classList.remove('hidden');
-    return;
-  }
-  noUsersMsg.classList.add('hidden');
-  usersList.innerHTML = users.map(user => `
-    <div class="bg-[#1a1a1a] border border-white/5 rounded-xl p-4 user-card">
-      <div class="flex justify-between items-start">
-        <div>
-          <p class="font-bold">${escapeHtml(user.name)}</p>
-          <p class="text-sm text-gray-300">${escapeHtml(user.email)}</p>
-          <p class="text-xs text-gray-400">${escapeHtml(user.phone)}</p>
-        </div>
-        <div class="flex flex-col items-end">
-          <button onclick="toggleLateFlag('${user.email}')" class="text-xs px-3 py-1 rounded-full ${user.late ? 'bg-yellow-600 text-white' : 'bg-gray-700 text-gray-300'} hover:bg-yellow-500 transition-colors">
-            ${user.late ? '⚠️ Late' : '✓ On Time'}
-          </button>
+  try {
+    const users = await getUsers();
+    if (users.length === 0) {
+      usersList.innerHTML = '';
+      noUsersMsg.classList.remove('hidden');
+      return;
+    }
+    noUsersMsg.classList.add('hidden');
+    usersList.innerHTML = users.map(user => `
+      <div class="bg-[#1a1a1a] border border-white/5 rounded-xl p-4 user-card">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="font-bold">${escapeHtml(user.name)}</p>
+            <p class="text-sm text-gray-300">${escapeHtml(user.email)}</p>
+            <p class="text-xs text-gray-400">${escapeHtml(user.phone)}</p>
+          </div>
+          <div class="flex flex-col items-end">
+            <button onclick="toggleLateFlag('${user.email}')" class="text-xs px-3 py-1 rounded-full ${user.late ? 'bg-yellow-600 text-white' : 'bg-gray-700 text-gray-300'} hover:bg-yellow-500 transition-colors">
+              ${user.late ? '⚠️ Late' : '✓ On Time'}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  `).join('');
-  lucide.createIcons();
+    `).join('');
+    lucide.createIcons();
+  } catch (err) {
+    console.error('Error rendering users:', err);
+    usersList.innerHTML = '<div class="text-red-500">Error loading users.</div>';
+  }
 }
 
 function escapeHtml(str) {
@@ -420,11 +485,16 @@ function escapeHtml(str) {
 }
 
 window.toggleLateFlag = async function(userEmail) {
-  const users = await getUsers();
-  const user = users.find(u => u.email === userEmail);
-  if (user) {
-    await updateUserLate(userEmail, !user.late);
-    await renderUsers();
+  try {
+    const users = await getUsers();
+    const user = users.find(u => u.email === userEmail);
+    if (user) {
+      await updateUserLate(userEmail, !user.late);
+      await renderUsers();
+    }
+  } catch (err) {
+    console.error(err);
+    alert('Error toggling late flag. Check console.');
   }
 };
 </script>

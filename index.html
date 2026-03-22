@@ -8,11 +8,11 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<!-- Firebase SDKs -->
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js"></script>
+<!-- Firebase SDK (v8 – global, non‑module) -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 <style>
-/* all styles unchanged */
+/* (all styles unchanged – copy from your previous working version) */
 body {
   font-family: 'Inter', sans-serif;
   background-color: #050505;
@@ -425,7 +425,7 @@ body {
 <script>
 lucide.createIcons();
 
-// ========== FIREBASE CONFIGURATION (YOUR CONFIG) ==========
+// ========== FIREBASE CONFIGURATION ==========
 const firebaseConfig = {
   apiKey: "AIzaSyB05r9ei92egPbcnbFKQNK0mso25DHcBss",
   authDomain: "private-barber-booking-67cde.firebaseapp.com",
@@ -440,7 +440,28 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-// ========== USER ACCOUNT SYSTEM (Firestore) ==========
+// ========== DOM ELEMENTS (moved up to avoid undefined errors) ==========
+const modal = document.getElementById('booking-modal');
+const calendarDays = document.getElementById('calendar-days');
+const monthYearLabel = document.getElementById('calendar-month-year');
+const timeSlotsContainer = document.getElementById('time-slots-container');
+const summaryService = document.getElementById('summary-service');
+const summaryDate = document.getElementById('summary-date');
+const summaryTime = document.getElementById('summary-time');
+const summaryServicePrice = document.getElementById('summary-service-price');
+const nameInput = document.getElementById('customer-name');
+const emailInput = document.getElementById('customer-email');
+const phoneInput = document.getElementById('customer-phone');
+const agreeCheck = document.getElementById('agree-policy');
+const nameError = document.getElementById('name-error');
+const emailError = document.getElementById('email-error');
+const phoneError = document.getElementById('phone-error');
+const confirmBtn = document.getElementById('confirm-btn');
+const confirmBtnText = document.getElementById('confirm-btn-text');
+const confirmSpinner = document.getElementById('confirm-spinner');
+const whatsappLink = document.getElementById('whatsapp-link');
+
+// ========== USER ACCOUNT SYSTEM ==========
 let currentUser = null;
 
 async function getUsers() {
@@ -465,10 +486,10 @@ async function login() {
     currentUser = user;
     closeAccountModal();
     updateAccountUI();
-    if (!document.getElementById('booking-modal').classList.contains('hidden')) {
-      document.getElementById('customer-name').value = user.name;
-      document.getElementById('customer-email').value = user.email;
-      document.getElementById('customer-phone').value = user.phone;
+    if (!modal.classList.contains('hidden')) {
+      nameInput.value = user.name;
+      emailInput.value = user.email;
+      phoneInput.value = user.phone;
     }
     checkLateReminder();
   } else {
@@ -498,10 +519,10 @@ async function register() {
   currentUser = newUser;
   closeAccountModal();
   updateAccountUI();
-  if (!document.getElementById('booking-modal').classList.contains('hidden')) {
-    document.getElementById('customer-name').value = name;
-    document.getElementById('customer-email').value = email;
-    document.getElementById('customer-phone').value = phone;
+  if (!modal.classList.contains('hidden')) {
+    nameInput.value = name;
+    emailInput.value = email;
+    phoneInput.value = phone;
   }
   checkLateReminder();
 }
@@ -592,27 +613,6 @@ let selectedDate = null;
 let selectedTime = null;
 let selectedService = null;
 let isProcessing = false;
-
-// DOM elements
-const modal = document.getElementById('booking-modal');
-const calendarDays = document.getElementById('calendar-days');
-const monthYearLabel = document.getElementById('calendar-month-year');
-const timeSlotsContainer = document.getElementById('time-slots-container');
-const summaryService = document.getElementById('summary-service');
-const summaryDate = document.getElementById('summary-date');
-const summaryTime = document.getElementById('summary-time');
-const summaryServicePrice = document.getElementById('summary-service-price');
-const nameInput = document.getElementById('customer-name');
-const emailInput = document.getElementById('customer-email');
-const phoneInput = document.getElementById('customer-phone');
-const agreeCheck = document.getElementById('agree-policy');
-const nameError = document.getElementById('name-error');
-const emailError = document.getElementById('email-error');
-const phoneError = document.getElementById('phone-error');
-const confirmBtn = document.getElementById('confirm-btn');
-const confirmBtnText = document.getElementById('confirm-btn-text');
-const confirmSpinner = document.getElementById('confirm-spinner');
-const whatsappLink = document.getElementById('whatsapp-link');
 
 // ========== PRE-FILL ==========
 function loadCustomerInfo() {
@@ -883,18 +883,26 @@ async function confirmBooking() {
     alert('Please complete all selection steps before confirming.');
     return;
   }
-  
+
+  // Final check: is the slot still available?
+  const stillAvailable = await isSlotAvailable(selectedDate, selectedTime);
+  if (!stillAvailable) {
+    alert('Sorry, this slot is no longer available. Please choose another time.');
+    renderTimeSlots(selectedDate);
+    return;
+  }
+
   isProcessing = true;
   confirmBtn.disabled = true;
   confirmBtnText.innerText = 'Processing...';
   confirmSpinner.classList.remove('hidden');
-  
+
   try {
     const name = nameInput.value.trim();
     const email = emailInput.value.trim();
     const phone = phoneInput.value.trim();
     const finalPrice = getFinalPrice(selectedService.price, selectedTime);
-    
+
     const booking = {
       id: Date.now() + '-' + Math.random().toString(36).substr(2, 8),
       date: selectedDate.toISOString().split('T')[0],
@@ -910,16 +918,16 @@ async function confirmBooking() {
     };
     await saveBooking(booking);
     await saveCustomerInfo();
-    
+
     document.getElementById('success-message').innerText = 'Your slot is reserved.';
     const firstDateStr = selectedDate.toLocaleDateString();
     document.getElementById('success-details').innerHTML = `${selectedService.name}<br>${firstDateStr} at ${selectedTime}<br>Total: R${finalPrice}`;
-    
+
     const barberPhone = "27768502521";
     const message = `New booking: ${selectedService.name} on ${selectedDate.toLocaleDateString()} at ${selectedTime}. Client: ${name} (${phone}) - Total: R${finalPrice}`;
     const whatsappUrl = `https://wa.me/${barberPhone}?text=${encodeURIComponent(message)}`;
     whatsappLink.href = whatsappUrl;
-    
+
     goToStep('success');
   } catch (err) {
     console.error(err);

@@ -7,6 +7,9 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/lucide@latest"></script>
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js"></script>
 <style>
 body {
   font-family: 'Inter', sans-serif;
@@ -18,23 +21,10 @@ body {
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
-.hidden {
-  display: none !important;
-}
-.slot-btn.closed {
-  background-color: #2d2d2d;
-  color: #888;
-  border-color: #444;
-}
-.slot-btn.open {
-  background-color: #1a1a1a;
-  border-color: #333;
-}
-.btn-disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  pointer-events: none;
-}
+.hidden { display: none !important; }
+.slot-btn.closed { background-color: #2d2d2d; color: #888; border-color: #444; }
+.slot-btn.open { background-color: #1a1a1a; border-color: #333; }
+.btn-disabled { opacity: 0.6; cursor: not-allowed; pointer-events: none; }
 .evening-badge {
   background: #ff6b6b20;
   border: 1px solid #ff6b6b;
@@ -44,12 +34,8 @@ body {
   font-size: 0.7rem;
   margin-left: 0.5rem;
 }
-.user-card {
-  transition: all 0.2s;
-}
-.user-card:hover {
-  background: rgba(255,255,255,0.05);
-}
+.user-card { transition: all 0.2s; }
+.user-card:hover { background: rgba(255,255,255,0.05); }
 </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
@@ -66,18 +52,15 @@ body {
       <label class="block text-sm text-gray-400 mb-1">Password</label>
       <input type="password" id="admin-password" placeholder="••••••••" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
     </div>
-    <button onclick="checkPassword()" class="w-full bg-white text-black hover:bg-gray-200 font-bold py-3 rounded-lg transition-colors">
-      Login
-    </button>
+    <button onclick="checkPassword()" class="w-full bg-white text-black hover:bg-gray-200 font-bold py-3 rounded-lg transition-colors">Login</button>
     <p id="login-error" class="text-red-500 text-sm text-center hidden">Incorrect password</p>
   </div>
   <p class="text-xs text-gray-600 text-center mt-6">(Password: voka2026)</p>
 </div>
 
-<!-- Admin Panel (hidden until login) -->
+<!-- Admin Panel -->
 <div id="admin-panel" class="hidden w-full">
   <div class="max-w-7xl mx-auto">
-    <!-- Header with logout -->
     <div class="flex items-center justify-between mb-8">
       <div class="flex items-center gap-3">
         <img src="https://image.qwenlm.ai/public_source/8b83e0df-dcfb-4b73-8354-600aa9e2a523/1beedd3c3-727f-4ecf-9df2-28663b4efe0b.png" alt="Logo" class="h-12 w-12 rounded-full border border-white/20">
@@ -91,7 +74,6 @@ body {
       </div>
     </div>
 
-    <!-- Three Column Layout (now with Users) -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <!-- LEFT: Manage Slots -->
       <div class="glass-panel rounded-2xl p-6">
@@ -133,6 +115,20 @@ body {
 <script>
 lucide.createIcons();
 
+// ========== FIREBASE CONFIGURATION (YOUR CONFIG) ==========
+const firebaseConfig = {
+  apiKey: "AIzaSyB05r9ei92egPbcnbFKQNK0mso25DHcBss",
+  authDomain: "private-barber-booking-67cde.firebaseapp.com",
+  projectId: "private-barber-booking-67cde",
+  storageBucket: "private-barber-booking-67cde.firebasestorage.app",
+  messagingSenderId: "889141435520",
+  appId: "1:889141435520:web:bf645a2b8584b853225a65",
+  measurementId: "G-KNCJ003KNP"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
 // ========== PASSWORD ==========
 const CORRECT_PASSWORD = "voka2026";
 
@@ -146,6 +142,10 @@ function checkPassword() {
     renderSlotManager();
     renderBookings();
     renderUsers();
+    // Real-time listeners
+    db.collection('bookings').onSnapshot(() => { renderBookings(); renderSlotManager(); });
+    db.collection('closedSlots').onSnapshot(() => renderSlotManager());
+    db.collection('users').onSnapshot(() => renderUsers());
   } else {
     error.classList.remove('hidden');
   }
@@ -165,36 +165,33 @@ const TIME_SLOTS = [
   "05:00 PM", "06:00 PM", "07:00 PM", "08:00 PM"
 ];
 
-function getClosedSlots() {
-  return JSON.parse(localStorage.getItem('barberClosedSlots') || '[]');
+async function getClosedSlots() {
+  const snapshot = await db.collection('closedSlots').get();
+  return snapshot.docs.map(doc => doc.data());
 }
-function setClosedSlots(slots) {
-  localStorage.setItem('barberClosedSlots', JSON.stringify(slots));
-}
-function getBookings() {
-  return JSON.parse(localStorage.getItem('barberBookings') || '[]');
-}
-function setBookings(bookings) {
-  localStorage.setItem('barberBookings', JSON.stringify(bookings));
-}
-function getUsers() {
-  return JSON.parse(localStorage.getItem('barberUsers') || '[]');
-}
-function saveUsers(users) {
-  localStorage.setItem('barberUsers', JSON.stringify(users));
-}
-
-function ensureBookingIds() {
-  let bookings = getBookings();
-  let changed = false;
-  bookings = bookings.map(booking => {
-    if (!booking.id) {
-      booking.id = Date.now() + '-' + Math.random().toString(36).substr(2, 8);
-      changed = true;
-    }
-    return booking;
+async function setClosedSlots(slots) {
+  const batch = db.batch();
+  const existing = await db.collection('closedSlots').get();
+  existing.forEach(doc => batch.delete(doc.ref));
+  slots.forEach(slot => {
+    const docRef = db.collection('closedSlots').doc();
+    batch.set(docRef, slot);
   });
-  if (changed) setBookings(bookings);
+  await batch.commit();
+}
+async function getBookings() {
+  const snapshot = await db.collection('bookings').get();
+  return snapshot.docs.map(doc => doc.data());
+}
+async function deleteBooking(bookingId) {
+  await db.collection('bookings').doc(bookingId).delete();
+}
+async function getUsers() {
+  const snapshot = await db.collection('users').get();
+  return snapshot.docs.map(doc => doc.data());
+}
+async function updateUserLate(email, late) {
+  await db.collection('users').doc(email).update({ late });
 }
 
 // ========== DOM ELEMENTS ==========
@@ -218,7 +215,7 @@ function isEvening(time) {
 }
 
 // ========== SLOT MANAGEMENT ==========
-function renderSlotManager() {
+async function renderSlotManager() {
   if (!dateInput) return;
   const date = dateInput.value;
   if (!date) {
@@ -228,8 +225,8 @@ function renderSlotManager() {
   }
   noSlotsMsg.classList.add('hidden');
 
-  const closedSlots = getClosedSlots().filter(s => s.date === date).map(s => s.time);
-  const bookingsOnDate = getBookings().filter(b => b.date === date).map(b => b.time);
+  const closedSlots = (await getClosedSlots()).filter(s => s.date === date).map(s => s.time);
+  const bookingsOnDate = (await getBookings()).filter(b => b.date === date).map(b => b.time);
 
   slotsContainer.innerHTML = '';
   TIME_SLOTS.forEach(time => {
@@ -252,19 +249,19 @@ function renderSlotManager() {
   });
 }
 
-function toggleSlot(date, time, currentlyClosed, hasBooking) {
+async function toggleSlot(date, time, currentlyClosed, hasBooking) {
   if (hasBooking) {
     alert('Cannot close this slot – there is a booking already.');
     return;
   }
-  let closedSlots = getClosedSlots();
+  let closedSlots = await getClosedSlots();
   if (currentlyClosed) {
     closedSlots = closedSlots.filter(s => !(s.date === date && s.time === time));
   } else {
     closedSlots.push({ date, time });
   }
-  setClosedSlots(closedSlots);
-  renderSlotManager();
+  await setClosedSlots(closedSlots);
+  await renderSlotManager();
 }
 
 let processing = false;
@@ -282,16 +279,16 @@ async function closeAllSlots() {
   openBtn.classList.add('btn-disabled');
 
   try {
-    const closedSlots = getClosedSlots();
-    const bookingsOnDate = getBookings().filter(b => b.date === date).map(b => b.time);
+    const closedSlots = await getClosedSlots();
+    const bookingsOnDate = (await getBookings()).filter(b => b.date === date).map(b => b.time);
     const newClosed = [...closedSlots];
     TIME_SLOTS.forEach(time => {
       if (closedSlots.some(s => s.date === date && s.time === time)) return;
       if (bookingsOnDate.includes(time)) return;
       newClosed.push({ date, time });
     });
-    setClosedSlots(newClosed);
-    renderSlotManager();
+    await setClosedSlots(newClosed);
+    await renderSlotManager();
     alert('All available slots closed.');
   } finally {
     processing = false;
@@ -313,10 +310,10 @@ async function openAllSlots() {
   openBtn.classList.add('btn-disabled');
 
   try {
-    const closedSlots = getClosedSlots();
+    const closedSlots = await getClosedSlots();
     const newClosed = closedSlots.filter(s => s.date !== date);
-    setClosedSlots(newClosed);
-    renderSlotManager();
+    await setClosedSlots(newClosed);
+    await renderSlotManager();
     alert('All closed slots opened.');
   } finally {
     processing = false;
@@ -326,9 +323,8 @@ async function openAllSlots() {
 }
 
 // ========== BOOKINGS ==========
-function renderBookings() {
-  ensureBookingIds();
-  let bookings = getBookings().sort((a, b) => {
+async function renderBookings() {
+  let bookings = (await getBookings()).sort((a, b) => {
     if (a.date !== b.date) return a.date.localeCompare(b.date);
     return a.time.localeCompare(b.time);
   });
@@ -339,12 +335,12 @@ function renderBookings() {
   }
   noBookingsMsg.classList.add('hidden');
   bookingsList.innerHTML = bookings.map(b => `
-    <div class="bg-[#1a1a1a] border border-white/5 rounded-xl p-4 relative group" data-id="${b.id}">
+    <div class="bg-[#1a1a1a] border border-white/5 rounded-xl p-4 relative group">
       <div class="flex justify-between items-start">
         <div>
-          <h3 class="font-bold">${b.service}</h3>
-          <p class="text-sm text-gray-300">${b.name} · ${b.phone}</p>
-          <p class="text-xs text-gray-500">${b.email}</p>
+          <h3 class="font-bold">${escapeHtml(b.service)}</h3>
+          <p class="text-sm text-gray-300">${escapeHtml(b.name)} · ${escapeHtml(b.phone)}</p>
+          <p class="text-xs text-gray-500">${escapeHtml(b.email)}</p>
         </div>
         <div class="text-right">
           <div class="text-sm font-medium">${new Date(b.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
@@ -360,18 +356,16 @@ function renderBookings() {
   lucide.createIcons();
 }
 
-window.cancelBooking = function(bookingId) {
+window.cancelBooking = async function(bookingId) {
   if (!confirm('Cancel this booking? This cannot be undone.')) return;
-  const bookings = getBookings();
-  const newBookings = bookings.filter(b => b.id !== bookingId);
-  setBookings(newBookings);
-  renderBookings();
-  renderSlotManager();
+  await deleteBooking(bookingId);
+  await renderBookings();
+  await renderSlotManager();
 };
 
 // ========== USERS ==========
-function renderUsers() {
-  const users = getUsers();
+async function renderUsers() {
+  const users = await getUsers();
   if (users.length === 0) {
     usersList.innerHTML = '';
     noUsersMsg.classList.remove('hidden');
@@ -407,30 +401,14 @@ function escapeHtml(str) {
   });
 }
 
-window.toggleLateFlag = function(userEmail) {
-  const users = getUsers();
-  const userIndex = users.findIndex(u => u.email === userEmail);
-  if (userIndex !== -1) {
-    users[userIndex].late = !users[userIndex].late;
-    saveUsers(users);
-    renderUsers();
-    // Also update any open booking modal in other tabs via storage event
+window.toggleLateFlag = async function(userEmail) {
+  const users = await getUsers();
+  const user = users.find(u => u.email === userEmail);
+  if (user) {
+    await updateUserLate(userEmail, !user.late);
+    await renderUsers();
   }
 };
-
-// ========== SYNC ==========
-window.addEventListener('storage', (e) => {
-  if (e.key === 'barberBookings') {
-    renderBookings();
-    renderSlotManager();
-  }
-  if (e.key === 'barberClosedSlots') {
-    renderSlotManager();
-  }
-  if (e.key === 'barberUsers') {
-    renderUsers();
-  }
-});
 </script>
 </body>
 </html>

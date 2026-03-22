@@ -152,7 +152,7 @@ body {
 </style>
 </head>
 <body class="antialiased min-h-screen flex flex-col">
-<!-- Navigation -->
+<!-- Navigation (unchanged) -->
 <nav class="fixed w-full z-50 glass-panel border-b border-white/5">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="flex items-center justify-between h-20">
@@ -322,7 +322,7 @@ body {
   </div>
 </div>
 
-<!-- Booking Modal (full) -->
+<!-- Booking Modal -->
 <div id="booking-modal" class="fixed inset-0 z-[100] hidden">
   <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity" onclick="closeBooking()"></div>
   <div class="relative min-h-full flex items-center justify-center p-4">
@@ -496,6 +496,44 @@ body {
 <script>
 lucide.createIcons();
 
+// ========== HELPER FUNCTIONS ==========
+function formatDateISO(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function parseLocalDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function parseLocalDateTime(dateStr, timeStr) {
+  const date = parseLocalDate(dateStr);
+  const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!match) return new Date(NaN);
+
+  let hour = parseInt(match[1], 10);
+  const minute = parseInt(match[2], 10);
+  const period = match[3].toUpperCase();
+
+  if (period === 'PM' && hour !== 12) hour += 12;
+  if (period === 'AM' && hour === 12) hour = 0;
+
+  date.setHours(hour, minute, 0, 0);
+  return date;
+}
+
+function escapeHtml(str = '') {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ========== FIREBASE CONFIGURATION ==========
 const firebaseConfig = {
   apiKey: "AIzaSyB05r9ei92egPbcnbFKQNK0mso25DHcBss",
@@ -602,7 +640,7 @@ async function register() {
 function updateAccountUI() {
   const statusSpan = document.getElementById('account-status');
   if (currentUser) {
-    statusSpan.innerHTML = `${currentUser.name} <span class="text-xs">▼</span>`;
+    statusSpan.innerHTML = `${escapeHtml(currentUser.name)} <span class="text-xs">▼</span>`;
     statusSpan.style.cursor = 'pointer';
     statusSpan.onclick = () => openAccountModal();
   } else {
@@ -860,22 +898,17 @@ function selectDate(element, date) {
 // ========== TIME SLOTS ==========
 async function renderTimeSlots(date) {
   timeSlotsContainer.innerHTML = '';
-  const dateStr = date.toISOString().split('T')[0];
+  const dateStr = formatDateISO(date);
   const closedSlots = (await getClosedSlots()).filter(slot => slot.date === dateStr).map(slot => slot.time);
   const bookedSlots = (await getBookings()).filter(b => b.date === dateStr).map(b => b.time);
   const now = new Date();
-  const isToday = dateStr === now.toISOString().split('T')[0];
+  const isToday = dateStr === formatDateISO(now);
   
   TIME_SLOTS.forEach(time => {
     // Skip past slots for today
     if (isToday) {
-      const [hour, minute, period] = time.match(/(\d+):(\d+) (\w+)/).slice(1);
-      let hour24 = parseInt(hour);
-      if (period === 'PM' && hour24 !== 12) hour24 += 12;
-      if (period === 'AM' && hour24 === 12) hour24 = 0;
-      const slotTime = new Date(now);
-      slotTime.setHours(hour24, parseInt(minute), 0, 0);
-      if (slotTime < now) return;
+      const slotDateTime = parseLocalDateTime(dateStr, time);
+      if (slotDateTime < now) return;
     }
     
     const btn = document.createElement('button');
@@ -927,7 +960,7 @@ function updateSummary() {
 
 // ========== HELPER ==========
 async function isSlotAvailable(date, time) {
-  const dateStr = date.toISOString().split('T')[0];
+  const dateStr = formatDateISO(date);
   const closedSlots = (await getClosedSlots()).filter(s => s.date === dateStr).map(s => s.time);
   const bookedSlots = (await getBookings()).filter(b => b.date === dateStr).map(b => b.time);
   return !closedSlots.includes(time) && !bookedSlots.includes(time);
@@ -954,11 +987,11 @@ function downloadReceipt() {
   doc.text('Private Barber - Booking Receipt', 20, 20);
   doc.setFontSize(12);
   doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 30);
-  doc.text(`Customer: ${name}`, 20, 40);
-  doc.text(`Email: ${email}`, 20, 45);
-  doc.text(`Phone: ${phone}`, 20, 50);
-  doc.text(`Service: ${service}`, 20, 60);
-  doc.text(`Appointment: ${dateStr} at ${timeStr}`, 20, 65);
+  doc.text(`Customer: ${escapeHtml(name)}`, 20, 40);
+  doc.text(`Email: ${escapeHtml(email)}`, 20, 45);
+  doc.text(`Phone: ${escapeHtml(phone)}`, 20, 50);
+  doc.text(`Service: ${escapeHtml(service)}`, 20, 60);
+  doc.text(`Appointment: ${escapeHtml(dateStr)} at ${escapeHtml(timeStr)}`, 20, 65);
   doc.text(`Price: ${price}`, 20, 70);
   if (selectedTime && getTimeSurcharge(selectedTime) > 0) {
     doc.text(`(Includes evening/after‑hours surcharge)`, 20, 75);
@@ -971,7 +1004,7 @@ function downloadReceipt() {
   doc.text('• No‑show may result in a late flag on your account.', 20, 105);
   doc.text('• Each booking is for one person only.', 20, 110);
   doc.text('Thank you for choosing Private Barber.', 20, 125);
-  doc.save(`Receipt_${name}_${dateStr.replace(/\//g, '-')}.pdf`);
+  doc.save(`Receipt_${name.replace(/[^a-z0-9]/gi, '_')}_${dateStr.replace(/\//g, '-')}.pdf`);
 }
 
 // ========== CONFIRM BOOKING ==========
@@ -1007,7 +1040,7 @@ async function confirmBooking() {
 
     const booking = {
       id: Date.now() + '-' + Math.random().toString(36).substr(2, 8),
-      date: selectedDate.toISOString().split('T')[0],
+      date: formatDateISO(selectedDate),
       time: selectedTime,
       service: selectedService.name,
       price: finalPrice,
@@ -1033,7 +1066,7 @@ async function confirmBooking() {
 
     document.getElementById('success-message').innerText = 'Your slot is reserved.';
     const firstDateStr = selectedDate.toLocaleDateString();
-    document.getElementById('success-details').innerHTML = `${selectedService.name}<br>${firstDateStr} at ${selectedTime}<br>Total: R${finalPrice}`;
+    document.getElementById('success-details').innerHTML = `${escapeHtml(selectedService.name)}<br>${firstDateStr} at ${selectedTime}<br>Total: R${finalPrice}`;
 
     const barberPhone = "27768502521";
     const message = `New booking: ${selectedService.name} on ${selectedDate.toLocaleDateString()} at ${selectedTime}. Client: ${name} (${phone}) - Total: R${finalPrice}`;
@@ -1068,7 +1101,7 @@ async function openMyBookings() {
       return;
     }
     container.innerHTML = userBookings.map(b => {
-      const apptDateTime = new Date(b.date + ' ' + b.time);
+      const apptDateTime = parseLocalDateTime(b.date, b.time);
       const isPast = apptDateTime < now;
       const isUpcoming = !isPast;
       const hoursDiff = (apptDateTime - now) / (1000*60*60);
@@ -1110,7 +1143,7 @@ async function rescheduleBooking(bookingId) {
   if (!booking) return;
   
   const now = new Date();
-  const appointmentDateTime = new Date(booking.date + ' ' + booking.time);
+  const appointmentDateTime = parseLocalDateTime(booking.date, booking.time);
   const hoursDiff = (appointmentDateTime - now) / (1000*60*60);
   if (hoursDiff < 5) {
     alert('Rescheduling is only allowed at least 5 hours before your appointment.');
@@ -1122,7 +1155,7 @@ async function rescheduleBooking(bookingId) {
   const serviceName = booking.service;
   const servicePrice = booking.basePrice || (serviceName.includes('Dye') ? 100 : 80);
   selectedService = { name: serviceName, price: servicePrice };
-  selectedDate = new Date(booking.date);
+  selectedDate = parseLocalDate(booking.date);
   selectedTime = booking.time;
   updateSummary();
   openBooking();
@@ -1134,7 +1167,7 @@ window.cancelMyBooking = async function(bookingId) {
   const booking = (await getBookings()).find(b => b.id === bookingId);
   if (!booking) return;
   const now = new Date();
-  const appointmentDateTime = new Date(booking.date + ' ' + booking.time);
+  const appointmentDateTime = parseLocalDateTime(booking.date, booking.time);
   const diffHours = (appointmentDateTime - now) / (1000 * 60 * 60);
   let warning = '';
   if (diffHours <= 5 && diffHours > 0) {
@@ -1147,7 +1180,7 @@ window.cancelMyBooking = async function(bookingId) {
   await deleteBooking(bookingId);
   closeMyBookings();
   openMyBookings(); // refresh
-  if (!modal.classList.contains('hidden') && selectedDate && selectedDate.toISOString().split('T')[0] === booking.date) {
+  if (!modal.classList.contains('hidden') && selectedDate && formatDateISO(selectedDate) === booking.date) {
     renderTimeSlots(selectedDate);
   }
 };

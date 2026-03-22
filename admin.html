@@ -7,9 +7,9 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/lucide@latest"></script>
-<!-- Firebase SDKs -->
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js"></script>
+<!-- Firebase SDK (v8) -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 <style>
 body {
   font-family: 'Inter', sans-serif;
@@ -115,7 +115,7 @@ body {
 <script>
 lucide.createIcons();
 
-// ========== FIREBASE CONFIGURATION (YOUR CONFIG) ==========
+// ========== FIREBASE CONFIGURATION ==========
 const firebaseConfig = {
   apiKey: "AIzaSyB05r9ei92egPbcnbFKQNK0mso25DHcBss",
   authDomain: "private-barber-booking-67cde.firebaseapp.com",
@@ -132,6 +132,10 @@ const db = firebase.firestore();
 // ========== PASSWORD ==========
 const CORRECT_PASSWORD = "voka2026";
 
+let unsubBookings = null;
+let unsubClosedSlots = null;
+let unsubUsers = null;
+
 function checkPassword() {
   const input = document.getElementById('admin-password').value;
   const error = document.getElementById('login-error');
@@ -139,19 +143,33 @@ function checkPassword() {
     document.getElementById('login-container').classList.add('hidden');
     document.getElementById('admin-panel').classList.remove('hidden');
     lucide.createIcons();
+
     renderSlotManager();
     renderBookings();
     renderUsers();
-    // Real-time listeners
-    db.collection('bookings').onSnapshot(() => { renderBookings(); renderSlotManager(); });
-    db.collection('closedSlots').onSnapshot(() => renderSlotManager());
-    db.collection('users').onSnapshot(() => renderUsers());
+
+    // Real‑time listeners
+    if (unsubBookings) unsubBookings();
+    if (unsubClosedSlots) unsubClosedSlots();
+    if (unsubUsers) unsubUsers();
+
+    unsubBookings = db.collection('bookings').onSnapshot(() => {
+      renderBookings();
+      renderSlotManager();
+    });
+    unsubClosedSlots = db.collection('closedSlots').onSnapshot(() => renderSlotManager());
+    unsubUsers = db.collection('users').onSnapshot(() => renderUsers());
   } else {
     error.classList.remove('hidden');
   }
 }
 
 function logout() {
+  if (unsubBookings) unsubBookings();
+  if (unsubClosedSlots) unsubClosedSlots();
+  if (unsubUsers) unsubUsers();
+  unsubBookings = unsubClosedSlots = unsubUsers = null;
+
   document.getElementById('admin-panel').classList.add('hidden');
   document.getElementById('login-container').classList.remove('hidden');
   document.getElementById('admin-password').value = '';

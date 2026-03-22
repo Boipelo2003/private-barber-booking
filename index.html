@@ -8,11 +8,11 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<!-- Firebase SDK (v8 – global, non‑module) -->
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+<!-- Firebase v9 Compat (global, no modules) -->
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 <style>
-/* (all styles unchanged – copy from your previous working version) */
+/* all styles unchanged – same as before */
 body {
   font-family: 'Inter', sans-serif;
   background-color: #050505;
@@ -131,7 +131,7 @@ body {
 </style>
 </head>
 <body class="antialiased min-h-screen flex flex-col">
-<!-- Navigation -->
+<!-- Navigation (unchanged) -->
 <nav class="fixed w-full z-50 glass-panel border-b border-white/5">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="flex items-center justify-between h-20">
@@ -157,7 +157,7 @@ body {
   </div>
 </nav>
 
-<!-- Hero Section -->
+<!-- Hero Section (unchanged) -->
 <div class="relative pt-32 pb-20 sm:pt-48 sm:pb-32 overflow-hidden flex items-center justify-center min-h-screen">
   <div class="absolute inset-0 z-0">
     <img src="https://image.qwenlm.ai/public_source/8b83e0df-dcfb-4b73-8354-600aa9e2a523/119177668-855f-445f-ab06-226cba680ca9.png" alt="Barber Background" class="w-full h-full object-cover opacity-40">
@@ -182,7 +182,7 @@ body {
   </div>
 </div>
 
-<!-- Features Section -->
+<!-- Features Section (unchanged) -->
 <section class="py-20 border-t border-white/5 bg-[#080808]">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="grid grid-cols-1 md:grid-cols-2 gap-12 text-center max-w-3xl mx-auto">
@@ -204,7 +204,7 @@ body {
   </div>
 </section>
 
-<!-- Account Modal -->
+<!-- Account Modal (unchanged) -->
 <div id="account-modal" class="fixed inset-0 z-[200] hidden">
   <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity" onclick="closeAccountModal()"></div>
   <div class="relative min-h-full flex items-center justify-center p-4">
@@ -252,7 +252,7 @@ body {
   </div>
 </div>
 
-<!-- Booking Modal -->
+<!-- Booking Modal (unchanged) -->
 <div id="booking-modal" class="fixed inset-0 z-[100] hidden">
   <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity" onclick="closeBooking()"></div>
   <div class="relative min-h-full flex items-center justify-center p-4">
@@ -436,11 +436,11 @@ const firebaseConfig = {
   measurementId: "G-KNCJ003KNP"
 };
 
-// Initialize Firebase
+// Initialize Firebase (using compat version, so firebase.initializeApp works)
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-// ========== DOM ELEMENTS (moved up to avoid undefined errors) ==========
+// ========== DOM ELEMENTS (defined early, before any usage) ==========
 const modal = document.getElementById('booking-modal');
 const calendarDays = document.getElementById('calendar-days');
 const monthYearLabel = document.getElementById('calendar-month-year');

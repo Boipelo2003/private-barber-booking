@@ -150,6 +150,21 @@ body {
 .rating-stars i.filled {
   color: #fbbf24;
 }
+/* new style for public reviews */
+.review-card {
+  background: rgba(20, 20, 20, 0.6);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: transform 0.2s, border-color 0.2s;
+}
+.review-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.review-star {
+  color: #fbbf24;
+  fill: #fbbf24;
+}
 </style>
 </head>
 <body class="antialiased min-h-screen flex flex-col">
@@ -222,6 +237,19 @@ body {
         <h3 class="text-lg font-bold uppercase mb-2">Real-Time Availability</h3>
         <p class="text-gray-500 text-sm">See live open slots and book instantly without confirmation delays.</p>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- NEW: Public Reviews Section -->
+<section class="py-20 bg-black/50 border-t border-white/5">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-12">
+      <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight">Client Reviews</h2>
+      <p class="text-gray-400 mt-2">What our clients say about their experience</p>
+    </div>
+    <div id="public-reviews-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div class="loader mx-auto col-span-full"></div>
     </div>
   </div>
 </section>
@@ -328,7 +356,7 @@ body {
   </div>
 </div>
 
-<!-- Booking Modal -->
+<!-- Booking Modal (full, identical to previous final version) -->
 <div id="booking-modal" class="fixed inset-0 z-[100] hidden">
   <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity" onclick="closeBooking()"></div>
   <div class="relative min-h-full flex items-center justify-center p-4">
@@ -632,12 +660,10 @@ async function login() {
   try {
     const userCredential = await auth.signInWithEmailAndPassword(email, password);
     currentAuthUser = userCredential.user;
-    // Load profile from Firestore
     const profileDoc = await db.collection('userProfiles').doc(currentAuthUser.uid).get();
     if (profileDoc.exists) {
       currentUser = { uid: currentAuthUser.uid, ...profileDoc.data() };
     } else {
-      // Fallback: create minimal profile
       currentUser = { uid: currentAuthUser.uid, email: currentAuthUser.email, name: '', phone: '', late: false };
     }
     closeAccountModal();
@@ -735,11 +761,9 @@ async function saveCustomerInfo() {
   const email = emailInput.value.trim();
   const phone = phoneInput.value.trim();
   if (currentAuthUser) {
-    // Update Firestore profile
     await db.collection('userProfiles').doc(currentAuthUser.uid).set({
       name, email, phone, late: currentUser ? currentUser.late : false
     }, { merge: true });
-    // Refresh local currentUser
     if (currentUser) {
       currentUser = { ...currentUser, name, email, phone };
     } else {
@@ -1169,6 +1193,7 @@ async function submitReview() {
   closeReviewModal();
   alert('Thank you for your review!');
   openMyBookings();
+  loadPublicReviews(); // refresh public reviews section
 }
 function closeReviewModal() {
   document.getElementById('review-modal').classList.add('hidden');
@@ -1215,6 +1240,52 @@ function downloadReceipt() {
   doc.save(`Receipt_${name}_${dateStr.replace(/\//g, '-')}.pdf`);
 }
 
+// ========== PUBLIC REVIEWS DISPLAY ==========
+async function loadPublicReviews() {
+  const container = document.getElementById('public-reviews-container');
+  container.innerHTML = '<div class="loader mx-auto col-span-full"></div>';
+  try {
+    const reviewsSnapshot = await db.collection('reviews')
+      .orderBy('createdAt', 'desc')
+      .limit(9)
+      .get();
+    
+    if (reviewsSnapshot.empty) {
+      container.innerHTML = '<p class="text-gray-500 text-center col-span-full">No reviews yet. Be the first to leave one!</p>';
+      return;
+    }
+    
+    const reviewsHTML = [];
+    reviewsSnapshot.forEach(doc => {
+      const review = doc.data();
+      const rating = review.rating || 0;
+      const comment = review.comment || '';
+      const createdAt = review.createdAt ? new Date(review.createdAt).toLocaleDateString() : 'Recently';
+      
+      let starsHtml = '';
+      for (let i = 1; i <= 5; i++) {
+        starsHtml += `<i data-lucide="star" class="w-4 h-4 ${i <= rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-500'}"></i>`;
+      }
+      
+      reviewsHTML.push(`
+        <div class="review-card rounded-2xl p-5 transition-all">
+          <div class="flex items-center gap-2 mb-3">
+            <div class="flex gap-1">${starsHtml}</div>
+            <span class="text-xs text-gray-400">${createdAt}</span>
+          </div>
+          <p class="text-gray-300 text-sm leading-relaxed">${escapeHtml(comment) || 'No comment provided.'}</p>
+        </div>
+      `);
+    });
+    
+    container.innerHTML = reviewsHTML.join('');
+    lucide.createIcons();
+  } catch (error) {
+    console.error('Error loading reviews:', error);
+    container.innerHTML = '<p class="text-red-500 text-center col-span-full">Failed to load reviews. Please try again later.</p>';
+  }
+}
+
 // ========== REAL-TIME UPDATES ==========
 db.collection('bookings').onSnapshot(() => {
   if (!modal.classList.contains('hidden') && !document.getElementById('step-time').classList.contains('hidden') && selectedDate) {
@@ -1229,6 +1300,8 @@ db.collection('closedSlots').onSnapshot(() => {
 
 // ========== INIT ==========
 updateAccountUI();
+loadPublicReviews(); // load reviews on page load
 </script>
 </body>
 </html>
+

@@ -8,16 +8,18 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<!-- Firebase v9 compat -->
 <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
 <style>
-/* (all styles remain unchanged) */
+* {
+  box-sizing: border-box;
+}
 body {
   font-family: 'Inter', sans-serif;
   background-color: #050505;
   color: #ffffff;
+  overflow-x: hidden;
 }
 .glass-panel {
   background: rgba(20, 20, 20, 0.7);
@@ -26,6 +28,7 @@ body {
 }
 .calendar-day {
   transition: all 0.2s;
+  cursor: pointer;
 }
 .calendar-day:hover:not(.empty):not(.disabled) {
   background-color: rgba(255, 255, 255, 0.1);
@@ -39,6 +42,10 @@ body {
 .calendar-day.disabled {
   opacity: 0.3;
   cursor: not-allowed;
+  pointer-events: none;
+}
+.calendar-day.empty {
+  cursor: default;
 }
 .time-slot-btn.selected,
 .service-btn.selected {
@@ -51,8 +58,15 @@ body {
   cursor: not-allowed;
   pointer-events: none;
 }
+.time-slot-btn:hover:not(.closed) {
+  transform: translateY(-2px);
+}
+.service-btn:hover:not(.selected) {
+  transform: translateY(-2px);
+}
 ::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: #0a0a0a;
@@ -61,12 +75,19 @@ body {
   background: #333;
   border-radius: 3px;
 }
+::-webkit-scrollbar-thumb:hover {
+  background: #444;
+}
 .fade-in {
   animation: fadeIn 0.5s ease-in-out;
 }
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 .error-message {
   color: #f87171;
@@ -76,15 +97,25 @@ body {
 }
 .input-error {
   border-color: #f87171 !important;
+  box-shadow: 0 0 0 1px #f87171;
+}
+.input-success {
+  border-color: #4ade80 !important;
+  box-shadow: 0 0 0 1px #4ade80;
 }
 .loader {
-  border: 2px solid rgba(0,0,0,0.2);
-  border-top: 2px solid black;
+  border: 2px solid rgba(255,255,255,0.1);
+  border-top: 2px solid #ffffff;
   border-radius: 50%;
-  width: 16px;
-  height: 16px;
+  width: 24px;
+  height: 24px;
   animation: spin 0.6s linear infinite;
   display: inline-block;
+}
+.loader-sm {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
 }
 @keyframes spin {
   0% { transform: rotate(0deg); }
@@ -93,26 +124,32 @@ body {
 .policy-box {
   background: rgba(255, 255, 255, 0.05);
   border-left: 3px solid #f59e0b;
-  padding: 0.75rem;
+  padding: 1rem;
   border-radius: 0.5rem;
   font-size: 0.75rem;
   color: #d1d5db;
   margin-top: 1rem;
 }
 .policy-box p {
-  margin: 0.25rem 0;
+  margin: 0.5rem 0;
+  line-height: 1.5;
 }
 .policy-box strong {
   color: #f59e0b;
 }
 .late-reminder {
-  background: rgba(245, 158, 11, 0.2);
+  background: rgba(245, 158, 11, 0.15);
   border-left: 3px solid #f59e0b;
-  padding: 0.75rem;
+  padding: 1rem;
   border-radius: 0.5rem;
   margin-bottom: 1rem;
   font-size: 0.8rem;
   color: #fbbf24;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
 }
 .step-view {
   display: block;
@@ -121,22 +158,24 @@ body {
   display: none;
 }
 .evening-badge {
-  background: #ff6b6b20;
+  background: rgba(255, 107, 107, 0.2);
   border: 1px solid #ff6b6b;
   color: #ffb3b3;
   border-radius: 20px;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.7rem;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.65rem;
   margin-left: 0.5rem;
+  white-space: nowrap;
 }
 .after-hours-badge {
-  background: #ff450020;
+  background: rgba(255, 69, 0, 0.2);
   border: 1px solid #ff4500;
   color: #ffb3b3;
   border-radius: 20px;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.7rem;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.65rem;
   margin-left: 0.5rem;
+  white-space: nowrap;
 }
 .rating-stars {
   display: inline-flex;
@@ -144,8 +183,11 @@ body {
   cursor: pointer;
 }
 .rating-stars i {
-  color: #888;
-  transition: color 0.2s;
+  color: #444;
+  transition: color 0.15s, transform 0.15s;
+}
+.rating-stars i:hover {
+  transform: scale(1.2);
 }
 .rating-stars i.filled {
   color: #fbbf24;
@@ -154,34 +196,91 @@ body {
   background: rgba(20, 20, 20, 0.6);
   backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  transition: transform 0.2s, border-color 0.2s;
+  transition: all 0.3s ease;
 }
 .review-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-4px);
   border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+}
+.toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: rgba(20, 20, 20, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  z-index: 9999;
+  animation: slideIn 0.3s ease-out;
+  max-width: 350px;
+}
+.toast-success {
+  border-left: 3px solid #4ade80;
+}
+.toast-error {
+  border-left: 3px solid #f87171;
+}
+.toast-info {
+  border-left: 3px solid #60a5fa;
+}
+.modal-backdrop {
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+}
+input:focus, textarea:focus, select:focus {
+  outline: none;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.booking-card {
+  transition: all 0.2s ease;
+}
+.booking-card:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateX(4px);
+}
+@media (max-width: 768px) {
+  .calendar-day {
+    height: 40px;
+    width: 40px;
+    font-size: 0.75rem;
+  }
+  .time-slot-btn {
+    padding: 0.75rem;
+    font-size: 0.75rem;
+  }
+  .service-btn {
+    padding: 1rem;
+  }
 }
 </style>
 </head>
 <body class="antialiased min-h-screen flex flex-col">
-<!-- Navigation (unchanged) -->
+<!-- Navigation -->
 <nav class="fixed w-full z-50 glass-panel border-b border-white/5">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="flex items-center justify-between h-20">
       <div class="flex-shrink-0 flex items-center gap-3">
-        <img src="https://image.qwenlm.ai/public_source/8b83e0df-dcfb-4b73-8354-600aa9e2a523/1beedd3c3-727f-4ecf-9df2-28663b4efe0b.png" alt="Private Barber Logo" class="h-10 w-10 rounded-full border border-white/20 bg-white">
+        <img src="https://image.qwenlm.ai/public_source/68ea7598-cc98-4fa8-b151-3a5069789143/1596727ff-af39-4fb7-9db7-73fbf21c16b6.png" alt="Private Barber Logo" class="h-10 w-10 rounded-full border border-white/20 bg-white">
         <span class="font-bold text-lg tracking-widest uppercase hidden sm:block">Private Barber</span>
       </div>
-      <div class="flex items-center gap-4">
-        <a href="tel:+27768502521" class="text-sm font-medium hover:text-gray-300 transition-colors flex items-center gap-2">
+      <div class="flex items-center gap-3 sm:gap-4">
+        <a href="tel:+27768502521" class="text-sm font-medium hover:text-gray-300 transition-colors flex items-center gap-2" aria-label="Call to book">
           <i data-lucide="phone" class="w-4 h-4"></i>
           <span class="hidden sm:inline">Call to Book</span>
         </a>
-        <button id="account-btn" onclick="openAccountModal()" class="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+        <button id="account-btn" onclick="openAccountModal()" class="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2" aria-label="Account">
           <i data-lucide="user" class="w-4 h-4"></i>
           <span id="account-status">Sign In</span>
         </button>
-        <a href="admin.html" target="_blank" class="text-sm text-gray-400 hover:text-white transition-colors">Barber Admin</a>
-        <button onclick="openBooking()" class="bg-white text-black hover:bg-gray-200 px-6 py-2 rounded-full text-sm font-bold uppercase tracking-wide transition-all transform hover:scale-105 shadow-lg shadow-white/10">
+        <a href="admin.html" target="_blank" class="text-sm text-gray-400 hover:text-white transition-colors hidden sm:block">Barber Admin</a>
+        <button onclick="openBooking()" class="bg-white text-black hover:bg-gray-200 px-4 sm:px-6 py-2 rounded-full text-sm font-bold uppercase tracking-wide transition-all transform hover:scale-105 shadow-lg shadow-white/10">
           Book Slot
         </button>
       </div>
@@ -192,22 +291,22 @@ body {
 <!-- Hero Section -->
 <div class="relative pt-32 pb-20 sm:pt-48 sm:pb-32 overflow-hidden flex items-center justify-center min-h-screen">
   <div class="absolute inset-0 z-0">
-    <img src="https://image.qwenlm.ai/public_source/8b83e0df-dcfb-4b73-8354-600aa9e2a523/119177668-855f-445f-ab06-226cba680ca9.png" alt="Barber Background" class="w-full h-full object-cover opacity-40">
+    <img src="https://image.qwenlm.ai/public_source/68ea7598-cc98-4fa8-b151-3a5069789143/1be81f341-0780-41c2-8a14-ffe1d76543f5.png" alt="Barber Background" class="w-full h-full object-cover opacity-40">
     <div class="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/80 to-transparent"></div>
   </div>
   <div class="relative z-10 max-w-4xl mx-auto px-4 text-center">
     <div class="inline-block mb-4 px-4 py-1 rounded-full border border-white/20 bg-white/5 backdrop-blur-sm">
       <span class="text-xs uppercase tracking-widest text-gray-300">Exclusive Appointments Only</span>
     </div>
-    <h1 class="text-5xl md:text-8xl font-extrabold tracking-tighter mb-6 leading-tight">
+    <h1 class="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-extrabold tracking-tighter mb-6 leading-tight">
       SECURE YOUR <br/>
       <span class="text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-400 to-white">TIME SLOT</span>
     </h1>
-    <p class="mt-4 max-w-xl mx-auto text-lg text-gray-400 mb-10 font-light">
+    <p class="mt-4 max-w-xl mx-auto text-base sm:text-lg text-gray-400 mb-10 font-light">
       Skip the wait. Book your private session directly through our secure calendar.
       Professional grooming, reserved exclusively for you.
     </p>
-    <button onclick="openBooking()" class="group relative inline-flex items-center justify-center px-8 py-4 text-base font-bold text-black transition-all duration-200 bg-white rounded-full hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white focus:ring-offset-black">
+    <button onclick="openBooking()" class="group relative inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 text-base font-bold text-black transition-all duration-200 bg-white rounded-full hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white focus:ring-offset-black" aria-label="Open booking calendar">
       <span>Open Calendar</span>
       <i data-lucide="calendar" class="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform"></i>
     </button>
@@ -240,7 +339,7 @@ body {
 <section class="py-20 bg-black/50 border-t border-white/5">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="text-center mb-12">
-      <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight">Client Reviews</h2>
+      <h2 class="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight">Client Reviews</h2>
       <p class="text-gray-400 mt-2">What our clients say about their experience</p>
     </div>
     <div id="public-reviews-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -249,28 +348,30 @@ body {
   </div>
 </section>
 
-<!-- Account Modal (with Forgot Password) -->
-<div id="account-modal" class="fixed inset-0 z-[200] hidden">
-  <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity" onclick="closeAccountModal()"></div>
+<!-- Account Modal -->
+<div id="account-modal" class="fixed inset-0 z-[200] hidden" role="dialog" aria-modal="true" aria-labelledby="account-modal-title">
+  <div class="absolute inset-0 modal-backdrop transition-opacity" onclick="closeAccountModal()"></div>
   <div class="relative min-h-full flex items-center justify-center p-4">
     <div class="relative w-full max-w-md bg-[#111] border border-white/10 rounded-2xl shadow-2xl p-6">
-      <button onclick="closeAccountModal()" class="absolute top-4 right-4 text-gray-500 hover:text-white">
+      <button onclick="closeAccountModal()" class="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors" aria-label="Close modal">
         <i data-lucide="x" class="w-5 h-5"></i>
       </button>
       <div class="text-center mb-6">
-        <img src="https://image.qwenlm.ai/public_source/8b83e0df-dcfb-4b73-8354-600aa9e2a523/1beedd3c3-727f-4ecf-9df2-28663b4efe0b.png" alt="Logo" class="h-12 w-12 rounded-full mx-auto mb-2">
-        <h3 class="text-xl font-bold">Welcome</h3>
+        <img src="https://image.qwenlm.ai/public_source/68ea7598-cc98-4fa8-b151-3a5069789143/1596727ff-af39-4fb7-9db7-73fbf21c16b6.png" alt="Logo" class="h-12 w-12 rounded-full mx-auto mb-2">
+        <h3 id="account-modal-title" class="text-xl font-bold">Welcome</h3>
         <p class="text-sm text-gray-400">Sign in or create an account</p>
       </div>
-
+      
       <!-- Login Form -->
       <div id="account-login-form">
         <div class="space-y-4">
           <div>
-            <input type="email" id="login-email" placeholder="Email" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
+            <label for="login-email" class="sr-only">Email</label>
+            <input type="email" id="login-email" placeholder="Email" autocomplete="email" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
           </div>
           <div>
-            <input type="password" id="login-password" placeholder="Password" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
+            <label for="login-password" class="sr-only">Password</label>
+            <input type="password" id="login-password" placeholder="Password" autocomplete="current-password" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
           </div>
           <button onclick="login()" class="w-full bg-white text-black font-bold py-2 rounded-lg hover:bg-gray-200 transition">Sign In</button>
           <div class="text-center">
@@ -279,32 +380,37 @@ body {
           <p class="text-center text-xs text-gray-500">Don't have an account? <button onclick="showRegister()" class="text-white underline">Register</button></p>
         </div>
       </div>
-
+      
       <!-- Register Form -->
       <div id="account-register-form" class="hidden">
         <div class="space-y-4">
           <div>
-            <input type="text" id="reg-name" placeholder="Full Name" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
+            <label for="reg-name" class="sr-only">Full Name</label>
+            <input type="text" id="reg-name" placeholder="Full Name" autocomplete="name" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
           </div>
           <div>
-            <input type="email" id="reg-email" placeholder="Email" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
+            <label for="reg-email" class="sr-only">Email</label>
+            <input type="email" id="reg-email" placeholder="Email" autocomplete="email" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
           </div>
           <div>
-            <input type="tel" id="reg-phone" placeholder="Phone" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
+            <label for="reg-phone" class="sr-only">Phone</label>
+            <input type="tel" id="reg-phone" placeholder="Phone" autocomplete="tel" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
           </div>
           <div>
-            <input type="password" id="reg-password" placeholder="Password" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
+            <label for="reg-password" class="sr-only">Password</label>
+            <input type="password" id="reg-password" placeholder="Password (min 6 characters)" autocomplete="new-password" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
           </div>
           <button onclick="register()" class="w-full bg-white text-black font-bold py-2 rounded-lg hover:bg-gray-200 transition">Create Account</button>
           <p class="text-center text-xs text-gray-500">Already have an account? <button onclick="showLogin()" class="text-white underline">Sign In</button></p>
         </div>
       </div>
-
+      
       <!-- Forgot Password Form -->
       <div id="account-forgot-form" class="hidden">
         <div class="space-y-4">
           <div>
-            <input type="email" id="forgot-email" placeholder="Your Email Address" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
+            <label for="forgot-email" class="sr-only">Your Email Address</label>
+            <input type="email" id="forgot-email" placeholder="Your Email Address" autocomplete="email" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
           </div>
           <button onclick="sendPasswordReset()" class="w-full bg-white text-black font-bold py-2 rounded-lg hover:bg-gray-200 transition">Send Reset Email</button>
           <p class="text-center text-xs text-gray-500">
@@ -312,13 +418,15 @@ body {
           </p>
         </div>
       </div>
-
+      
       <div id="logout-section" class="mt-4 hidden">
         <button onclick="logout()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg transition flex items-center justify-center gap-2">
           <i data-lucide="log-out" class="w-4 h-4"></i> Logout
         </button>
       </div>
-      <p id="account-message" class="text-red-400 text-xs text-center mt-3 hidden"></p>
+      
+      <p id="account-message" class="text-red-400 text-xs text-center mt-3 hidden" role="alert"></p>
+      
       <div id="my-bookings-button" class="mt-4 hidden">
         <button onclick="openMyBookings()" class="w-full bg-gray-800 hover:bg-gray-700 text-white font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-2">
           <i data-lucide="calendar" class="w-4 h-4"></i> My Bookings
@@ -329,14 +437,14 @@ body {
 </div>
 
 <!-- My Bookings Modal -->
-<div id="my-bookings-modal" class="fixed inset-0 z-[250] hidden">
-  <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity" onclick="closeMyBookings()"></div>
+<div id="my-bookings-modal" class="fixed inset-0 z-[250] hidden" role="dialog" aria-modal="true" aria-labelledby="bookings-modal-title">
+  <div class="absolute inset-0 modal-backdrop transition-opacity" onclick="closeMyBookings()"></div>
   <div class="relative min-h-full flex items-center justify-center p-4">
     <div class="relative w-full max-w-2xl bg-[#111] border border-white/10 rounded-2xl shadow-2xl p-6 max-h-[80vh] overflow-y-auto">
-      <button onclick="closeMyBookings()" class="absolute top-4 right-4 text-gray-500 hover:text-white">
+      <button onclick="closeMyBookings()" class="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors" aria-label="Close modal">
         <i data-lucide="x" class="w-5 h-5"></i>
       </button>
-      <h2 class="text-2xl font-bold mb-4">My Bookings</h2>
+      <h2 id="bookings-modal-title" class="text-2xl font-bold mb-4">My Bookings</h2>
       <div id="my-bookings-list" class="space-y-3">
         <div class="loader"></div>
       </div>
@@ -345,52 +453,61 @@ body {
 </div>
 
 <!-- Review Modal -->
-<div id="review-modal" class="fixed inset-0 z-[300] hidden">
-  <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity" onclick="closeReviewModal()"></div>
+<div id="review-modal" class="fixed inset-0 z-[300] hidden" role="dialog" aria-modal="true" aria-labelledby="review-modal-title">
+  <div class="absolute inset-0 modal-backdrop transition-opacity" onclick="closeReviewModal()"></div>
   <div class="relative min-h-full flex items-center justify-center p-4">
     <div class="relative w-full max-w-md bg-[#111] border border-white/10 rounded-2xl shadow-2xl p-6">
-      <button onclick="closeReviewModal()" class="absolute top-4 right-4 text-gray-500 hover:text-white">
+      <button onclick="closeReviewModal()" class="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors" aria-label="Close modal">
         <i data-lucide="x" class="w-5 h-5"></i>
       </button>
-      <h3 class="text-xl font-bold mb-4">Rate Your Experience</h3>
+      <h3 id="review-modal-title" class="text-xl font-bold mb-4">Rate Your Experience</h3>
       <div class="mb-4">
         <label class="block text-sm text-gray-400 mb-2">Rating</label>
-        <div id="rating-stars" class="rating-stars">
-          <i data-lucide="star" class="w-6 h-6 cursor-pointer"></i>
-          <i data-lucide="star" class="w-6 h-6 cursor-pointer"></i>
-          <i data-lucide="star" class="w-6 h-6 cursor-pointer"></i>
-          <i data-lucide="star" class="w-6 h-6 cursor-pointer"></i>
-          <i data-lucide="star" class="w-6 h-6 cursor-pointer"></i>
+        <div id="rating-stars" class="rating-stars" role="radiogroup" aria-label="Star rating">
+          <i data-lucide="star" class="w-8 h-8 cursor-pointer" data-rating="1" role="radio" aria-label="1 star"></i>
+          <i data-lucide="star" class="w-8 h-8 cursor-pointer" data-rating="2" role="radio" aria-label="2 stars"></i>
+          <i data-lucide="star" class="w-8 h-8 cursor-pointer" data-rating="3" role="radio" aria-label="3 stars"></i>
+          <i data-lucide="star" class="w-8 h-8 cursor-pointer" data-rating="4" role="radio" aria-label="4 stars"></i>
+          <i data-lucide="star" class="w-8 h-8 cursor-pointer" data-rating="5" role="radio" aria-label="5 stars"></i>
         </div>
       </div>
       <div class="mb-4">
-        <label class="block text-sm text-gray-400 mb-2">Comment (optional)</label>
-        <textarea id="review-comment" rows="3" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white"></textarea>
+        <label for="review-comment" class="block text-sm text-gray-400 mb-2">Comment (optional)</label>
+        <textarea id="review-comment" rows="3" placeholder="Share your experience..." class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors"></textarea>
       </div>
       <button onclick="submitReview()" class="w-full bg-white text-black font-bold py-2 rounded-lg hover:bg-gray-200 transition">Submit Review</button>
     </div>
   </div>
 </div>
 
-<!-- Booking Modal (full, unchanged) -->
-<div id="booking-modal" class="fixed inset-0 z-[100] hidden">
-  <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity" onclick="closeBooking()"></div>
+<!-- Booking Modal -->
+<div id="booking-modal" class="fixed inset-0 z-[100] hidden" role="dialog" aria-modal="true" aria-labelledby="booking-modal-title">
+  <div class="absolute inset-0 modal-backdrop transition-opacity" onclick="closeBooking()"></div>
   <div class="relative min-h-full flex items-center justify-center p-4">
     <div class="relative w-full max-w-5xl bg-[#111] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col lg:flex-row max-h-[90vh] lg:max-h-[800px]">
       <!-- Sidebar Summary -->
-      <div class="w-full lg:w-80 bg-[#161616] border-r border-white/5 p-6 flex flex-col justify-between">
+      <div class="w-full lg:w-80 bg-[#161616] border-r border-white/5 p-6 flex flex-col justify-between flex-shrink-0">
         <div>
           <div class="flex items-center gap-3 mb-8">
-            <img src="https://image.qwenlm.ai/public_source/8b83e0df-dcfb-4b73-8354-600aa9e2a523/1beedd3c3-727f-4ecf-9df2-28663b4efe0b.png" alt="Logo" class="h-10 w-10 rounded-full bg-white">
+            <img src="https://image.qwenlm.ai/public_source/68ea7598-cc98-4fa8-b151-3a5069789143/1596727ff-af39-4fb7-9db7-73fbf21c16b6.png" alt="Logo" class="h-10 w-10 rounded-full bg-white">
             <div>
               <h3 class="font-bold text-sm uppercase tracking-wider">Private Barber</h3>
               <p class="text-xs text-gray-500">Booking System</p>
             </div>
           </div>
           <div class="space-y-6">
-            <div><p class="text-xs uppercase text-gray-500 mb-1">Selected Service</p><p id="summary-service" class="text-white font-medium">Not selected</p></div>
-            <div><p class="text-xs uppercase text-gray-500 mb-1">Selected Date</p><p id="summary-date" class="text-white font-medium">Not selected</p></div>
-            <div><p class="text-xs uppercase text-gray-500 mb-1">Selected Time</p><p id="summary-time" class="text-white font-medium">Not selected</p></div>
+            <div>
+              <p class="text-xs uppercase text-gray-500 mb-1">Selected Service</p>
+              <p id="summary-service" class="text-white font-medium">Not selected</p>
+            </div>
+            <div>
+              <p class="text-xs uppercase text-gray-500 mb-1">Selected Date</p>
+              <p id="summary-date" class="text-white font-medium">Not selected</p>
+            </div>
+            <div>
+              <p class="text-xs uppercase text-gray-500 mb-1">Selected Time</p>
+              <p id="summary-time" class="text-white font-medium">Not selected</p>
+            </div>
           </div>
         </div>
         <div class="mt-8 pt-6 border-t border-white/5">
@@ -400,80 +517,101 @@ body {
           </div>
         </div>
       </div>
+      
       <!-- Main Content -->
       <div class="flex-1 p-6 lg:p-10 overflow-y-auto relative bg-[#111]">
-        <button onclick="closeBooking()" class="absolute top-6 right-6 text-gray-500 hover:text-white transition-colors">
+        <button onclick="closeBooking()" class="absolute top-6 right-6 text-gray-500 hover:text-white transition-colors" aria-label="Close booking">
           <i data-lucide="x" class="w-6 h-6"></i>
         </button>
+        
         <!-- Step 1: Calendar -->
         <div id="step-calendar" class="step-view fade-in">
-          <h2 class="text-3xl font-bold mb-2">Select Date</h2>
+          <h2 id="booking-modal-title" class="text-2xl sm:text-3xl font-bold mb-2">Select Date</h2>
           <p class="text-gray-400 mb-8">Choose an available day for your appointment.</p>
           <div class="flex items-center justify-between mb-6">
-            <button onclick="prevMonth()" class="p-2 hover:bg-white/10 rounded-full transition-colors"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
-            <h3 id="calendar-month-year" class="text-xl font-bold uppercase tracking-widest"></h3>
-            <button onclick="nextMonth()" class="p-2 hover:bg-white/10 rounded-full transition-colors"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>
+            <button onclick="prevMonth()" class="p-2 hover:bg-white/10 rounded-full transition-colors" aria-label="Previous month">
+              <i data-lucide="chevron-left" class="w-5 h-5"></i>
+            </button>
+            <h3 id="calendar-month-year" class="text-lg sm:text-xl font-bold uppercase tracking-widest"></h3>
+            <button onclick="nextMonth()" class="p-2 hover:bg-white/10 rounded-full transition-colors" aria-label="Next month">
+              <i data-lucide="chevron-right" class="w-5 h-5"></i>
+            </button>
           </div>
-          <div class="grid grid-cols-7 gap-2 mb-2 text-center">
-            <div class="text-xs text-gray-500 font-bold uppercase">Sun</div><div class="text-xs text-gray-500 font-bold uppercase">Mon</div><div class="text-xs text-gray-500 font-bold uppercase">Tue</div><div class="text-xs text-gray-500 font-bold uppercase">Wed</div><div class="text-xs text-gray-500 font-bold uppercase">Thu</div><div class="text-xs text-gray-500 font-bold uppercase">Fri</div><div class="text-xs text-gray-500 font-bold uppercase">Sat</div>
+          <div class="grid grid-cols-7 gap-1 sm:gap-2 mb-2 text-center">
+            <div class="text-xs text-gray-500 font-bold uppercase">Sun</div>
+            <div class="text-xs text-gray-500 font-bold uppercase">Mon</div>
+            <div class="text-xs text-gray-500 font-bold uppercase">Tue</div>
+            <div class="text-xs text-gray-500 font-bold uppercase">Wed</div>
+            <div class="text-xs text-gray-500 font-bold uppercase">Thu</div>
+            <div class="text-xs text-gray-500 font-bold uppercase">Fri</div>
+            <div class="text-xs text-gray-500 font-bold uppercase">Sat</div>
           </div>
-          <div id="calendar-days" class="grid grid-cols-7 gap-2"></div>
+          <div id="calendar-days" class="grid grid-cols-7 gap-1 sm:gap-2"></div>
           <div class="mt-8 flex justify-end">
-            <button onclick="goToStep('time')" id="btn-calendar-next" class="bg-white text-black px-8 py-3 rounded-full font-bold uppercase text-sm hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>Continue</button>
+            <button onclick="goToStep('time')" id="btn-calendar-next" class="bg-white text-black px-6 sm:px-8 py-3 rounded-full font-bold uppercase text-sm hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>Continue</button>
           </div>
         </div>
+        
         <!-- Step 2: Time Slots -->
         <div id="step-time" class="step-view hidden fade-in">
-          <button onclick="goToStep('calendar')" class="mb-4 text-xs text-gray-500 hover:text-white flex items-center gap-1"><i data-lucide="arrow-left" class="w-3 h-3"></i> Back to Calendar</button>
-          <h2 class="text-3xl font-bold mb-2">Select Time</h2>
+          <button onclick="goToStep('calendar')" class="mb-4 text-xs text-gray-500 hover:text-white flex items-center gap-1">
+            <i data-lucide="arrow-left" class="w-3 h-3"></i> Back to Calendar
+          </button>
+          <h2 class="text-2xl sm:text-3xl font-bold mb-2">Select Time</h2>
           <p class="text-gray-400 mb-8">Available slots for <span id="time-header-date" class="text-white"></span></p>
-          <div id="time-slots-container" class="grid grid-cols-3 sm:grid-cols-4 gap-4"></div>
+          <div id="time-slots-container" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4"></div>
           <div class="mt-8 flex justify-end">
-            <button onclick="goToStep('service')" id="btn-time-next" class="bg-white text-black px-8 py-3 rounded-full font-bold uppercase text-sm hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>Continue</button>
+            <button onclick="goToStep('service')" id="btn-time-next" class="bg-white text-black px-6 sm:px-8 py-3 rounded-full font-bold uppercase text-sm hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>Continue</button>
           </div>
         </div>
+        
         <!-- Step 3: Service Selection -->
         <div id="step-service" class="step-view hidden fade-in">
-          <button onclick="goToStep('time')" class="mb-4 text-xs text-gray-500 hover:text-white flex items-center gap-1"><i data-lucide="arrow-left" class="w-3 h-3"></i> Back to Time</button>
-          <h2 class="text-3xl font-bold mb-2">Choose Your Service</h2>
+          <button onclick="goToStep('time')" class="mb-4 text-xs text-gray-500 hover:text-white flex items-center gap-1">
+            <i data-lucide="arrow-left" class="w-3 h-3"></i> Back to Time
+          </button>
+          <h2 class="text-2xl sm:text-3xl font-bold mb-2">Choose Your Service</h2>
           <p class="text-gray-400 mb-8">Select the service that fits your style.</p>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
-            <button class="service-btn p-5 border border-white/10 rounded-xl hover:bg-white hover:text-black transition-all text-left" onclick="selectService(this, 'Any Cut with Dye', 100)">
+            <button class="service-btn p-5 border border-white/10 rounded-xl hover:bg-white hover:text-black transition-all text-left" onclick="selectService(this, 'Any Cut with Dye', 100)" aria-label="Any Cut with Dye service">
               <div class="font-bold text-lg">Any Cut with Dye</div>
               <div class="text-sm opacity-80">Base R100 · 60 min</div>
               <div class="text-xs mt-1 text-gray-400">Fresh cut + professional dye</div>
             </button>
-            <button class="service-btn p-5 border border-white/10 rounded-xl hover:bg-white hover:text-black transition-all text-left" onclick="selectService(this, 'Any Cut (No Dye)', 80)">
+            <button class="service-btn p-5 border border-white/10 rounded-xl hover:bg-white hover:text-black transition-all text-left" onclick="selectService(this, 'Any Cut (No Dye)', 80)" aria-label="Any Cut No Dye service">
               <div class="font-bold text-lg">Any Cut (No Dye)</div>
               <div class="text-sm opacity-80">Base R80 · 60 min</div>
               <div class="text-xs mt-1 text-gray-400">Clean, sharp haircut</div>
             </button>
           </div>
           <div class="mt-8 flex justify-end">
-            <button onclick="goToStep('details')" id="btn-service-next" class="bg-white text-black px-8 py-3 rounded-full font-bold uppercase text-sm hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>Continue to Details</button>
+            <button onclick="goToStep('details')" id="btn-service-next" class="bg-white text-black px-6 sm:px-8 py-3 rounded-full font-bold uppercase text-sm hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>Continue to Details</button>
           </div>
         </div>
+        
         <!-- Step 4: Contact Details + Policy -->
         <div id="step-details" class="step-view hidden fade-in">
-          <button onclick="goToStep('service')" class="mb-4 text-xs text-gray-500 hover:text-white flex items-center gap-1"><i data-lucide="arrow-left" class="w-3 h-3"></i> Back to Services</button>
-          <h2 class="text-3xl font-bold mb-6">Your Information</h2>
+          <button onclick="goToStep('service')" class="mb-4 text-xs text-gray-500 hover:text-white flex items-center gap-1">
+            <i data-lucide="arrow-left" class="w-3 h-3"></i> Back to Services
+          </button>
+          <h2 class="text-2xl sm:text-3xl font-bold mb-6">Your Information</h2>
           <div id="late-reminder" class="late-reminder hidden">
             <p><strong>⚠️ Important:</strong> You were marked as late for a previous appointment. Please remember that being late results in a fee of <strong>R10 per 10 minutes</strong>. We appreciate your punctuality!</p>
           </div>
           <div class="space-y-4 max-w-md mx-auto">
             <div>
-              <label class="block text-sm text-gray-400 mb-1">Full Name *</label>
-              <input type="text" id="customer-name" placeholder="e.g., Thabo Mbeki" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
+              <label for="customer-name" class="block text-sm text-gray-400 mb-1">Full Name *</label>
+              <input type="text" id="customer-name" placeholder="e.g., Thabo Mbeki" autocomplete="name" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
               <div id="name-error" class="error-message">Please enter your full name.</div>
             </div>
             <div>
-              <label class="block text-sm text-gray-400 mb-1">Email Address *</label>
-              <input type="email" id="customer-email" placeholder="thabo@example.com" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
+              <label for="customer-email" class="block text-sm text-gray-400 mb-1">Email Address *</label>
+              <input type="email" id="customer-email" placeholder="thabo@example.com" autocomplete="email" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
               <div id="email-error" class="error-message">Please enter a valid email address.</div>
             </div>
             <div>
-              <label class="block text-sm text-gray-400 mb-1">Phone Number *</label>
-              <input type="tel" id="customer-phone" placeholder="+27 12 345 6789" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
+              <label for="customer-phone" class="block text-sm text-gray-400 mb-1">Phone Number *</label>
+              <input type="tel" id="customer-phone" placeholder="+27 12 345 6789" autocomplete="tel" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
               <div id="phone-error" class="error-message">Please enter a valid phone number (minimum 10 digits).</div>
             </div>
             <div class="policy-box">
@@ -481,8 +619,8 @@ body {
               <p><strong>❌ Cancellation Policy</strong> – If you cancel within 5 hours of your appointment, a <strong>R20 cancellation fee</strong> will apply.</p>
               <p><strong>🚫 No‑Show Policy</strong> – Failure to show up without notice may result in a late flag on your account and a reminder for future bookings.</p>
               <p><strong>👤 Single Seat</strong> – Each booking is for one person only. If you wish to book for multiple people, please make separate bookings.</p>
-              <p><strong>🌙 After‑Hours Surcharge</strong> – Appointments after 7:00 PM include an additional <strong>R50</strong> (on top of the R20 evening fee).</p>
-              <p class="text-xs text-gray-500 mt-1">By booking, you agree to these terms.</p>
+              <p><strong>🌙 After‑Hours Surcharge</strong> – Appointments after 7:00 PM include an additional <strong>R50</strong> (on top of the R20 evening fee).</p>
+              <p class="text-xs text-gray-500 mt-2">By booking, you agree to these terms.</p>
             </div>
             <label class="flex items-center gap-2 text-xs text-gray-400 cursor-pointer mt-4">
               <input type="checkbox" id="agree-policy" class="rounded bg-[#222] border-white/10 text-white focus:ring-0">
@@ -490,23 +628,26 @@ body {
             </label>
           </div>
           <div class="mt-8 flex justify-end">
-            <button id="confirm-btn" class="bg-white text-black px-8 py-3 rounded-full font-bold uppercase text-sm hover:bg-gray-200 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+            <button id="confirm-btn" class="bg-white text-black px-6 sm:px-8 py-3 rounded-full font-bold uppercase text-sm hover:bg-gray-200 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
               <span id="confirm-btn-text">Confirm Booking</span>
-              <div id="confirm-spinner" class="loader hidden"></div>
+              <div id="confirm-spinner" class="loader loader-sm hidden"></div>
             </button>
           </div>
         </div>
+        
         <!-- Step 5: Success -->
         <div id="step-success" class="step-view hidden fade-in text-center py-10">
-          <div class="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(34,197,94,0.4)]"><i data-lucide="check" class="w-10 h-10 text-black"></i></div>
-          <h2 class="text-3xl font-bold mb-2">Booking Confirmed</h2>
+          <div class="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(34,197,94,0.4)]">
+            <i data-lucide="check" class="w-10 h-10 text-black"></i>
+          </div>
+          <h2 class="text-2xl sm:text-3xl font-bold mb-2">Booking Confirmed</h2>
           <p class="text-gray-400 mb-4 max-w-md mx-auto" id="success-message">Your slot is reserved.</p>
           <div class="bg-white/5 p-4 rounded-lg inline-block mb-6">
             <p class="text-sm text-gray-400">Appointment Details</p>
-            <p class="text-xl font-bold" id="success-details">--</p>
+            <p class="text-lg sm:text-xl font-bold" id="success-details">--</p>
           </div>
           <div class="flex flex-col sm:flex-row gap-4 justify-center">
-            <a id="whatsapp-link" href="#" target="_blank" class="inline-flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-full font-bold transition-colors">
+            <a id="whatsapp-link" href="#" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-full font-bold transition-colors">
               <i data-lucide="message-circle" class="w-5 h-5"></i>
               Send WhatsApp
             </a>
@@ -525,6 +666,9 @@ body {
   </div>
 </div>
 
+<!-- Toast Container -->
+<div id="toast-container" class="fixed bottom-4 right-4 z-[9999] space-y-2"></div>
+
 <footer class="bg-black py-12 border-t border-white/5 mt-auto">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6">
     <div class="text-center md:text-left">
@@ -533,16 +677,21 @@ body {
       <p class="text-gray-600 text-xs mt-1">Created by Bokamoso Mothibi</p>
     </div>
     <div class="flex gap-6 text-gray-500">
-      <a href="https://www.instagram.com/private_barber_sa?igsh=MWl0bnZ4NnJ3aHJ5cw==" target="_blank" rel="noopener noreferrer" class="hover:text-white transition-colors">
+      <a href="https://www.instagram.com/private_barber_sa?igsh=MWl0bnZ4NnJ3aHJ5cw==" target="_blank" rel="noopener noreferrer" class="hover:text-white transition-colors" aria-label="Instagram">
         <i data-lucide="instagram" class="w-5 h-5"></i>
       </a>
-      <i data-lucide="facebook" class="w-5 h-5 hover:text-white cursor-pointer transition-colors"></i>
-      <i data-lucide="twitter" class="w-5 h-5 hover:text-white cursor-pointer transition-colors"></i>
+      <a href="#" class="hover:text-white transition-colors" aria-label="Facebook">
+        <i data-lucide="facebook" class="w-5 h-5"></i>
+      </a>
+      <a href="#" class="hover:text-white transition-colors" aria-label="Twitter">
+        <i data-lucide="twitter" class="w-5 h-5"></i>
+      </a>
     </div>
   </div>
 </footer>
 
 <script>
+// Initialize Lucide icons
 lucide.createIcons();
 
 // ========== FIREBASE CONFIGURATION ==========
@@ -556,9 +705,21 @@ const firebaseConfig = {
   measurementId: "G-KNCJ003KNP"
 };
 
-firebase.initializeApp(firebaseConfig);
+// Initialize Firebase
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
 const db = firebase.firestore();
 const auth = firebase.auth();
+
+// Enable offline persistence
+db.enablePersistence().catch(err => {
+  if (err.code === 'failed-precondition') {
+    console.log('Persistence failed: Multiple tabs open');
+  } else if (err.code === 'unimplemented') {
+    console.log('Persistence not supported by browser');
+  }
+});
 
 // ========== DOM ELEMENTS ==========
 const modal = document.getElementById('booking-modal');
@@ -580,6 +741,7 @@ const confirmBtn = document.getElementById('confirm-btn');
 const confirmBtnText = document.getElementById('confirm-btn-text');
 const confirmSpinner = document.getElementById('confirm-spinner');
 const whatsappLink = document.getElementById('whatsapp-link');
+const toastContainer = document.getElementById('toast-container');
 
 // ========== USER STATE ==========
 let currentUser = null;
@@ -590,6 +752,30 @@ let selectedTime = null;
 let selectedService = null;
 let isProcessing = false;
 let rescheduleOldBookingId = null;
+let selectedRating = null;
+let currentReviewBooking = null;
+
+// Real-time listeners
+let currentBookingsUnsubscribe = null;
+let currentClosedSlotsUnsubscribe = null;
+
+// ========== TOAST NOTIFICATIONS ==========
+function showToast(message, type = 'info') {
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.innerHTML = `
+    <i data-lucide="${type === 'success' ? 'check-circle' : type === 'error' ? 'alert-circle' : 'info'}" class="w-5 h-5"></i>
+    <span class="text-sm">${escapeHtml(message)}</span>
+  `;
+  toastContainer.appendChild(toast);
+  lucide.createIcons();
+  
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(100%)';
+    setTimeout(() => toast.remove(), 300);
+  }, 4000);
+}
 
 // ========== HELPER FUNCTIONS ==========
 function formatDateISO(date) {
@@ -626,38 +812,67 @@ function escapeHtml(str = '') {
     .replace(/'/g, '&#39;');
 }
 
-// ========== OPTIMIZED FIRESTORE QUERIES ==========
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+// ========== FIRESTORE QUERIES ==========
 async function getBookingsForDate(dateStr) {
-  const snapshot = await db.collection('bookings')
-    .where('date', '==', dateStr)
-    .get();
-  return snapshot.docs.map(doc => doc.data());
+  try {
+    const snapshot = await db.collection('bookings')
+      .where('date', '==', dateStr)
+      .get();
+    return snapshot.docs.map(doc => doc.data());
+  } catch (error) {
+    console.error('Error fetching bookings:', error);
+    return [];
+  }
 }
 
 async function getClosedSlotsForDate(dateStr) {
-  const snapshot = await db.collection('closedSlots')
-    .where('date', '==', dateStr)
-    .get();
-  return snapshot.docs.map(doc => doc.data());
+  try {
+    const snapshot = await db.collection('closedSlots')
+      .where('date', '==', dateStr)
+      .get();
+    return snapshot.docs.map(doc => doc.data());
+  } catch (error) {
+    console.error('Error fetching closed slots:', error);
+    return [];
+  }
 }
 
 async function getUserBookings(userId, email) {
-  let query = db.collection('bookings');
-  if (userId) {
-    query = query.where('userId', '==', userId);
-  } else if (email) {
-    query = query.where('email', '==', email);
-  } else {
+  try {
+    let query = db.collection('bookings');
+    if (userId) {
+      query = query.where('userId', '==', userId);
+    } else if (email) {
+      query = query.where('email', '==', email);
+    } else {
+      return [];
+    }
+    const snapshot = await query.get();
+    return snapshot.docs.map(doc => doc.data());
+  } catch (error) {
+    console.error('Error fetching user bookings:', error);
     return [];
   }
-  const snapshot = await query.get();
-  return snapshot.docs.map(doc => doc.data());
 }
 
 async function isSlotAvailable(date, time) {
   const dateStr = formatDateISO(date);
-  const closedSlots = await getClosedSlotsForDate(dateStr);
-  const bookedSlots = await getBookingsForDate(dateStr);
+  const [closedSlots, bookedSlots] = await Promise.all([
+    getClosedSlotsForDate(dateStr),
+    getBookingsForDate(dateStr)
+  ]);
   const isClosed = closedSlots.some(slot => slot.time === time);
   const isBooked = bookedSlots.some(booking => booking.time === time);
   return !isClosed && !isBooked;
@@ -668,29 +883,26 @@ async function login() {
   const email = document.getElementById('login-email').value.trim();
   const password = document.getElementById('login-password').value;
   const msgDiv = document.getElementById('account-message');
+  
+  if (!email || !password) {
+    msgDiv.innerText = 'Please enter email and password.';
+    msgDiv.classList.remove('hidden');
+    msgDiv.style.color = '#f87171';
+    return;
+  }
+  
   try {
     const userCredential = await auth.signInWithEmailAndPassword(email, password);
     currentAuthUser = userCredential.user;
-    const profileDoc = await db.collection('userProfiles').doc(currentAuthUser.uid).get();
-    if (profileDoc.exists) {
-      currentUser = { uid: currentAuthUser.uid, ...profileDoc.data() };
-    } else {
-      currentUser = { uid: currentAuthUser.uid, email: currentAuthUser.email, name: '', phone: '', late: false };
-    }
+    await loadUserProfile();
     closeAccountModal();
     updateAccountUI();
-    if (!modal.classList.contains('hidden')) {
-      nameInput.value = currentUser.name || '';
-      emailInput.value = currentUser.email;
-      phoneInput.value = currentUser.phone || '';
-    }
-    checkLateReminder();
-    document.getElementById('my-bookings-button').classList.remove('hidden');
-    document.getElementById('logout-section').classList.remove('hidden');
-    msgDiv.classList.add('hidden');
+    syncAuthToBookingForm();
+    showToast('Welcome back!', 'success');
   } catch (error) {
-    msgDiv.innerText = error.message;
+    msgDiv.innerText = getAuthErrorMessage(error.code);
     msgDiv.classList.remove('hidden');
+    msgDiv.style.color = '#f87171';
   }
 }
 
@@ -700,41 +912,56 @@ async function register() {
   const phone = document.getElementById('reg-phone').value.trim();
   const password = document.getElementById('reg-password').value;
   const msgDiv = document.getElementById('account-message');
+  
   if (!name || !email || !phone || !password) {
     msgDiv.innerText = 'Please fill all fields.';
     msgDiv.classList.remove('hidden');
+    msgDiv.style.color = '#f87171';
     return;
   }
+  
+  if (password.length < 6) {
+    msgDiv.innerText = 'Password must be at least 6 characters.';
+    msgDiv.classList.remove('hidden');
+    msgDiv.style.color = '#f87171';
+    return;
+  }
+  
   try {
     const userCredential = await auth.createUserWithEmailAndPassword(email, password);
     currentAuthUser = userCredential.user;
-    const profile = { uid: currentAuthUser.uid, name, email, phone, late: false };
+    const profile = { 
+      uid: currentAuthUser.uid, 
+      name, 
+      email, 
+      phone, 
+      late: false,
+      createdAt: new Date().toISOString()
+    };
     await db.collection('userProfiles').doc(currentAuthUser.uid).set(profile);
     currentUser = profile;
     closeAccountModal();
     updateAccountUI();
-    if (!modal.classList.contains('hidden')) {
-      nameInput.value = name;
-      emailInput.value = email;
-      phoneInput.value = phone;
-    }
-    checkLateReminder();
-    document.getElementById('my-bookings-button').classList.remove('hidden');
-    document.getElementById('logout-section').classList.remove('hidden');
+    syncAuthToBookingForm();
+    showToast('Account created successfully!', 'success');
   } catch (error) {
-    msgDiv.innerText = error.message;
+    msgDiv.innerText = getAuthErrorMessage(error.code);
     msgDiv.classList.remove('hidden');
+    msgDiv.style.color = '#f87171';
   }
 }
 
 async function sendPasswordReset() {
   const email = document.getElementById('forgot-email').value.trim();
   const msgDiv = document.getElementById('account-message');
+  
   if (!email) {
     msgDiv.innerText = 'Please enter your email address.';
     msgDiv.classList.remove('hidden');
+    msgDiv.style.color = '#f87171';
     return;
   }
+  
   try {
     await auth.sendPasswordResetEmail(email);
     msgDiv.innerText = 'Password reset email sent! Check your inbox.';
@@ -743,37 +970,78 @@ async function sendPasswordReset() {
     setTimeout(() => {
       showLogin();
       msgDiv.classList.add('hidden');
-      msgDiv.style.color = '';
     }, 3000);
   } catch (error) {
-    msgDiv.innerText = error.message;
+    msgDiv.innerText = getAuthErrorMessage(error.code);
     msgDiv.classList.remove('hidden');
     msgDiv.style.color = '#f87171';
   }
 }
 
+function getAuthErrorMessage(code) {
+  const messages = {
+    'auth/invalid-email': 'Invalid email address.',
+    'auth/user-disabled': 'This account has been disabled.',
+    'auth/user-not-found': 'No account found with this email.',
+    'auth/wrong-password': 'Incorrect password.',
+    'auth/email-already-in-use': 'This email is already registered.',
+    'auth/weak-password': 'Password should be at least 6 characters.',
+    'auth/operation-not-allowed': 'This operation is not allowed.',
+    'auth/network-request-failed': 'Network error. Please check your connection.'
+  };
+  return messages[code] || 'An error occurred. Please try again.';
+}
+
 async function logout() {
-  await auth.signOut();
-  currentAuthUser = null;
-  currentUser = null;
-  updateAccountUI();
-  if (!modal.classList.contains('hidden')) loadCustomerInfo();
-  document.getElementById('my-bookings-button').classList.add('hidden');
-  document.getElementById('logout-section').classList.add('hidden');
-  closeAccountModal();
+  try {
+    await auth.signOut();
+    currentAuthUser = null;
+    currentUser = null;
+    updateAccountUI();
+    loadCustomerInfo();
+    document.getElementById('my-bookings-button').classList.add('hidden');
+    document.getElementById('logout-section').classList.add('hidden');
+    closeAccountModal();
+    showToast('Logged out successfully', 'info');
+  } catch (error) {
+    showToast('Error logging out', 'error');
+  }
+}
+
+async function loadUserProfile() {
+  if (!currentAuthUser) return;
+  try {
+    const profileDoc = await db.collection('userProfiles').doc(currentAuthUser.uid).get();
+    if (profileDoc.exists) {
+      currentUser = { uid: currentAuthUser.uid, ...profileDoc.data() };
+    } else {
+      currentUser = { 
+        uid: currentAuthUser.uid, 
+        email: currentAuthUser.email, 
+        name: '', 
+        phone: '', 
+        late: false 
+      };
+    }
+    checkLateReminder();
+  } catch (error) {
+    console.error('Error loading profile:', error);
+  }
 }
 
 function updateAccountUI() {
   const statusSpan = document.getElementById('account-status');
   if (currentUser) {
-    statusSpan.innerHTML = `${escapeHtml(currentUser.name)} <span class="text-xs">▼</span>`;
+    statusSpan.innerHTML = `${escapeHtml(currentUser.name || currentUser.email)} <span class="text-xs">▼</span>`;
     statusSpan.style.cursor = 'pointer';
     statusSpan.onclick = () => openAccountModal();
     document.getElementById('logout-section').classList.remove('hidden');
+    document.getElementById('my-bookings-button').classList.remove('hidden');
   } else {
     statusSpan.innerText = 'Sign In';
     statusSpan.onclick = () => openAccountModal();
     document.getElementById('logout-section').classList.add('hidden');
+    document.getElementById('my-bookings-button').classList.add('hidden');
   }
 }
 
@@ -781,45 +1049,80 @@ function openAccountModal() {
   document.getElementById('account-modal').classList.remove('hidden');
   if (currentUser) {
     document.getElementById('logout-section').classList.remove('hidden');
+    document.getElementById('my-bookings-button').classList.remove('hidden');
   } else {
     document.getElementById('logout-section').classList.add('hidden');
+    document.getElementById('my-bookings-button').classList.add('hidden');
     showLogin();
   }
+  document.getElementById('account-message').classList.add('hidden');
 }
-function closeAccountModal() { document.getElementById('account-modal').classList.add('hidden'); }
+
+function closeAccountModal() { 
+  document.getElementById('account-modal').classList.add('hidden'); 
+  document.getElementById('account-message').classList.add('hidden');
+}
+
 function showLogin() {
   document.getElementById('account-login-form').classList.remove('hidden');
   document.getElementById('account-register-form').classList.add('hidden');
   document.getElementById('account-forgot-form').classList.add('hidden');
   document.getElementById('account-message').classList.add('hidden');
 }
+
 function showRegister() {
   document.getElementById('account-login-form').classList.add('hidden');
   document.getElementById('account-register-form').classList.remove('hidden');
   document.getElementById('account-forgot-form').classList.add('hidden');
   document.getElementById('account-message').classList.add('hidden');
 }
+
 function showForgotPassword() {
   document.getElementById('account-login-form').classList.add('hidden');
   document.getElementById('account-register-form').classList.add('hidden');
   document.getElementById('account-forgot-form').classList.remove('hidden');
   document.getElementById('account-message').classList.add('hidden');
 }
-function checkLateReminder() { const div = document.getElementById('late-reminder'); if (currentUser && currentUser.late) div.classList.remove('hidden'); else div.classList.add('hidden'); }
+
+function checkLateReminder() { 
+  const div = document.getElementById('late-reminder'); 
+  if (currentUser && currentUser.late) {
+    div.classList.remove('hidden');
+  } else {
+    div.classList.add('hidden');
+  }
+}
+
+function syncAuthToBookingForm() {
+  if (!modal.classList.contains('hidden') && currentUser) {
+    nameInput.value = currentUser.name || '';
+    emailInput.value = currentUser.email;
+    phoneInput.value = currentUser.phone || '';
+  }
+}
 
 // ========== CUSTOMER INFO MANAGEMENT ==========
 async function saveCustomerInfo() {
   const name = nameInput.value.trim();
   const email = emailInput.value.trim();
   const phone = phoneInput.value.trim();
+  
   if (currentAuthUser) {
-    await db.collection('userProfiles').doc(currentAuthUser.uid).set({
-      name, email, phone, late: currentUser ? currentUser.late : false
-    }, { merge: true });
-    if (currentUser) {
-      currentUser = { ...currentUser, name, email, phone };
-    } else {
-      currentUser = { uid: currentAuthUser.uid, name, email, phone, late: false };
+    try {
+      await db.collection('userProfiles').doc(currentAuthUser.uid).set({
+        name, 
+        email, 
+        phone, 
+        late: currentUser ? currentUser.late : false,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+      if (currentUser) {
+        currentUser = { ...currentUser, name, email, phone };
+      } else {
+        currentUser = { uid: currentAuthUser.uid, name, email, phone, late: false };
+      }
+    } catch (error) {
+      console.error('Error saving customer info:', error);
     }
   } else {
     localStorage.setItem('customerName', name);
@@ -846,30 +1149,43 @@ function renderCalendar() {
   calendarDays.innerHTML = '';
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
+  
   monthYearLabel.innerText = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
+  
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  
+  // Empty cells for days before first day of month
   for (let i = 0; i < firstDay; i++) {
     const emptyDiv = document.createElement('div');
     emptyDiv.classList.add('empty');
     calendarDays.appendChild(emptyDiv);
   }
+  
+  // Day buttons
   for (let i = 1; i <= daysInMonth; i++) {
     const dayBtn = document.createElement('button');
     dayBtn.innerText = i;
-    dayBtn.classList.add('calendar-day', 'h-12', 'w-12', 'mx-auto', 'rounded-full', 'flex', 'items-center', 'justify-center', 'text-sm');
+    dayBtn.classList.add('calendar-day', 'h-10', 'sm:h-12', 'w-10', 'sm:w-12', 'mx-auto', 'rounded-full', 'flex', 'items-center', 'justify-center', 'text-sm');
+    
     const checkDate = new Date(year, month, i);
     checkDate.setHours(0, 0, 0, 0);
+    
     if (selectedDate && checkDate.toDateString() === selectedDate.toDateString()) {
       dayBtn.classList.add('selected');
     }
+    
     if (checkDate < today) {
       dayBtn.classList.add('disabled');
+      dayBtn.setAttribute('aria-disabled', 'true');
     } else {
       dayBtn.onclick = () => selectDate(dayBtn, checkDate);
+      dayBtn.setAttribute('aria-label', `Select ${checkDate.toLocaleDateString()}`);
     }
+    
     calendarDays.appendChild(dayBtn);
   }
 }
@@ -877,32 +1193,48 @@ function renderCalendar() {
 async function renderTimeSlots(date) {
   timeSlotsContainer.innerHTML = '';
   const dateStr = formatDateISO(date);
-  const closedSlots = await getClosedSlotsForDate(dateStr);
-  const bookedSlots = await getBookingsForDate(dateStr);
+  
+  const [closedSlots, bookedSlots] = await Promise.all([
+    getClosedSlotsForDate(dateStr),
+    getBookingsForDate(dateStr)
+  ]);
+  
   const now = new Date();
   const isToday = dateStr === formatDateISO(now);
+  
   TIME_SLOTS.forEach(time => {
+    // Skip past times for today
     if (isToday) {
       const slotTime = parseLocalDateTime(dateStr, time);
       if (slotTime < now) return;
     }
+    
     const btn = document.createElement('button');
     const surcharge = getTimeSurcharge(time);
     const afterHours = surcharge >= 50;
     const isEvening = surcharge > 0 && !afterHours;
+    
     let badgeHtml = '';
     if (afterHours) badgeHtml = '<span class="after-hours-badge">+R70</span>';
     else if (isEvening) badgeHtml = '<span class="evening-badge">+R20</span>';
+    
     btn.innerHTML = `<div class="flex items-center justify-between w-full">${time}${badgeHtml}</div>`;
-    btn.classList.add('time-slot-btn', 'p-4', 'border', 'border-white/10', 'rounded-lg', 'hover:bg-white', 'hover:text-black', 'transition-all', 'text-sm', 'font-medium');
+    btn.classList.add('time-slot-btn', 'p-3', 'sm:p-4', 'border', 'border-white/10', 'rounded-lg', 'hover:bg-white', 'hover:text-black', 'transition-all', 'text-sm', 'font-medium');
+    
     if (time === selectedTime) btn.classList.add('selected');
+    
     const isClosed = closedSlots.some(slot => slot.time === time);
     const isBooked = bookedSlots.some(booking => booking.time === time);
+    
     if (isClosed || isBooked) {
       btn.classList.add('closed', 'opacity-30', 'pointer-events-none');
+      btn.setAttribute('aria-disabled', 'true');
+      btn.title = 'Unavailable';
     } else {
       btn.onclick = () => selectTime(btn, time);
+      btn.setAttribute('aria-label', `Select ${time}`);
     }
+    
     timeSlotsContainer.appendChild(btn);
   });
 }
@@ -919,6 +1251,7 @@ function getTimeSurcharge(time) {
   if (["07:00 PM", "08:00 PM"].includes(time)) surcharge += 50;
   return surcharge;
 }
+
 function getFinalPrice(basePrice, time) {
   return basePrice + getTimeSurcharge(time);
 }
@@ -927,6 +1260,7 @@ function updateSummary() {
   summaryService.innerText = selectedService ? selectedService.name : 'Not selected';
   summaryDate.innerText = selectedDate ? selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not selected';
   summaryTime.innerText = selectedTime || 'Not selected';
+  
   if (selectedService && selectedTime) {
     const finalPrice = getFinalPrice(selectedService.price, selectedTime);
     summaryServicePrice.innerText = `R${finalPrice}`;
@@ -940,13 +1274,17 @@ function selectDate(element, date) {
   element.classList.add('selected');
   selectedDate = date;
   selectedTime = null;
+  
   document.getElementById('btn-calendar-next').disabled = false;
   document.getElementById('btn-time-next').disabled = true;
+  
   updateSummary();
+  
   if (!document.getElementById('step-time').classList.contains('hidden')) {
     renderTimeSlots(selectedDate);
   }
-  // Start real‑time listeners for the new date
+  
+  // Start real-time listeners for the new date
   startRealTimeUpdates(formatDateISO(selectedDate));
 }
 
@@ -969,43 +1307,66 @@ function selectService(element, serviceName, servicePrice) {
 function goToStep(stepName) {
   document.querySelectorAll('.step-view').forEach(el => el.classList.add('hidden'));
   document.getElementById(`step-${stepName}`).classList.remove('hidden');
+  
   if (stepName === 'time' && selectedDate) {
     document.getElementById('time-header-date').innerText = selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
     renderTimeSlots(selectedDate);
-    // Ensure listeners are active for the current date
     startRealTimeUpdates(formatDateISO(selectedDate));
   }
+  
   if (stepName === 'details') {
     checkLateReminder();
   }
+  
+  // Scroll to top of modal content
+  const mainContent = document.querySelector('#booking-modal .flex-1');
+  if (mainContent) mainContent.scrollTop = 0;
 }
 
-function prevMonth() { currentDate.setMonth(currentDate.getMonth() - 1); renderCalendar(); }
-function nextMonth() { currentDate.setMonth(currentDate.getMonth() + 1); renderCalendar(); }
+function prevMonth() { 
+  currentDate.setMonth(currentDate.getMonth() - 1); 
+  renderCalendar(); 
+}
+
+function nextMonth() { 
+  currentDate.setMonth(currentDate.getMonth() + 1); 
+  renderCalendar(); 
+}
 
 function resetSelection() {
   selectedDate = null;
   selectedTime = null;
   selectedService = null;
+  
   updateSummary();
-  document.querySelectorAll('.calendar-day.selected, .time-slot-btn.selected, .service-btn.selected').forEach(el => el.classList.remove('selected'));
+  
+  document.querySelectorAll('.calendar-day.selected, .time-slot-btn.selected, .service-btn.selected').forEach(el => {
+    el.classList.remove('selected');
+  });
+  
   document.getElementById('btn-calendar-next').disabled = true;
   document.getElementById('btn-time-next').disabled = true;
   document.getElementById('btn-service-next').disabled = true;
-  [nameInput, emailInput, phoneInput].forEach(i => i.classList.remove('input-error'));
+  
+  [nameInput, emailInput, phoneInput].forEach(i => {
+    i.classList.remove('input-error', 'input-success');
+  });
   [nameError, emailError, phoneError].forEach(e => e.style.display = 'none');
+  
   agreeCheck.checked = false;
-  // Stop real‑time listeners when resetting
+  
   stopRealTimeUpdates();
 }
 
 function openBooking(options = {}) {
   modal.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
+  
   if (!options.preserveSelection) resetSelection();
   loadCustomerInfo();
   renderCalendar();
   updateSummary();
+  
   if (options.preserveSelection) {
     document.getElementById('btn-calendar-next').disabled = !selectedDate;
     document.getElementById('btn-time-next').disabled = !selectedTime;
@@ -1014,6 +1375,7 @@ function openBooking(options = {}) {
       startRealTimeUpdates(formatDateISO(selectedDate));
     }
   }
+  
   goToStep(options.step || 'calendar');
   lucide.createIcons();
   checkLateReminder();
@@ -1022,13 +1384,10 @@ function openBooking(options = {}) {
 function closeBooking() {
   modal.classList.add('hidden');
   document.body.style.overflow = 'auto';
-  stopRealTimeUpdates(); // Clean up listeners
+  stopRealTimeUpdates();
 }
 
-// ========== REAL-TIME UPDATES (FIXED) ==========
-let currentBookingsUnsubscribe = null;
-let currentClosedSlotsUnsubscribe = null;
-
+// ========== REAL-TIME UPDATES ==========
 function stopRealTimeUpdates() {
   if (currentBookingsUnsubscribe) {
     currentBookingsUnsubscribe();
@@ -1041,66 +1400,87 @@ function stopRealTimeUpdates() {
 }
 
 function startRealTimeUpdates(dateStr) {
-  // Stop previous listeners
   stopRealTimeUpdates();
-  // Only set up listeners if the time step is visible and we have a date
-  if (!modal.classList.contains('hidden') && !document.getElementById('step-time').classList.contains('hidden') && selectedDate && formatDateISO(selectedDate) === dateStr) {
+  
+  if (!modal.classList.contains('hidden') && 
+      !document.getElementById('step-time').classList.contains('hidden') && 
+      selectedDate && 
+      formatDateISO(selectedDate) === dateStr) {
+    
     currentBookingsUnsubscribe = db.collection('bookings')
       .where('date', '==', dateStr)
       .onSnapshot(() => {
-        if (!modal.classList.contains('hidden') && !document.getElementById('step-time').classList.contains('hidden') && selectedDate) {
+        if (!modal.classList.contains('hidden') && 
+            !document.getElementById('step-time').classList.contains('hidden') && 
+            selectedDate) {
           renderTimeSlots(selectedDate);
         }
+      }, (error) => {
+        console.error('Real-time bookings error:', error);
       });
+    
     currentClosedSlotsUnsubscribe = db.collection('closedSlots')
       .where('date', '==', dateStr)
       .onSnapshot(() => {
-        if (!modal.classList.contains('hidden') && !document.getElementById('step-time').classList.contains('hidden') && selectedDate) {
+        if (!modal.classList.contains('hidden') && 
+            !document.getElementById('step-time').classList.contains('hidden') && 
+            selectedDate) {
           renderTimeSlots(selectedDate);
         }
+      }, (error) => {
+        console.error('Real-time closed slots error:', error);
       });
   }
 }
 
 // ========== FORM VALIDATION ==========
-function validateName() {
+const validateName = debounce(() => {
   const value = nameInput.value.trim();
   if (value === '') {
     nameInput.classList.add('input-error');
+    nameInput.classList.remove('input-success');
     nameError.style.display = 'block';
     return false;
   } else {
     nameInput.classList.remove('input-error');
+    nameInput.classList.add('input-success');
     nameError.style.display = 'none';
     return true;
   }
-}
-function validateEmail() {
+}, 300);
+
+const validateEmail = debounce(() => {
   const value = emailInput.value.trim();
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(value)) {
     emailInput.classList.add('input-error');
+    emailInput.classList.remove('input-success');
     emailError.style.display = 'block';
     return false;
   } else {
     emailInput.classList.remove('input-error');
+    emailInput.classList.add('input-success');
     emailError.style.display = 'none';
     return true;
   }
-}
-function validatePhone() {
+}, 300);
+
+const validatePhone = debounce(() => {
   const value = phoneInput.value.trim();
   const digits = value.replace(/\D/g, '');
   if (digits.length < 10) {
     phoneInput.classList.add('input-error');
+    phoneInput.classList.remove('input-success');
     phoneError.style.display = 'block';
     return false;
   } else {
     phoneInput.classList.remove('input-error');
+    phoneInput.classList.add('input-success');
     phoneError.style.display = 'none';
     return true;
   }
-}
+}, 300);
+
 function validateForm() {
   return validateName() && validateEmail() && validatePhone() && agreeCheck.checked;
 }
@@ -1112,37 +1492,40 @@ phoneInput.addEventListener('input', validatePhone);
 // ========== CONFIRM BOOKING WITH TRANSACTION ==========
 async function confirmBooking() {
   if (isProcessing) return;
+  
   if (!validateForm()) {
-    alert('Please fix the errors in the form.');
+    showToast('Please fix the errors in the form.', 'error');
     return;
   }
+  
   if (!selectedDate || !selectedTime || !selectedService) {
-    alert('Please complete all selection steps before confirming.');
+    showToast('Please complete all selection steps.', 'error');
     return;
   }
-
-  // Quick optimistic check
+  
+  // Quick availability check
   const quickAvailable = await isSlotAvailable(selectedDate, selectedTime);
   if (!quickAvailable) {
-    alert('Sorry, this slot is no longer available. Please choose another time.');
+    showToast('Sorry, this slot is no longer available.', 'error');
     renderTimeSlots(selectedDate);
     return;
   }
-
+  
   const infoSaved = await saveCustomerInfo();
   if (!infoSaved) return;
-
+  
   isProcessing = true;
   confirmBtn.disabled = true;
   confirmBtnText.innerText = 'Processing...';
   confirmSpinner.classList.remove('hidden');
-
+  
   try {
     const name = nameInput.value.trim();
     const email = emailInput.value.trim();
     const phone = phoneInput.value.trim();
     const finalPrice = getFinalPrice(selectedService.price, selectedTime);
-    const bookingId = Date.now() + '-' + Math.random().toString(36).substr(2, 8);
+    const bookingId = Date.now().toString() + '-' + Math.random().toString(36).substr(2, 8);
+    
     const bookingData = {
       id: bookingId,
       date: formatDateISO(selectedDate),
@@ -1160,47 +1543,60 @@ async function confirmBooking() {
       arrivalConfirmed: false,
       reviewGiven: false
     };
-
-    // Firestore transaction
+    
+    // Firestore transaction for atomic booking
     await db.runTransaction(async (transaction) => {
-      // Check bookings for the same date
       const bookingsSnapshot = await transaction.get(
         db.collection('bookings').where('date', '==', bookingData.date)
       );
+      
       const slotTaken = bookingsSnapshot.docs.some(doc => doc.data().time === bookingData.time);
       if (slotTaken) {
         throw new Error('SLOT_ALREADY_BOOKED');
       }
-      // Check closed slots for the same date
+      
       const closedSnapshot = await transaction.get(
         db.collection('closedSlots').where('date', '==', bookingData.date).where('time', '==', bookingData.time)
       );
+      
       if (!closedSnapshot.empty) {
         throw new Error('SLOT_CLOSED');
       }
+      
       transaction.set(db.collection('bookings').doc(bookingId), bookingData);
     });
-
+    
+    // Handle reschedule
     if (rescheduleOldBookingId) {
       await db.collection('bookings').doc(rescheduleOldBookingId).delete();
       rescheduleOldBookingId = null;
-      alert('Original booking cancelled. Reschedule complete.');
+      showToast('Original booking cancelled. Reschedule complete.', 'success');
     }
-
+    
+    // Success state
     document.getElementById('success-message').innerText = 'Your slot is reserved.';
     const firstDateStr = selectedDate.toLocaleDateString();
-    document.getElementById('success-details').innerHTML = `${selectedService.name}<br>${firstDateStr} at ${selectedTime}<br>Total: R${finalPrice}`;
+    document.getElementById('success-details').innerHTML = `
+      ${escapeHtml(selectedService.name)}<br>
+      ${firstDateStr} at ${selectedTime}<br>
+      Total: R${finalPrice}
+    `;
+    
+    // WhatsApp link
     const barberPhone = "27768502521";
     const message = `New booking: ${selectedService.name} on ${selectedDate.toLocaleDateString()} at ${selectedTime}. Client: ${name} (${phone}) - Total: R${finalPrice}`;
     whatsappLink.href = `https://wa.me/${barberPhone}?text=${encodeURIComponent(message)}`;
+    
     goToStep('success');
+    showToast('Booking confirmed!', 'success');
+    
   } catch (err) {
-    console.error(err);
+    console.error('Booking error:', err);
     if (err.message === 'SLOT_ALREADY_BOOKED' || err.message === 'SLOT_CLOSED') {
-      alert('Sorry, this slot was just taken by another user. Please choose another time.');
+      showToast('This slot was just taken. Please choose another time.', 'error');
       renderTimeSlots(selectedDate);
     } else {
-      alert('Something went wrong. Please try again.');
+      showToast('Something went wrong. Please try again.', 'error');
     }
   } finally {
     isProcessing = false;
@@ -1209,29 +1605,43 @@ async function confirmBooking() {
     confirmSpinner.classList.add('hidden');
   }
 }
+
 confirmBtn.addEventListener('click', confirmBooking);
 
 // ========== MY BOOKINGS & RESCHEDULE ==========
 async function openMyBookings() {
   if (!currentAuthUser && !currentUser) {
-    alert('Please sign in to view your bookings.');
+    showToast('Please sign in to view your bookings.', 'error');
     return;
   }
+  
   const userId = currentAuthUser ? currentAuthUser.uid : null;
   const userEmail = currentUser ? currentUser.email : (currentAuthUser ? currentAuthUser.email : null);
-  if (!userId && !userEmail) return;
-  const modal = document.getElementById('my-bookings-modal');
-  modal.classList.remove('hidden');
+  
+  if (!userId && !userEmail) {
+    showToast('Unable to load bookings.', 'error');
+    return;
+  }
+  
+  const bookingsModal = document.getElementById('my-bookings-modal');
+  bookingsModal.classList.remove('hidden');
   const container = document.getElementById('my-bookings-list');
   container.innerHTML = '<div class="loader"></div>';
+  
   try {
     const bookings = await getUserBookings(userId, userEmail);
     const now = new Date();
-    bookings.sort((a, b) => a.date.localeCompare(b.date));
+    bookings.sort((a, b) => {
+      const dateCompare = a.date.localeCompare(b.date);
+      if (dateCompare !== 0) return dateCompare;
+      return a.time.localeCompare(b.time);
+    });
+    
     if (bookings.length === 0) {
-      container.innerHTML = '<p class="text-gray-500">No bookings found.</p>';
+      container.innerHTML = '<p class="text-gray-500 text-center py-8">No bookings found.</p>';
       return;
     }
+    
     container.innerHTML = bookings.map(b => {
       const apptDateTime = parseLocalDateTime(b.date, b.time);
       const isPast = apptDateTime < now;
@@ -1239,8 +1649,9 @@ async function openMyBookings() {
       const hoursDiff = (apptDateTime - now) / (1000 * 60 * 60);
       const canReschedule = isUpcoming && hoursDiff >= 5;
       const canReview = isPast && !b.reviewGiven;
+      
       return `
-        <div class="bg-[#1a1a1a] border border-white/5 rounded-xl p-4">
+        <div class="booking-card bg-[#1a1a1a] border border-white/5 rounded-xl p-4">
           <div class="flex justify-between items-start gap-4">
             <div>
               <p class="font-bold">${escapeHtml(b.service)}</p>
@@ -1249,118 +1660,177 @@ async function openMyBookings() {
               <p class="text-xs text-gray-500 mt-1">Status: ${isPast ? 'Completed' : (b.status || 'Upcoming')}</p>
             </div>
             <div class="flex gap-2 flex-wrap justify-end">
-              ${canReschedule ? `<button onclick="rescheduleBooking('${b.id}')" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-full text-xs font-bold">Reschedule</button>` : ''}
-              ${isUpcoming ? `<button onclick="cancelMyBooking('${b.id}')" class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded-full text-xs font-bold">Cancel</button>` : ''}
-              ${canReview ? `<button onclick="openReviewModal('${b.id}')" class="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 rounded-full text-xs font-bold">Rate</button>` : ''}
+              ${canReschedule ? `<button onclick="rescheduleBooking('${b.id}')" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-full text-xs font-bold transition-colors">Reschedule</button>` : ''}
+              ${isUpcoming ? `<button onclick="cancelMyBooking('${b.id}')" class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded-full text-xs font-bold transition-colors">Cancel</button>` : ''}
+              ${canReview ? `<button onclick="openReviewModal('${b.id}')" class="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 rounded-full text-xs font-bold transition-colors">Rate</button>` : ''}
             </div>
           </div>
         </div>
       `;
     }).join('');
+    
     lucide.createIcons();
   } catch (err) {
-    console.error(err);
-    container.innerHTML = '<p class="text-red-500">Error loading bookings.</p>';
+    console.error('Error loading bookings:', err);
+    container.innerHTML = '<p class="text-red-500 text-center py-8">Error loading bookings.</p>';
   }
 }
-function closeMyBookings() { document.getElementById('my-bookings-modal').classList.add('hidden'); }
+
+function closeMyBookings() { 
+  document.getElementById('my-bookings-modal').classList.add('hidden'); 
+}
+
 async function rescheduleBooking(bookingId) {
-  const booking = (await getUserBookings(currentAuthUser ? currentAuthUser.uid : null, currentUser ? currentUser.email : null)).find(b => b.id === bookingId);
-  if (!booking) return;
+  const bookings = await getUserBookings(
+    currentAuthUser ? currentAuthUser.uid : null, 
+    currentUser ? currentUser.email : null
+  );
+  const booking = bookings.find(b => b.id === bookingId);
+  
+  if (!booking) {
+    showToast('Booking not found.', 'error');
+    return;
+  }
+  
   const now = new Date();
   const appointmentDateTime = parseLocalDateTime(booking.date, booking.time);
   const hoursDiff = (appointmentDateTime - now) / (1000 * 60 * 60);
+  
   if (hoursDiff < 5) {
-    alert('Rescheduling is only allowed at least 5 hours before your appointment.');
+    showToast('Rescheduling is only allowed at least 5 hours before your appointment.', 'error');
     return;
   }
+  
   closeMyBookings();
+  
   const serviceName = booking.service;
   const servicePrice = booking.basePrice || (serviceName.includes('Dye') ? 100 : 80);
+  
   rescheduleOldBookingId = bookingId;
   selectedService = { name: serviceName, price: servicePrice };
   selectedDate = parseLocalDate(booking.date);
   selectedTime = booking.time;
+  
   openBooking({ preserveSelection: true, step: 'calendar' });
   updateSummary();
+  showToast('Select your new time slot.', 'info');
 }
+
 window.cancelMyBooking = async function(bookingId) {
-  const booking = (await getUserBookings(currentAuthUser ? currentAuthUser.uid : null, currentUser ? currentUser.email : null)).find(b => b.id === bookingId);
-  if (!booking) return;
+  const bookings = await getUserBookings(
+    currentAuthUser ? currentAuthUser.uid : null, 
+    currentUser ? currentUser.email : null
+  );
+  const booking = bookings.find(b => b.id === bookingId);
+  
+  if (!booking) {
+    showToast('Booking not found.', 'error');
+    return;
+  }
+  
   const now = new Date();
   const appointmentDateTime = parseLocalDateTime(booking.date, booking.time);
   const diffHours = (appointmentDateTime - now) / (1000 * 60 * 60);
+  
   let warning = '';
   if (diffHours <= 5 && diffHours > 0) {
-    warning = '\n\n⚠️ WARNING: Cancelling within 5 hours of your appointment will incur a R20 cancellation fee.';
+    warning = '\n\n⚠️ WARNING: Cancelling within 5 hours will incur a R20 cancellation fee.';
   }
+  
   if (!confirm(`Are you sure you want to cancel this booking?${warning}`)) return;
+  
   if (diffHours <= 5 && diffHours > 0) {
-    alert('A R20 cancellation fee will be charged. Please contact the barber for payment.');
+    showToast('A R20 cancellation fee will be charged. Please contact the barber for payment.', 'info');
   }
-  await db.collection('bookings').doc(bookingId).delete();
-  closeMyBookings();
-  openMyBookings();
-  if (!modal.classList.contains('hidden') && selectedDate && formatDateISO(selectedDate) === booking.date) {
-    renderTimeSlots(selectedDate);
+  
+  try {
+    await db.collection('bookings').doc(bookingId).delete();
+    closeMyBookings();
+    openMyBookings();
+    
+    if (!modal.classList.contains('hidden') && selectedDate && formatDateISO(selectedDate) === booking.date) {
+      renderTimeSlots(selectedDate);
+    }
+    
+    showToast('Booking cancelled.', 'success');
+  } catch (error) {
+    showToast('Error cancelling booking.', 'error');
   }
 };
 
 // ========== REVIEW FUNCTIONS ==========
-let currentReviewBooking = null;
 function openReviewModal(bookingId) {
   currentReviewBooking = bookingId;
   document.getElementById('review-modal').classList.remove('hidden');
+  
   const stars = document.querySelectorAll('#rating-stars i');
-  stars.forEach((star, idx) => {
+  stars.forEach((star) => {
     star.classList.remove('filled');
-    star.onclick = () => setRating(idx + 1);
+    star.onclick = () => setRating(parseInt(star.dataset.rating));
   });
+  
   document.getElementById('review-comment').value = '';
-  window.selectedRating = null;
+  selectedRating = null;
 }
+
 function setRating(rating) {
   const stars = document.querySelectorAll('#rating-stars i');
-  stars.forEach((star, idx) => {
-    if (idx < rating) star.classList.add('filled');
-    else star.classList.remove('filled');
+  stars.forEach((star) => {
+    const starRating = parseInt(star.dataset.rating);
+    if (starRating <= rating) {
+      star.classList.add('filled');
+    } else {
+      star.classList.remove('filled');
+    }
   });
-  window.selectedRating = rating;
+  selectedRating = rating;
 }
+
 async function submitReview() {
-  if (!window.selectedRating) {
-    alert('Please select a rating.');
+  if (!selectedRating) {
+    showToast('Please select a rating.', 'error');
     return;
   }
+  
   const comment = document.getElementById('review-comment').value.trim();
+  
   const reviewData = {
     bookingId: currentReviewBooking,
-    rating: window.selectedRating,
+    rating: selectedRating,
     comment: comment,
     userId: currentAuthUser ? currentAuthUser.uid : null,
     createdAt: new Date().toISOString()
   };
-  await db.collection('reviews').doc(currentReviewBooking).set(reviewData);
-  await db.collection('bookings').doc(currentReviewBooking).update({ reviewGiven: true });
-  closeReviewModal();
-  alert('Thank you for your review!');
-  openMyBookings();
-  loadPublicReviews();
+  
+  try {
+    await db.collection('reviews').doc(currentReviewBooking).set(reviewData);
+    await db.collection('bookings').doc(currentReviewBooking).update({ reviewGiven: true });
+    closeReviewModal();
+    showToast('Thank you for your review!', 'success');
+    openMyBookings();
+    loadPublicReviews();
+  } catch (error) {
+    console.error('Error submitting review:', error);
+    showToast('Error submitting review.', 'error');
+  }
 }
+
 function closeReviewModal() {
   document.getElementById('review-modal').classList.add('hidden');
   currentReviewBooking = null;
-  window.selectedRating = null;
+  selectedRating = null;
 }
 
 // ========== PDF RECEIPT ==========
 function downloadReceipt() {
   if (typeof window.jspdf === 'undefined') {
-    alert('PDF library not loaded. Please try again.');
+    showToast('PDF library not loaded. Please try again.', 'error');
     return;
   }
+  
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
+  
   const service = selectedService ? selectedService.name : 'N/A';
   const dateStr = selectedDate ? selectedDate.toLocaleDateString() : 'N/A';
   const timeStr = selectedTime || 'N/A';
@@ -1368,9 +1838,15 @@ function downloadReceipt() {
   const name = nameInput.value.trim();
   const email = emailInput.value.trim();
   const phone = phoneInput.value.trim();
+  
+  // Header
   doc.setFontSize(20);
+  doc.setFont('helvetica', 'bold');
   doc.text('Private Barber - Booking Receipt', 20, 20);
+  
+  // Info
   doc.setFontSize(12);
+  doc.setFont('helvetica', 'normal');
   doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 30);
   doc.text(`Customer: ${name}`, 20, 40);
   doc.text(`Email: ${email}`, 20, 45);
@@ -1378,24 +1854,34 @@ function downloadReceipt() {
   doc.text(`Service: ${service}`, 20, 60);
   doc.text(`Appointment: ${dateStr} at ${timeStr}`, 20, 65);
   doc.text(`Price: R${finalPrice}`, 20, 70);
+  
   if (selectedTime && getTimeSurcharge(selectedTime) > 0) {
     doc.text(`(Includes evening/after-hours surcharge)`, 20, 75);
   }
+  
+  // Policies
   doc.setFontSize(10);
   doc.setTextColor(100);
   doc.text('Policies:', 20, 90);
   doc.text('• Late fee: R10 per 10 minutes late.', 20, 95);
   doc.text('• Cancellation within 5h: R20 fee.', 20, 100);
-  doc.text('• No-show may result in a late flag on your account.', 20, 105);
+  doc.text('• No-show may result in a late flag.', 20, 105);
   doc.text('• Each booking is for one person only.', 20, 110);
+  
+  // Footer
+  doc.setFontSize(10);
+  doc.setTextColor(0);
   doc.text('Thank you for choosing Private Barber.', 20, 125);
-  doc.save(`Receipt_${name}_${dateStr.replace(/\//g, '-')}.pdf`);
+  
+  doc.save(`Receipt_${name.replace(/\s+/g, '_')}_${dateStr.replace(/\//g, '-')}.pdf`);
+  showToast('Receipt downloaded!', 'success');
 }
 
 // ========== PUBLIC REVIEWS DISPLAY ==========
 async function loadPublicReviews() {
   const container = document.getElementById('public-reviews-container');
   container.innerHTML = '<div class="loader mx-auto col-span-full"></div>';
+  
   try {
     const reviewsSnapshot = await db.collection('reviews')
       .orderBy('createdAt', 'desc')
@@ -1403,7 +1889,7 @@ async function loadPublicReviews() {
       .get();
     
     if (reviewsSnapshot.empty) {
-      container.innerHTML = '<p class="text-gray-500 text-center col-span-full">No reviews yet. Be the first to leave one!</p>';
+      container.innerHTML = '<p class="text-gray-500 text-center col-span-full py-8">No reviews yet. Be the first to leave one!</p>';
       return;
     }
     
@@ -1416,7 +1902,7 @@ async function loadPublicReviews() {
       
       let starsHtml = '';
       for (let i = 1; i <= 5; i++) {
-        starsHtml += `<i data-lucide="star" class="w-4 h-4 ${i <= rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-500'}"></i>`;
+        starsHtml += `<i data-lucide="star" class="w-4 h-4 ${i <= rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-600'}"></i>`;
       }
       
       reviewsHTML.push(`
@@ -1434,7 +1920,7 @@ async function loadPublicReviews() {
     lucide.createIcons();
   } catch (error) {
     console.error('Error loading reviews:', error);
-    container.innerHTML = '<p class="text-red-500 text-center col-span-full">Failed to load reviews. Please try again later.</p>';
+    container.innerHTML = '<p class="text-red-500 text-center col-span-full py-8">Failed to load reviews. Please try again later.</p>';
   }
 }
 
@@ -1442,21 +1928,9 @@ async function loadPublicReviews() {
 auth.onAuthStateChanged(async (user) => {
   if (user) {
     currentAuthUser = user;
-    const profileDoc = await db.collection('userProfiles').doc(user.uid).get();
-    if (profileDoc.exists) {
-      currentUser = { uid: user.uid, ...profileDoc.data() };
-    } else {
-      currentUser = { uid: user.uid, email: user.email, name: '', phone: '', late: false };
-    }
+    await loadUserProfile();
     updateAccountUI();
-    if (!modal.classList.contains('hidden')) {
-      nameInput.value = currentUser.name || '';
-      emailInput.value = currentUser.email;
-      phoneInput.value = currentUser.phone || '';
-    }
-    checkLateReminder();
-    document.getElementById('my-bookings-button').classList.remove('hidden');
-    document.getElementById('logout-section').classList.remove('hidden');
+    syncAuthToBookingForm();
   } else {
     currentAuthUser = null;
     currentUser = null;
@@ -1467,9 +1941,29 @@ auth.onAuthStateChanged(async (user) => {
   }
 });
 
-// ========== INIT ==========
-updateAccountUI();
-loadPublicReviews();
+// ========== INITIALIZATION ==========
+document.addEventListener('DOMContentLoaded', () => {
+  updateAccountUI();
+  loadPublicReviews();
+  
+  // Close modals on Escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (!modal.classList.contains('hidden')) closeBooking();
+      if (!document.getElementById('account-modal').classList.contains('hidden')) closeAccountModal();
+      if (!document.getElementById('my-bookings-modal').classList.contains('hidden')) closeMyBookings();
+      if (!document.getElementById('review-modal').classList.contains('hidden')) closeReviewModal();
+    }
+  });
+});
+
+// Handle page visibility change to refresh data
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && selectedDate) {
+    renderTimeSlots(selectedDate);
+  }
+});
 </script>
 </body>
 </html>
+

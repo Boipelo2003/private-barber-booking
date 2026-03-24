@@ -3,37 +3,28 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Barber Admin | Dashboard</title>
+<title>Barber Admin | Dashboard (SAST)</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/lucide@latest"></script>
-<!-- Firebase v8 -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 <style>
-body {
-  font-family: 'Inter', sans-serif;
-  background-color: #0a0a0a;
-  color: #ffffff;
-}
-.glass-panel {
-  background: rgba(20, 20, 20, 0.8);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
+body { font-family: 'Inter', sans-serif; background-color: #0a0a0a; color: #ffffff; }
+.glass-panel { background: rgba(20, 20, 20, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
 .hidden { display: none !important; }
 .slot-btn.closed { background-color: #2d2d2d; color: #888; border-color: #444; }
 .slot-btn.open { background-color: #1a1a1a; border-color: #333; }
 .btn-disabled { opacity: 0.6; cursor: not-allowed; pointer-events: none; }
-.evening-badge {
-  background: #ff6b6b20;
-  border: 1px solid #ff6b6b;
-  color: #ffb3b3;
+.evening-badge, .after-hours-badge {
+  display: inline-block;
   border-radius: 20px;
   padding: 0.25rem 0.5rem;
   font-size: 0.7rem;
   margin-left: 0.5rem;
 }
+.evening-badge { background: #ff6b6b20; border: 1px solid #ff6b6b; color: #ffb3b3; }
+.after-hours-badge { background: #ff450020; border: 1px solid #ff4500; color: #ffb3b3; }
 .user-card { transition: all 0.2s; }
 .user-card:hover { background: rgba(255,255,255,0.05); }
 .loading-spinner {
@@ -45,10 +36,8 @@ body {
   animation: spin 0.8s linear infinite;
   margin: 20px auto;
 }
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+.timezone-note { font-size: 0.7rem; color: #aaa; margin-top: 0.5rem; text-align: center; }
 </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
@@ -63,17 +52,16 @@ body {
   <div class="space-y-4">
     <div>
       <label class="block text-sm text-gray-400 mb-1">Password</label>
-      <input type="password" id="admin-password" placeholder="••••••••" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
+      <input type="password" id="admin-password" placeholder="••••••••" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white">
     </div>
     <button onclick="checkPassword()" class="w-full bg-white text-black hover:bg-gray-200 font-bold py-3 rounded-lg transition-colors">Login</button>
     <p id="login-error" class="text-red-500 text-sm text-center hidden">Incorrect password</p>
   </div>
-  <!-- Password hint removed -->
 </div>
 
 <!-- Admin Panel -->
 <div id="admin-panel" class="hidden w-full">
-  <div class="max-w-7xl mx-auto">
+  <div class="max-w-7xl mx-auto px-4 py-6">
     <div class="flex items-center justify-between mb-8">
       <div class="flex items-center gap-3">
         <img src="https://image.qwenlm.ai/public_source/8b83e0df-dcfb-4b73-8354-600aa9e2a523/1beedd3c3-727f-4ecf-9df2-28663b4efe0b.png" alt="Logo" class="h-12 w-12 rounded-full border border-white/20">
@@ -91,9 +79,9 @@ body {
       <!-- LEFT: Manage Slots -->
       <div class="glass-panel rounded-2xl p-6">
         <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><i data-lucide="calendar-x" class="w-5 h-5"></i> Close / Open Slots</h2>
-        <p class="text-sm text-gray-400 mb-6">Select a date and toggle individual slots. Slots after 6 PM include a <span class="evening-badge inline-block">+R20</span> surcharge.</p>
+        <p class="text-sm text-gray-400 mb-6">Select a date and toggle individual slots. Surcharges: <span class="evening-badge">6 PM → +R20</span> <span class="after-hours-badge">7 PM–8 PM → +R70</span></p>
         <div class="mb-6">
-          <label class="block text-xs uppercase text-gray-500 mb-2">Select Date</label>
+          <label class="block text-xs uppercase text-gray-500 mb-2">Select Date (SAST)</label>
           <input type="date" id="slot-date" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white">
         </div>
         <div class="flex gap-3 mb-6">
@@ -102,9 +90,10 @@ body {
         </div>
         <div id="admin-slots-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 min-h-[200px]"></div>
         <p id="no-slots-message" class="text-sm text-gray-500 mt-4 hidden">Select a date to manage slots.</p>
+        <div class="timezone-note">All dates/times are in South Africa Standard Time (SAST, UTC+2).</div>
       </div>
 
-      <!-- MIDDLE: Upcoming Bookings (enhanced) -->
+      <!-- MIDDLE: Upcoming Bookings -->
       <div class="glass-panel rounded-2xl p-6">
         <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><i data-lucide="calendar-check" class="w-5 h-5"></i> Upcoming Bookings</h2>
         <p class="text-sm text-gray-400 mb-6">Manage arrivals, completions, and cancellations.</p>
@@ -121,52 +110,86 @@ body {
       </div>
     </div>
 
-    <p class="text-center text-xs text-gray-600 mt-10">Changes reflect immediately on the public booking site.</p>
+    <p class="text-center text-xs text-gray-600 mt-10">Changes reflect immediately on the public booking site. All times are SAST (UTC+2).</p>
   </div>
 </div>
 
 <script>
 lucide.createIcons();
 
-// ========== HELPER FUNCTIONS ==========
-function formatDateISO(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+// ========== SAST TIMEZONE HELPERS (same as public site) ==========
+function getBarberCurrentDateTime() {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Johannesburg', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  const parts = formatter.formatToParts(now);
+  const year = parseInt(parts.find(p => p.type === 'year').value);
+  const month = parseInt(parts.find(p => p.type === 'month').value);
+  const day = parseInt(parts.find(p => p.type === 'day').value);
+  const hour = parseInt(parts.find(p => p.type === 'hour').value);
+  const minute = parseInt(parts.find(p => p.type === 'minute').value);
+  const second = parseInt(parts.find(p => p.type === 'second').value);
+  const utcTimestamp = Date.UTC(year, month-1, day, hour-2, minute, second);
+  return new Date(utcTimestamp);
 }
 
-function parseLocalDate(dateStr) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(y, m - 1, d);
+function getBarberCurrentDateMidnight() {
+  const barberNow = getBarberCurrentDateTime();
+  const utcMidnight = Date.UTC(barberNow.getUTCFullYear(), barberNow.getUTCMonth(), barberNow.getUTCDate(), -2, 0, 0);
+  return new Date(utcMidnight);
 }
 
-function parseLocalDateTime(dateStr, timeStr) {
-  const date = parseLocalDate(dateStr);
+function formatBarberDate(date) {
+  const formatter = new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Johannesburg', year: 'numeric', month: '2-digit', day: '2-digit' });
+  const parts = formatter.formatToParts(date);
+  const year = parts.find(p => p.type === 'year').value;
+  const month = parts.find(p => p.type === 'month').value;
+  const day = parts.find(p => p.type === 'day').value;
+  return `${year}-${month}-${day}`;
+}
+
+function parseBarberDate(dateStr) {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const utcTimestamp = Date.UTC(year, month-1, day, -2, 0, 0);
+  return new Date(utcTimestamp);
+}
+
+function parseBarberDateTime(dateStr, timeStr) {
+  const date = parseBarberDate(dateStr);
   const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
   if (!match) return new Date(NaN);
-
   let hour = parseInt(match[1], 10);
   const minute = parseInt(match[2], 10);
   const period = match[3].toUpperCase();
-
   if (period === 'PM' && hour !== 12) hour += 12;
   if (period === 'AM' && hour === 12) hour = 0;
-
-  date.setHours(hour, minute, 0, 0);
+  // Set UTC hour/minute adjusting for SAST offset (+2)
+  date.setUTCHours(hour, minute, 0, 0);
   return date;
 }
 
-function escapeHtml(str = '') {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+function getTimeMinutesFromMidnight(timeStr) {
+  const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!match) return 0;
+  let hour = parseInt(match[1], 10);
+  const minute = parseInt(match[2], 10);
+  const period = match[3].toUpperCase();
+  if (period === 'PM' && hour !== 12) hour += 12;
+  if (period === 'AM' && hour === 12) hour = 0;
+  return hour * 60 + minute;
 }
 
-// ========== FIREBASE CONFIG ==========
+function isTimeSlotPassedForDate(date, timeStr) {
+  const todayMidnight = getBarberCurrentDateMidnight();
+  const checkMidnight = new Date(date);
+  checkMidnight.setUTCHours(0,0,0,0);
+  if (checkMidnight.getTime() !== todayMidnight.getTime()) return false;
+  const slotMinutes = getTimeMinutesFromMidnight(timeStr);
+  const nowBarber = getBarberCurrentDateTime();
+  const currentMinutes = nowBarber.getUTCHours() * 60 + nowBarber.getUTCMinutes();
+  return slotMinutes < currentMinutes;
+}
+
+// ========== FIREBASE ==========
 const firebaseConfig = {
   apiKey: "AIzaSyB05r9ei92egPbcnbFKQNK0mso25DHcBss",
   authDomain: "private-barber-booking-67cde.firebaseapp.com",
@@ -176,16 +199,11 @@ const firebaseConfig = {
   appId: "1:889141435520:web:bf645a2b8584b853225a65",
   measurementId: "G-KNCJ003KNP"
 };
-
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-// ========== PASSWORD ==========
 const CORRECT_PASSWORD = "voka2026";
-
-let unsubBookings = null;
-let unsubClosedSlots = null;
-let unsubUsers = null;
+let unsubBookings = null, unsubClosedSlots = null, unsubUsers = null;
 
 function checkPassword() {
   const input = document.getElementById('admin-password').value;
@@ -219,7 +237,6 @@ function logout() {
   if (unsubClosedSlots) unsubClosedSlots();
   if (unsubUsers) unsubUsers();
   unsubBookings = unsubClosedSlots = unsubUsers = null;
-
   document.getElementById('admin-panel').classList.add('hidden');
   document.getElementById('login-container').classList.remove('hidden');
   document.getElementById('admin-password').value = '';
@@ -234,61 +251,62 @@ const TIME_SLOTS = [
 ];
 
 async function getClosedSlots() {
-  const snapshot = await db.collection('closedSlots').get();
-  return snapshot.docs.map(doc => doc.data());
+  const snap = await db.collection('closedSlots').get();
+  return snap.docs.map(doc => doc.data());
 }
 async function setClosedSlots(slots) {
   const batch = db.batch();
   const existing = await db.collection('closedSlots').get();
   existing.forEach(doc => batch.delete(doc.ref));
   slots.forEach(slot => {
-    const docRef = db.collection('closedSlots').doc();
-    batch.set(docRef, slot);
+    const ref = db.collection('closedSlots').doc();
+    batch.set(ref, slot);
   });
   await batch.commit();
 }
 async function getBookings() {
-  const snapshot = await db.collection('bookings').get();
-  return snapshot.docs.map(doc => doc.data());
+  const snap = await db.collection('bookings').get();
+  return snap.docs.map(doc => doc.data());
 }
-async function updateBooking(bookingId, data) {
-  await db.collection('bookings').doc(bookingId).update(data);
+async function updateBooking(id, data) {
+  await db.collection('bookings').doc(id).update(data);
 }
-async function deleteBooking(bookingId) {
-  await db.collection('bookings').doc(bookingId).delete();
+async function deleteBooking(id) {
+  await db.collection('bookings').doc(id).delete();
 }
 async function getUsers() {
-  const snapshot = await db.collection('users').get();
-  return snapshot.docs.map(doc => doc.data());
+  const snap = await db.collection('users').get();
+  return snap.docs.map(doc => doc.data());
 }
 async function updateUserLate(email, late) {
   await db.collection('users').doc(email).update({ late });
 }
 
-// ========== DOM ELEMENTS ==========
+function getSurchargeBadge(time) {
+  if (time === "06:00 PM") return '<span class="evening-badge">+R20</span>';
+  if (time === "07:00 PM" || time === "08:00 PM") return '<span class="after-hours-badge">+R70</span>';
+  return '';
+}
+
+function isSlotBooked(bookingsOnDate, time) {
+  return bookingsOnDate.includes(time);
+}
+
+// ========== SLOT MANAGER (SAST aware) ==========
 const dateInput = document.getElementById('slot-date');
 const slotsContainer = document.getElementById('admin-slots-container');
 const noSlotsMsg = document.getElementById('no-slots-message');
-const bookingsList = document.getElementById('bookings-list');
-const noBookingsMsg = document.getElementById('no-bookings');
-const usersList = document.getElementById('users-list');
-const noUsersMsg = document.getElementById('no-users');
 
-const today = new Date();
-const todayStr = formatDateISO(today);
-if (dateInput) {
-  dateInput.value = todayStr;
+function setMinDateToBarberToday() {
+  const todayMidnight = getBarberCurrentDateMidnight();
+  const todayStr = formatBarberDate(todayMidnight);
   dateInput.min = todayStr;
-  dateInput.addEventListener('change', renderSlotManager);
+  if (!dateInput.value) dateInput.value = todayStr;
 }
+setMinDateToBarberToday();
+dateInput.addEventListener('change', renderSlotManager);
 
-function isEvening(time) {
-  return ["06:00 PM", "07:00 PM", "08:00 PM"].includes(time);
-}
-
-// ========== SLOT MANAGEMENT ==========
 async function renderSlotManager() {
-  if (!dateInput) return;
   const date = dateInput.value;
   if (!date) {
     slotsContainer.innerHTML = '';
@@ -304,19 +322,26 @@ async function renderSlotManager() {
   TIME_SLOTS.forEach(time => {
     const isClosed = closedSlots.includes(time);
     const isBooked = bookingsOnDate.includes(time);
-    const evening = isEvening(time);
-    
+    const badge = getSurchargeBadge(time);
+    const isPassedToday = isTimeSlotPassedForDate(parseBarberDate(date), time);
+
     const btn = document.createElement('button');
     btn.className = `slot-btn p-4 rounded-lg border text-left transition-all ${isClosed ? 'closed bg-[#2d2d2d] text-gray-400' : 'open bg-[#1a1a1a] hover:bg-[#252525]'}`;
     btn.innerHTML = `
       <div class="font-medium flex items-center justify-between">
         ${time}
-        ${evening ? '<span class="evening-badge">+R20</span>' : ''}
+        ${badge}
       </div>
       <div class="text-xs mt-1 ${isClosed ? 'text-gray-500' : 'text-gray-400'}">${isClosed ? '🔴 Closed' : '🟢 Open'}</div>
       ${isBooked ? '<div class="text-xs text-yellow-500 mt-1">⚠️ Has booking</div>' : ''}
+      ${isPassedToday && !isBooked ? '<div class="text-xs text-gray-500 mt-1">⏰ Passed today</div>' : ''}
     `;
-    btn.onclick = () => toggleSlot(date, time, isClosed, isBooked);
+    if (isPassedToday && !isBooked) {
+      btn.style.opacity = '0.6';
+      btn.style.cursor = 'not-allowed';
+    } else {
+      btn.onclick = () => toggleSlot(date, time, isClosed, isBooked);
+    }
     slotsContainer.appendChild(btn);
   });
 }
@@ -324,6 +349,10 @@ async function renderSlotManager() {
 async function toggleSlot(date, time, currentlyClosed, hasBooking) {
   if (hasBooking) {
     alert('Cannot close this slot – there is a booking already.');
+    return;
+  }
+  if (isTimeSlotPassedForDate(parseBarberDate(date), time)) {
+    alert('Cannot modify a time slot that has already passed for today.');
     return;
   }
   let closedSlots = await getClosedSlots();
@@ -343,13 +372,11 @@ async function closeAllSlots() {
   const date = dateInput.value;
   if (!date) { alert('Please select a date first.'); return; }
   if (!confirm(`Close ALL available slots on ${new Date(date).toLocaleDateString()}?`)) return;
-
   processing = true;
   const closeBtn = document.getElementById('close-all-btn');
   const openBtn = document.getElementById('open-all-btn');
   closeBtn.classList.add('btn-disabled');
   openBtn.classList.add('btn-disabled');
-
   try {
     const closedSlots = await getClosedSlots();
     const bookingsOnDate = (await getBookings()).filter(b => b.date === date).map(b => b.time);
@@ -357,6 +384,7 @@ async function closeAllSlots() {
     TIME_SLOTS.forEach(time => {
       if (closedSlots.some(s => s.date === date && s.time === time)) return;
       if (bookingsOnDate.includes(time)) return;
+      if (isTimeSlotPassedForDate(parseBarberDate(date), time)) return;
       newClosed.push({ date, time });
     });
     await setClosedSlots(newClosed);
@@ -374,13 +402,11 @@ async function openAllSlots() {
   const date = dateInput.value;
   if (!date) { alert('Please select a date first.'); return; }
   if (!confirm(`Open all closed slots on ${new Date(date).toLocaleDateString()}?`)) return;
-
   processing = true;
   const closeBtn = document.getElementById('close-all-btn');
   const openBtn = document.getElementById('open-all-btn');
   closeBtn.classList.add('btn-disabled');
   openBtn.classList.add('btn-disabled');
-
   try {
     const closedSlots = await getClosedSlots();
     const newClosed = closedSlots.filter(s => s.date !== date);
@@ -394,22 +420,22 @@ async function openAllSlots() {
   }
 }
 
-// ========== BOOKINGS (enhanced) ==========
+// ========== BOOKINGS (SAST aware) ==========
 async function renderBookings() {
   let bookings = (await getBookings()).sort((a, b) => {
     if (a.date !== b.date) return a.date.localeCompare(b.date);
     return a.time.localeCompare(b.time);
   });
   if (bookings.length === 0) {
-    bookingsList.innerHTML = '';
-    noBookingsMsg.classList.remove('hidden');
+    document.getElementById('bookings-list').innerHTML = '';
+    document.getElementById('no-bookings').classList.remove('hidden');
     return;
   }
-  noBookingsMsg.classList.add('hidden');
-  bookingsList.innerHTML = bookings.map(b => {
-    const now = new Date();
-    const apptDateTime = parseLocalDateTime(b.date, b.time);
-    const isPast = apptDateTime < now;
+  document.getElementById('no-bookings').classList.add('hidden');
+  const nowBarber = getBarberCurrentDateTime();
+  const bookingsHtml = bookings.map(b => {
+    const apptDateTime = parseBarberDateTime(b.date, b.time);
+    const isPast = apptDateTime < nowBarber;
     const canArrive = !b.arrivalConfirmed && !isPast;
     const canComplete = (b.arrivalConfirmed || isPast) && b.status !== 'completed';
     return `
@@ -426,7 +452,7 @@ async function renderBookings() {
             </div>
           </div>
           <div class="text-right">
-            <div class="text-sm font-medium">${new Date(b.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+            <div class="text-sm font-medium">${new Date(b.date).toLocaleDateString('en-ZA')}</div>
             <div class="text-sm text-gray-400">${b.time}</div>
             <div class="text-xs text-gray-500 mt-1">R${b.price}</div>
           </div>
@@ -439,22 +465,21 @@ async function renderBookings() {
       </div>
     `;
   }).join('');
+  document.getElementById('bookings-list').innerHTML = bookingsHtml;
   lucide.createIcons();
 }
 
-window.markArrived = async function(bookingId) {
-  await updateBooking(bookingId, { arrivalConfirmed: true, arrivalTime: new Date().toISOString() });
+window.markArrived = async function(id) {
+  await updateBooking(id, { arrivalConfirmed: true, arrivalTime: new Date().toISOString() });
   await renderBookings();
 };
-
-window.markCompleted = async function(bookingId) {
-  await updateBooking(bookingId, { status: 'completed', completedAt: new Date().toISOString() });
+window.markCompleted = async function(id) {
+  await updateBooking(id, { status: 'completed', completedAt: new Date().toISOString() });
   await renderBookings();
 };
-
-window.cancelBooking = async function(bookingId) {
+window.cancelBooking = async function(id) {
   if (!confirm('Cancel this booking? This cannot be undone.')) return;
-  await deleteBooking(bookingId);
+  await deleteBooking(id);
   await renderBookings();
   await renderSlotManager();
 };
@@ -463,12 +488,12 @@ window.cancelBooking = async function(bookingId) {
 async function renderUsers() {
   const users = await getUsers();
   if (users.length === 0) {
-    usersList.innerHTML = '';
-    noUsersMsg.classList.remove('hidden');
+    document.getElementById('users-list').innerHTML = '';
+    document.getElementById('no-users').classList.remove('hidden');
     return;
   }
-  noUsersMsg.classList.add('hidden');
-  usersList.innerHTML = users.map(user => `
+  document.getElementById('no-users').classList.add('hidden');
+  const usersHtml = users.map(user => `
     <div class="bg-[#1a1a1a] border border-white/5 rounded-xl p-4 user-card">
       <div class="flex justify-between items-start">
         <div>
@@ -476,7 +501,7 @@ async function renderUsers() {
           <p class="text-sm text-gray-300">${escapeHtml(user.email)}</p>
           <p class="text-xs text-gray-400">${escapeHtml(user.phone)}</p>
         </div>
-        <div class="flex flex-col items-end">
+        <div>
           <button onclick="toggleLateFlag('${user.email}')" class="text-xs px-3 py-1 rounded-full ${user.late ? 'bg-yellow-600 text-white' : 'bg-gray-700 text-gray-300'} hover:bg-yellow-500 transition-colors">
             ${user.late ? '⚠️ Late' : '✓ On Time'}
           </button>
@@ -484,17 +509,27 @@ async function renderUsers() {
       </div>
     </div>
   `).join('');
+  document.getElementById('users-list').innerHTML = usersHtml;
   lucide.createIcons();
 }
 
-window.toggleLateFlag = async function(userEmail) {
+window.toggleLateFlag = async function(email) {
   const users = await getUsers();
-  const user = users.find(u => u.email === userEmail);
+  const user = users.find(u => u.email === email);
   if (user) {
-    await updateUserLate(userEmail, !user.late);
+    await updateUserLate(email, !user.late);
     await renderUsers();
   }
 };
+
+function escapeHtml(str) {
+  return String(str).replace(/[&<>]/g, function(m) {
+    if (m === '&') return '&amp;';
+    if (m === '<') return '&lt;';
+    if (m === '>') return '&gt;';
+    return m;
+  });
+}
 </script>
 </body>
 </html>

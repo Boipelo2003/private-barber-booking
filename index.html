@@ -13,7 +13,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
 <style>
-/* all styles unchanged */
+/* all styles unchanged from previous version */
 body {
   font-family: 'Inter', sans-serif;
   background-color: #050505;
@@ -163,7 +163,7 @@ body {
 </style>
 </head>
 <body class="antialiased min-h-screen flex flex-col">
-<!-- Navigation (unchanged) -->
+<!-- Navigation -->
 <nav class="fixed w-full z-50 glass-panel border-b border-white/5">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="flex items-center justify-between h-20">
@@ -249,7 +249,7 @@ body {
   </div>
 </section>
 
-<!-- Account Modal (unchanged) -->
+<!-- Account Modal with Forgot Password -->
 <div id="account-modal" class="fixed inset-0 z-[200] hidden">
   <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity" onclick="closeAccountModal()"></div>
   <div class="relative min-h-full flex items-center justify-center p-4">
@@ -262,6 +262,8 @@ body {
         <h3 class="text-xl font-bold">Welcome</h3>
         <p class="text-sm text-gray-400">Sign in or create an account</p>
       </div>
+
+      <!-- Login Form -->
       <div id="account-login-form">
         <div class="space-y-4">
           <div>
@@ -271,9 +273,14 @@ body {
             <input type="password" id="login-password" placeholder="Password" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
           </div>
           <button onclick="login()" class="w-full bg-white text-black font-bold py-2 rounded-lg hover:bg-gray-200 transition">Sign In</button>
+          <div class="text-center">
+            <button onclick="showForgotPassword()" class="text-xs text-gray-400 hover:text-white transition">Forgot Password?</button>
+          </div>
           <p class="text-center text-xs text-gray-500">Don't have an account? <button onclick="showRegister()" class="text-white underline">Register</button></p>
         </div>
       </div>
+
+      <!-- Register Form -->
       <div id="account-register-form" class="hidden">
         <div class="space-y-4">
           <div>
@@ -292,6 +299,20 @@ body {
           <p class="text-center text-xs text-gray-500">Already have an account? <button onclick="showLogin()" class="text-white underline">Sign In</button></p>
         </div>
       </div>
+
+      <!-- Forgot Password Form -->
+      <div id="account-forgot-form" class="hidden">
+        <div class="space-y-4">
+          <div>
+            <input type="email" id="forgot-email" placeholder="Your Email Address" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
+          </div>
+          <button onclick="sendPasswordReset()" class="w-full bg-white text-black font-bold py-2 rounded-lg hover:bg-gray-200 transition">Send Reset Email</button>
+          <p class="text-center text-xs text-gray-500">
+            <button onclick="showLogin()" class="text-white underline">Back to Sign In</button>
+          </p>
+        </div>
+      </div>
+
       <div id="logout-section" class="mt-4 hidden">
         <button onclick="logout()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg transition flex items-center justify-center gap-2">
           <i data-lucide="log-out" class="w-4 h-4"></i> Logout
@@ -351,7 +372,7 @@ body {
   </div>
 </div>
 
-<!-- Booking Modal (full, unchanged except for addition of userId) -->
+<!-- Booking Modal (full, unchanged) -->
 <div id="booking-modal" class="fixed inset-0 z-[100] hidden">
   <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity" onclick="closeBooking()"></div>
   <div class="relative min-h-full flex items-center justify-center p-4">
@@ -711,6 +732,31 @@ async function register() {
   }
 }
 
+async function sendPasswordReset() {
+  const email = document.getElementById('forgot-email').value.trim();
+  const msgDiv = document.getElementById('account-message');
+  if (!email) {
+    msgDiv.innerText = 'Please enter your email address.';
+    msgDiv.classList.remove('hidden');
+    return;
+  }
+  try {
+    await auth.sendPasswordResetEmail(email);
+    msgDiv.innerText = 'Password reset email sent! Check your inbox.';
+    msgDiv.classList.remove('hidden');
+    msgDiv.style.color = '#4ade80'; // green
+    setTimeout(() => {
+      showLogin();
+      msgDiv.classList.add('hidden');
+      msgDiv.style.color = ''; // reset
+    }, 3000);
+  } catch (error) {
+    msgDiv.innerText = error.message;
+    msgDiv.classList.remove('hidden');
+    msgDiv.style.color = '#f87171';
+  }
+}
+
 async function logout() {
   await auth.signOut();
   currentAuthUser = null;
@@ -746,8 +792,24 @@ function openAccountModal() {
   }
 }
 function closeAccountModal() { document.getElementById('account-modal').classList.add('hidden'); }
-function showLogin() { document.getElementById('account-login-form').classList.remove('hidden'); document.getElementById('account-register-form').classList.add('hidden'); document.getElementById('account-message').classList.add('hidden'); }
-function showRegister() { document.getElementById('account-login-form').classList.add('hidden'); document.getElementById('account-register-form').classList.remove('hidden'); document.getElementById('account-message').classList.add('hidden'); }
+function showLogin() {
+  document.getElementById('account-login-form').classList.remove('hidden');
+  document.getElementById('account-register-form').classList.add('hidden');
+  document.getElementById('account-forgot-form').classList.add('hidden');
+  document.getElementById('account-message').classList.add('hidden');
+}
+function showRegister() {
+  document.getElementById('account-login-form').classList.add('hidden');
+  document.getElementById('account-register-form').classList.remove('hidden');
+  document.getElementById('account-forgot-form').classList.add('hidden');
+  document.getElementById('account-message').classList.add('hidden');
+}
+function showForgotPassword() {
+  document.getElementById('account-login-form').classList.add('hidden');
+  document.getElementById('account-register-form').classList.add('hidden');
+  document.getElementById('account-forgot-form').classList.remove('hidden');
+  document.getElementById('account-message').classList.add('hidden');
+}
 function checkLateReminder() { const div = document.getElementById('late-reminder'); if (currentUser && currentUser.late) div.classList.remove('hidden'); else div.classList.add('hidden'); }
 
 // ========== CUSTOMER INFO MANAGEMENT ==========

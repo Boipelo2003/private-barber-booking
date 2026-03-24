@@ -163,7 +163,7 @@ body {
 </style>
 </head>
 <body class="antialiased min-h-screen flex flex-col">
-<!-- Navigation -->
+<!-- Navigation (unchanged) -->
 <nav class="fixed w-full z-50 glass-panel border-b border-white/5">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="flex items-center justify-between h-20">
@@ -249,7 +249,7 @@ body {
   </div>
 </section>
 
-<!-- Account Modal with Forgot Password -->
+<!-- Account Modal (with Forgot Password) -->
 <div id="account-modal" class="fixed inset-0 z-[200] hidden">
   <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity" onclick="closeAccountModal()"></div>
   <div class="relative min-h-full flex items-center justify-center p-4">
@@ -582,14 +582,21 @@ const confirmSpinner = document.getElementById('confirm-spinner');
 const whatsappLink = document.getElementById('whatsapp-link');
 
 // ========== USER STATE ==========
-let currentUser = null;          // profile from Firestore (name, phone, late)
-let currentAuthUser = null;      // Firebase Auth user object
+let currentUser = null;
+let currentAuthUser = null;
 let currentDate = new Date();
 let selectedDate = null;
 let selectedTime = null;
 let selectedService = null;
 let isProcessing = false;
 let rescheduleOldBookingId = null;
+
+// ========== TIME SLOTS (MOVED TO TOP) ==========
+const TIME_SLOTS = [
+  "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
+  "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM",
+  "05:00 PM", "06:00 PM", "07:00 PM", "08:00 PM"
+];
 
 // ========== HELPER FUNCTIONS ==========
 function formatDateISO(date) {
@@ -626,43 +633,41 @@ function escapeHtml(str = '') {
     .replace(/'/g, '&#39;');
 }
 
-// ========== FIRESTORE HELPERS ==========
-async function getBookings() {
-  const snapshot = await db.collection('bookings').get();
-  return snapshot.docs.map(doc => doc.data());
-}
-async function deleteBooking(bookingId) {
-  await db.collection('bookings').doc(bookingId).delete();
-}
-async function updateBooking(bookingId, data) {
-  await db.collection('bookings').doc(bookingId).update(data);
-}
-async function getClosedSlots() {
-  const snapshot = await db.collection('closedSlots').get();
+// ========== OPTIMIZED FIRESTORE QUERIES ==========
+async function getBookingsForDate(dateStr) {
+  const snapshot = await db.collection('bookings')
+    .where('date', '==', dateStr)
+    .get();
   return snapshot.docs.map(doc => doc.data());
 }
 
-// ========== TIME SLOTS & PRICING ==========
-const TIME_SLOTS = [
-  "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
-  "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM",
-  "05:00 PM", "06:00 PM", "07:00 PM", "08:00 PM"
-];
+async function getClosedSlotsForDate(dateStr) {
+  const snapshot = await db.collection('closedSlots')
+    .where('date', '==', dateStr)
+    .get();
+  return snapshot.docs.map(doc => doc.data());
+}
 
-function getTimeSurcharge(time) {
-  let surcharge = 0;
-  if (["06:00 PM", "07:00 PM", "08:00 PM"].includes(time)) surcharge += 20;
-  if (["07:00 PM", "08:00 PM"].includes(time)) surcharge += 50;
-  return surcharge;
+async function getUserBookings(userId, email) {
+  let query = db.collection('bookings');
+  if (userId) {
+    query = query.where('userId', '==', userId);
+  } else if (email) {
+    query = query.where('email', '==', email);
+  } else {
+    return [];
+  }
+  const snapshot = await query.get();
+  return snapshot.docs.map(doc => doc.data());
 }
-function getFinalPrice(basePrice, time) {
-  return basePrice + getTimeSurcharge(time);
-}
+
 async function isSlotAvailable(date, time) {
   const dateStr = formatDateISO(date);
-  const closedSlots = (await getClosedSlots()).filter(slot => slot.date === dateStr).map(slot => slot.time);
-  const bookedSlots = (await getBookings()).filter(b => b.date === dateStr).map(b => b.time);
-  return !closedSlots.includes(time) && !bookedSlots.includes(time);
+  const closedSlots = await getClosedSlotsForDate(dateStr);
+  const bookedSlots = await getBookingsForDate(dateStr);
+  const isClosed = closedSlots.some(slot => slot.time === time);
+  const isBooked = bookedSlots.some(booking => booking.time === time);
+  return !isClosed && !isBooked;
 }
 
 // ========== AUTHENTICATION FUNCTIONS ==========
@@ -741,11 +746,11 @@ async function sendPasswordReset() {
     await auth.sendPasswordResetEmail(email);
     msgDiv.innerText = 'Password reset email sent! Check your inbox.';
     msgDiv.classList.remove('hidden');
-    msgDiv.style.color = '#4ade80'; // green
+    msgDiv.style.color = '#4ade80';
     setTimeout(() => {
       showLogin();
       msgDiv.classList.add('hidden');
-      msgDiv.style.color = ''; // reset
+      msgDiv.style.color = '';
     }, 3000);
   } catch (error) {
     msgDiv.innerText = error.message;
@@ -845,6 +850,10 @@ function loadCustomerInfo() {
 
 // ========== BOOKING UI FUNCTIONS ==========
 function renderCalendar() {
+  if (!calendarDays) {
+    console.error('calendarDays element not found');
+    return;
+  }
   calendarDays.innerHTML = '';
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -874,37 +883,61 @@ function renderCalendar() {
     }
     calendarDays.appendChild(dayBtn);
   }
+  console.log('Calendar rendered for', monthYearLabel.innerText);
 }
 
+// Main function to fetch and render time slots (no listener logic inside)
 async function renderTimeSlots(date) {
+  if (!timeSlotsContainer) {
+    console.error('timeSlotsContainer not found');
+    return;
+  }
   timeSlotsContainer.innerHTML = '';
   const dateStr = formatDateISO(date);
-  const closedSlots = (await getClosedSlots()).filter(slot => slot.date === dateStr).map(slot => slot.time);
-  const bookedSlots = (await getBookings()).filter(b => b.date === dateStr).map(b => b.time);
-  const now = new Date();
-  const isToday = dateStr === formatDateISO(now);
-  TIME_SLOTS.forEach(time => {
-    if (isToday) {
-      const slotTime = parseLocalDateTime(dateStr, time);
-      if (slotTime < now) return;
-    }
-    const btn = document.createElement('button');
-    const surcharge = getTimeSurcharge(time);
-    const afterHours = surcharge >= 50;
-    const isEvening = surcharge > 0 && !afterHours;
-    let badgeHtml = '';
-    if (afterHours) badgeHtml = '<span class="after-hours-badge">+R70</span>';
-    else if (isEvening) badgeHtml = '<span class="evening-badge">+R20</span>';
-    btn.innerHTML = `<div class="flex items-center justify-between w-full">${time}${badgeHtml}</div>`;
-    btn.classList.add('time-slot-btn', 'p-4', 'border', 'border-white/10', 'rounded-lg', 'hover:bg-white', 'hover:text-black', 'transition-all', 'text-sm', 'font-medium');
-    if (time === selectedTime) btn.classList.add('selected');
-    if (closedSlots.includes(time) || bookedSlots.includes(time)) {
-      btn.classList.add('closed', 'opacity-30', 'pointer-events-none');
-    } else {
-      btn.onclick = () => selectTime(btn, time);
-    }
-    timeSlotsContainer.appendChild(btn);
-  });
+  try {
+    const closedSlots = await getClosedSlotsForDate(dateStr);
+    const bookedSlots = await getBookingsForDate(dateStr);
+    const now = new Date();
+    const isToday = dateStr === formatDateISO(now);
+    TIME_SLOTS.forEach(time => {
+      if (isToday) {
+        const slotTime = parseLocalDateTime(dateStr, time);
+        if (slotTime < now) return;
+      }
+      const btn = document.createElement('button');
+      const surcharge = getTimeSurcharge(time);
+      const afterHours = surcharge >= 50;
+      const isEvening = surcharge > 0 && !afterHours;
+      let badgeHtml = '';
+      if (afterHours) badgeHtml = '<span class="after-hours-badge">+R70</span>';
+      else if (isEvening) badgeHtml = '<span class="evening-badge">+R20</span>';
+      btn.innerHTML = `<div class="flex items-center justify-between w-full">${time}${badgeHtml}</div>`;
+      btn.classList.add('time-slot-btn', 'p-4', 'border', 'border-white/10', 'rounded-lg', 'hover:bg-white', 'hover:text-black', 'transition-all', 'text-sm', 'font-medium');
+      if (time === selectedTime) btn.classList.add('selected');
+      const isClosed = closedSlots.some(slot => slot.time === time);
+      const isBooked = bookedSlots.some(booking => booking.time === time);
+      if (isClosed || isBooked) {
+        btn.classList.add('closed', 'opacity-30', 'pointer-events-none');
+      } else {
+        btn.onclick = () => selectTime(btn, time);
+      }
+      timeSlotsContainer.appendChild(btn);
+    });
+    console.log('Time slots rendered for', dateStr);
+  } catch (error) {
+    console.error('Error rendering time slots:', error);
+    timeSlotsContainer.innerHTML = '<p class="text-red-500">Failed to load time slots. Please refresh.</p>';
+  }
+}
+
+function getTimeSurcharge(time) {
+  let surcharge = 0;
+  if (["06:00 PM", "07:00 PM", "08:00 PM"].includes(time)) surcharge += 20;
+  if (["07:00 PM", "08:00 PM"].includes(time)) surcharge += 50;
+  return surcharge;
+}
+function getFinalPrice(basePrice, time) {
+  return basePrice + getTimeSurcharge(time);
 }
 
 function updateSummary() {
@@ -927,8 +960,11 @@ function selectDate(element, date) {
   document.getElementById('btn-calendar-next').disabled = false;
   document.getElementById('btn-time-next').disabled = true;
   updateSummary();
+  // If we are already on the time step, re-render slots for the new date
   if (!document.getElementById('step-time').classList.contains('hidden')) {
     renderTimeSlots(selectedDate);
+    // Start real‑time listeners for the new date
+    startRealTimeUpdates(formatDateISO(selectedDate));
   }
 }
 
@@ -950,10 +986,16 @@ function selectService(element, serviceName, servicePrice) {
 
 function goToStep(stepName) {
   document.querySelectorAll('.step-view').forEach(el => el.classList.add('hidden'));
-  document.getElementById(`step-${stepName}`).classList.remove('hidden');
+  const nextStep = document.getElementById(`step-${stepName}`);
+  if (nextStep) nextStep.classList.remove('hidden');
   if (stepName === 'time' && selectedDate) {
     document.getElementById('time-header-date').innerText = selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
     renderTimeSlots(selectedDate);
+    // Start real‑time listeners for the current date
+    startRealTimeUpdates(formatDateISO(selectedDate));
+  } else if (stepName !== 'time') {
+    // If leaving the time step, stop listeners
+    stopRealTimeUpdates();
   }
   if (stepName === 'details') {
     checkLateReminder();
@@ -975,9 +1017,14 @@ function resetSelection() {
   [nameInput, emailInput, phoneInput].forEach(i => i.classList.remove('input-error'));
   [nameError, emailError, phoneError].forEach(e => e.style.display = 'none');
   agreeCheck.checked = false;
+  stopRealTimeUpdates();
 }
 
 function openBooking(options = {}) {
+  if (!modal) {
+    console.error('Booking modal not found');
+    return;
+  }
   modal.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
   if (!options.preserveSelection) resetSelection();
@@ -997,6 +1044,7 @@ function openBooking(options = {}) {
 function closeBooking() {
   modal.classList.add('hidden');
   document.body.style.overflow = 'auto';
+  stopRealTimeUpdates();
 }
 
 // ========== FORM VALIDATION ==========
@@ -1058,7 +1106,7 @@ async function confirmBooking() {
     return;
   }
 
-  // Quick availability check (optimistic, but final check happens inside transaction)
+  // Quick optimistic check
   const quickAvailable = await isSlotAvailable(selectedDate, selectedTime);
   if (!quickAvailable) {
     alert('Sorry, this slot is no longer available. Please choose another time.');
@@ -1098,30 +1146,26 @@ async function confirmBooking() {
       reviewGiven: false
     };
 
-    // Firestore transaction to prevent double booking
+    // Firestore transaction
     await db.runTransaction(async (transaction) => {
-      // Get all bookings for the same date
-      const bookingsSnapshot = await transaction.get(db.collection('bookings').where('date', '==', bookingData.date));
-      // Check if the slot is already taken
-      const slotTaken = bookingsSnapshot.docs.some(doc => {
-        const b = doc.data();
-        return b.time === bookingData.time;
-      });
+      const bookingsSnapshot = await transaction.get(
+        db.collection('bookings').where('date', '==', bookingData.date)
+      );
+      const slotTaken = bookingsSnapshot.docs.some(doc => doc.data().time === bookingData.time);
       if (slotTaken) {
         throw new Error('SLOT_ALREADY_BOOKED');
       }
-      // Also check closed slots (though already checked client-side, but double-check)
-      const closedSnapshot = await transaction.get(db.collection('closedSlots').where('date', '==', bookingData.date).where('time', '==', bookingData.time));
+      const closedSnapshot = await transaction.get(
+        db.collection('closedSlots').where('date', '==', bookingData.date).where('time', '==', bookingData.time)
+      );
       if (!closedSnapshot.empty) {
         throw new Error('SLOT_CLOSED');
       }
-      // All good, create the booking
       transaction.set(db.collection('bookings').doc(bookingId), bookingData);
     });
 
-    // If rescheduling, delete the old booking
     if (rescheduleOldBookingId) {
-      await deleteBooking(rescheduleOldBookingId);
+      await db.collection('bookings').doc(rescheduleOldBookingId).delete();
       rescheduleOldBookingId = null;
       alert('Original booking cancelled. Reschedule complete.');
     }
@@ -1150,7 +1194,7 @@ async function confirmBooking() {
 }
 confirmBtn.addEventListener('click', confirmBooking);
 
-// ========== MY BOOKINGS & RESCHEDULE (use userId where possible) ==========
+// ========== MY BOOKINGS & RESCHEDULE ==========
 async function openMyBookings() {
   if (!currentAuthUser && !currentUser) {
     alert('Please sign in to view your bookings.');
@@ -1164,19 +1208,14 @@ async function openMyBookings() {
   const container = document.getElementById('my-bookings-list');
   container.innerHTML = '<div class="loader"></div>';
   try {
-    const bookings = await getBookings();
+    const bookings = await getUserBookings(userId, userEmail);
     const now = new Date();
-    // Filter by userId if available, otherwise by email (backward compatibility)
-    const userBookings = bookings.filter(b => {
-      if (userId && b.userId === userId) return true;
-      if (!userId && userEmail && b.email === userEmail) return true;
-      return false;
-    }).sort((a, b) => a.date.localeCompare(b.date));
-    if (userBookings.length === 0) {
+    bookings.sort((a, b) => a.date.localeCompare(b.date));
+    if (bookings.length === 0) {
       container.innerHTML = '<p class="text-gray-500">No bookings found.</p>';
       return;
     }
-    container.innerHTML = userBookings.map(b => {
+    container.innerHTML = bookings.map(b => {
       const apptDateTime = parseLocalDateTime(b.date, b.time);
       const isPast = apptDateTime < now;
       const isUpcoming = !isPast;
@@ -1209,8 +1248,7 @@ async function openMyBookings() {
 }
 function closeMyBookings() { document.getElementById('my-bookings-modal').classList.add('hidden'); }
 async function rescheduleBooking(bookingId) {
-  const bookings = await getBookings();
-  const booking = bookings.find(b => b.id === bookingId);
+  const booking = (await getUserBookings(currentAuthUser ? currentAuthUser.uid : null, currentUser ? currentUser.email : null)).find(b => b.id === bookingId);
   if (!booking) return;
   const now = new Date();
   const appointmentDateTime = parseLocalDateTime(booking.date, booking.time);
@@ -1230,7 +1268,7 @@ async function rescheduleBooking(bookingId) {
   updateSummary();
 }
 window.cancelMyBooking = async function(bookingId) {
-  const booking = (await getBookings()).find(b => b.id === bookingId);
+  const booking = (await getUserBookings(currentAuthUser ? currentAuthUser.uid : null, currentUser ? currentUser.email : null)).find(b => b.id === bookingId);
   if (!booking) return;
   const now = new Date();
   const appointmentDateTime = parseLocalDateTime(booking.date, booking.time);
@@ -1243,7 +1281,7 @@ window.cancelMyBooking = async function(bookingId) {
   if (diffHours <= 5 && diffHours > 0) {
     alert('A R20 cancellation fee will be charged. Please contact the barber for payment.');
   }
-  await deleteBooking(bookingId);
+  await db.collection('bookings').doc(bookingId).delete();
   closeMyBookings();
   openMyBookings();
   if (!modal.classList.contains('hidden') && selectedDate && formatDateISO(selectedDate) === booking.date) {
@@ -1251,7 +1289,7 @@ window.cancelMyBooking = async function(bookingId) {
   }
 };
 
-// ========== REVIEW FUNCTIONS (ADDED userId) ==========
+// ========== REVIEW FUNCTIONS ==========
 let currentReviewBooking = null;
 function openReviewModal(bookingId) {
   currentReviewBooking = bookingId;
@@ -1286,11 +1324,11 @@ async function submitReview() {
     createdAt: new Date().toISOString()
   };
   await db.collection('reviews').doc(currentReviewBooking).set(reviewData);
-  await updateBooking(currentReviewBooking, { reviewGiven: true });
+  await db.collection('bookings').doc(currentReviewBooking).update({ reviewGiven: true });
   closeReviewModal();
   alert('Thank you for your review!');
   openMyBookings();
-  loadPublicReviews(); // refresh public reviews section
+  loadPublicReviews();
 }
 function closeReviewModal() {
   document.getElementById('review-modal').classList.add('hidden');
@@ -1383,6 +1421,43 @@ async function loadPublicReviews() {
   }
 }
 
+// ========== REAL-TIME UPDATES (SIMPLIFIED) ==========
+let currentBookingsUnsubscribe = null;
+let currentClosedSlotsUnsubscribe = null;
+
+function stopRealTimeUpdates() {
+  if (currentBookingsUnsubscribe) {
+    currentBookingsUnsubscribe();
+    currentBookingsUnsubscribe = null;
+  }
+  if (currentClosedSlotsUnsubscribe) {
+    currentClosedSlotsUnsubscribe();
+    currentClosedSlotsUnsubscribe = null;
+  }
+}
+
+function startRealTimeUpdates(dateStr) {
+  // Stop any previous listeners
+  stopRealTimeUpdates();
+  // Only attach if we are on the time step and the date matches
+  if (!modal.classList.contains('hidden') && !document.getElementById('step-time').classList.contains('hidden') && selectedDate && formatDateISO(selectedDate) === dateStr) {
+    currentBookingsUnsubscribe = db.collection('bookings')
+      .where('date', '==', dateStr)
+      .onSnapshot(() => {
+        if (!modal.classList.contains('hidden') && !document.getElementById('step-time').classList.contains('hidden') && selectedDate) {
+          renderTimeSlots(selectedDate);
+        }
+      });
+    currentClosedSlotsUnsubscribe = db.collection('closedSlots')
+      .where('date', '==', dateStr)
+      .onSnapshot(() => {
+        if (!modal.classList.contains('hidden') && !document.getElementById('step-time').classList.contains('hidden') && selectedDate) {
+          renderTimeSlots(selectedDate);
+        }
+      });
+  }
+}
+
 // ========== AUTH STATE OBSERVER ==========
 auth.onAuthStateChanged(async (user) => {
   if (user) {
@@ -1409,18 +1484,6 @@ auth.onAuthStateChanged(async (user) => {
     if (!modal.classList.contains('hidden')) loadCustomerInfo();
     document.getElementById('my-bookings-button').classList.add('hidden');
     document.getElementById('logout-section').classList.add('hidden');
-  }
-});
-
-// ========== REAL-TIME UPDATES ==========
-db.collection('bookings').onSnapshot(() => {
-  if (!modal.classList.contains('hidden') && !document.getElementById('step-time').classList.contains('hidden') && selectedDate) {
-    renderTimeSlots(selectedDate);
-  }
-});
-db.collection('closedSlots').onSnapshot(() => {
-  if (!modal.classList.contains('hidden') && !document.getElementById('step-time').classList.contains('hidden') && selectedDate) {
-    renderTimeSlots(selectedDate);
   }
 });
 

@@ -13,7 +13,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
 <style>
-/* all styles unchanged from previous version */
+/* (all styles remain unchanged) */
 body {
   font-family: 'Inter', sans-serif;
   background-color: #050505;
@@ -627,7 +627,6 @@ function escapeHtml(str = '') {
 }
 
 // ========== OPTIMIZED FIRESTORE QUERIES ==========
-// Get bookings for a specific date only
 async function getBookingsForDate(dateStr) {
   const snapshot = await db.collection('bookings')
     .where('date', '==', dateStr)
@@ -635,7 +634,6 @@ async function getBookingsForDate(dateStr) {
   return snapshot.docs.map(doc => doc.data());
 }
 
-// Get closed slots for a specific date
 async function getClosedSlotsForDate(dateStr) {
   const snapshot = await db.collection('closedSlots')
     .where('date', '==', dateStr)
@@ -643,7 +641,6 @@ async function getClosedSlotsForDate(dateStr) {
   return snapshot.docs.map(doc => doc.data());
 }
 
-// Get all bookings for a user (by userId or email fallback)
 async function getUserBookings(userId, email) {
   let query = db.collection('bookings');
   if (userId) {
@@ -657,7 +654,6 @@ async function getUserBookings(userId, email) {
   return snapshot.docs.map(doc => doc.data());
 }
 
-// Check if a specific slot is available
 async function isSlotAvailable(date, time) {
   const dateStr = formatDateISO(date);
   const closedSlots = await getClosedSlotsForDate(dateStr);
@@ -950,6 +946,8 @@ function selectDate(element, date) {
   if (!document.getElementById('step-time').classList.contains('hidden')) {
     renderTimeSlots(selectedDate);
   }
+  // Start real‑time listeners for the new date
+  startRealTimeUpdates(formatDateISO(selectedDate));
 }
 
 function selectTime(element, time) {
@@ -974,6 +972,8 @@ function goToStep(stepName) {
   if (stepName === 'time' && selectedDate) {
     document.getElementById('time-header-date').innerText = selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
     renderTimeSlots(selectedDate);
+    // Ensure listeners are active for the current date
+    startRealTimeUpdates(formatDateISO(selectedDate));
   }
   if (stepName === 'details') {
     checkLateReminder();
@@ -995,6 +995,8 @@ function resetSelection() {
   [nameInput, emailInput, phoneInput].forEach(i => i.classList.remove('input-error'));
   [nameError, emailError, phoneError].forEach(e => e.style.display = 'none');
   agreeCheck.checked = false;
+  // Stop real‑time listeners when resetting
+  stopRealTimeUpdates();
 }
 
 function openBooking(options = {}) {
@@ -1008,6 +1010,9 @@ function openBooking(options = {}) {
     document.getElementById('btn-calendar-next').disabled = !selectedDate;
     document.getElementById('btn-time-next').disabled = !selectedTime;
     document.getElementById('btn-service-next').disabled = !selectedService;
+    if (selectedDate) {
+      startRealTimeUpdates(formatDateISO(selectedDate));
+    }
   }
   goToStep(options.step || 'calendar');
   lucide.createIcons();
@@ -1017,6 +1022,44 @@ function openBooking(options = {}) {
 function closeBooking() {
   modal.classList.add('hidden');
   document.body.style.overflow = 'auto';
+  stopRealTimeUpdates(); // Clean up listeners
+}
+
+// ========== REAL-TIME UPDATES (FIXED) ==========
+let currentBookingsUnsubscribe = null;
+let currentClosedSlotsUnsubscribe = null;
+
+function stopRealTimeUpdates() {
+  if (currentBookingsUnsubscribe) {
+    currentBookingsUnsubscribe();
+    currentBookingsUnsubscribe = null;
+  }
+  if (currentClosedSlotsUnsubscribe) {
+    currentClosedSlotsUnsubscribe();
+    currentClosedSlotsUnsubscribe = null;
+  }
+}
+
+function startRealTimeUpdates(dateStr) {
+  // Stop previous listeners
+  stopRealTimeUpdates();
+  // Only set up listeners if the time step is visible and we have a date
+  if (!modal.classList.contains('hidden') && !document.getElementById('step-time').classList.contains('hidden') && selectedDate && formatDateISO(selectedDate) === dateStr) {
+    currentBookingsUnsubscribe = db.collection('bookings')
+      .where('date', '==', dateStr)
+      .onSnapshot(() => {
+        if (!modal.classList.contains('hidden') && !document.getElementById('step-time').classList.contains('hidden') && selectedDate) {
+          renderTimeSlots(selectedDate);
+        }
+      });
+    currentClosedSlotsUnsubscribe = db.collection('closedSlots')
+      .where('date', '==', dateStr)
+      .onSnapshot(() => {
+        if (!modal.classList.contains('hidden') && !document.getElementById('step-time').classList.contains('hidden') && selectedDate) {
+          renderTimeSlots(selectedDate);
+        }
+      });
+  }
 }
 
 // ========== FORM VALIDATION ==========
@@ -1423,40 +1466,6 @@ auth.onAuthStateChanged(async (user) => {
     document.getElementById('logout-section').classList.add('hidden');
   }
 });
-
-// ========== REAL-TIME UPDATES ==========
-// Use targeted listeners for performance
-let currentBookingsUnsubscribe = null;
-let currentClosedSlotsUnsubscribe = null;
-
-function startRealTimeUpdates(dateStr) {
-  if (currentBookingsUnsubscribe) currentBookingsUnsubscribe();
-  if (currentClosedSlotsUnsubscribe) currentClosedSlotsUnsubscribe();
-  
-  currentBookingsUnsubscribe = db.collection('bookings')
-    .where('date', '==', dateStr)
-    .onSnapshot(() => {
-      if (!modal.classList.contains('hidden') && !document.getElementById('step-time').classList.contains('hidden') && selectedDate) {
-        renderTimeSlots(selectedDate);
-      }
-    });
-  
-  currentClosedSlotsUnsubscribe = db.collection('closedSlots')
-    .where('date', '==', dateStr)
-    .onSnapshot(() => {
-      if (!modal.classList.contains('hidden') && !document.getElementById('step-time').classList.contains('hidden') && selectedDate) {
-        renderTimeSlots(selectedDate);
-      }
-    });
-}
-
-// Override renderTimeSlots to start listeners when date changes
-const originalRenderTimeSlots = renderTimeSlots;
-renderTimeSlots = async function(date) {
-  const dateStr = formatDateISO(date);
-  startRealTimeUpdates(dateStr);
-  await originalRenderTimeSlots(date);
-};
 
 // ========== INIT ==========
 updateAccountUI();

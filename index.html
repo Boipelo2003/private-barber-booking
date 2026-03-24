@@ -163,7 +163,7 @@ body {
 </style>
 </head>
 <body class="antialiased min-h-screen flex flex-col">
-<!-- Navigation -->
+<!-- Navigation (unchanged) -->
 <nav class="fixed w-full z-50 glass-panel border-b border-white/5">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="flex items-center justify-between h-20">
@@ -249,7 +249,7 @@ body {
   </div>
 </section>
 
-<!-- Account Modal with Forgot Password -->
+<!-- Account Modal (with Forgot Password) -->
 <div id="account-modal" class="fixed inset-0 z-[200] hidden">
   <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity" onclick="closeAccountModal()"></div>
   <div class="relative min-h-full flex items-center justify-center p-4">
@@ -582,8 +582,8 @@ const confirmSpinner = document.getElementById('confirm-spinner');
 const whatsappLink = document.getElementById('whatsapp-link');
 
 // ========== USER STATE ==========
-let currentUser = null;          // profile from Firestore (name, phone, late)
-let currentAuthUser = null;      // Firebase Auth user object
+let currentUser = null;
+let currentAuthUser = null;
 let currentDate = new Date();
 let selectedDate = null;
 let selectedTime = null;
@@ -626,43 +626,45 @@ function escapeHtml(str = '') {
     .replace(/'/g, '&#39;');
 }
 
-// ========== FIRESTORE HELPERS ==========
-async function getBookings() {
-  const snapshot = await db.collection('bookings').get();
-  return snapshot.docs.map(doc => doc.data());
-}
-async function deleteBooking(bookingId) {
-  await db.collection('bookings').doc(bookingId).delete();
-}
-async function updateBooking(bookingId, data) {
-  await db.collection('bookings').doc(bookingId).update(data);
-}
-async function getClosedSlots() {
-  const snapshot = await db.collection('closedSlots').get();
+// ========== OPTIMIZED FIRESTORE QUERIES ==========
+// Get bookings for a specific date only
+async function getBookingsForDate(dateStr) {
+  const snapshot = await db.collection('bookings')
+    .where('date', '==', dateStr)
+    .get();
   return snapshot.docs.map(doc => doc.data());
 }
 
-// ========== TIME SLOTS & PRICING ==========
-const TIME_SLOTS = [
-  "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
-  "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM",
-  "05:00 PM", "06:00 PM", "07:00 PM", "08:00 PM"
-];
+// Get closed slots for a specific date
+async function getClosedSlotsForDate(dateStr) {
+  const snapshot = await db.collection('closedSlots')
+    .where('date', '==', dateStr)
+    .get();
+  return snapshot.docs.map(doc => doc.data());
+}
 
-function getTimeSurcharge(time) {
-  let surcharge = 0;
-  if (["06:00 PM", "07:00 PM", "08:00 PM"].includes(time)) surcharge += 20;
-  if (["07:00 PM", "08:00 PM"].includes(time)) surcharge += 50;
-  return surcharge;
+// Get all bookings for a user (by userId or email fallback)
+async function getUserBookings(userId, email) {
+  let query = db.collection('bookings');
+  if (userId) {
+    query = query.where('userId', '==', userId);
+  } else if (email) {
+    query = query.where('email', '==', email);
+  } else {
+    return [];
+  }
+  const snapshot = await query.get();
+  return snapshot.docs.map(doc => doc.data());
 }
-function getFinalPrice(basePrice, time) {
-  return basePrice + getTimeSurcharge(time);
-}
+
+// Check if a specific slot is available
 async function isSlotAvailable(date, time) {
   const dateStr = formatDateISO(date);
-  const closedSlots = (await getClosedSlots()).filter(slot => slot.date === dateStr).map(slot => slot.time);
-  const bookedSlots = (await getBookings()).filter(b => b.date === dateStr).map(b => b.time);
-  return !closedSlots.includes(time) && !bookedSlots.includes(time);
+  const closedSlots = await getClosedSlotsForDate(dateStr);
+  const bookedSlots = await getBookingsForDate(dateStr);
+  const isClosed = closedSlots.some(slot => slot.time === time);
+  const isBooked = bookedSlots.some(booking => booking.time === time);
+  return !isClosed && !isBooked;
 }
 
 // ========== AUTHENTICATION FUNCTIONS ==========
@@ -741,11 +743,11 @@ async function sendPasswordReset() {
     await auth.sendPasswordResetEmail(email);
     msgDiv.innerText = 'Password reset email sent! Check your inbox.';
     msgDiv.classList.remove('hidden');
-    msgDiv.style.color = '#4ade80'; // green
+    msgDiv.style.color = '#4ade80';
     setTimeout(() => {
       showLogin();
       msgDiv.classList.add('hidden');
-      msgDiv.style.color = ''; // reset
+      msgDiv.style.color = '';
     }, 3000);
   } catch (error) {
     msgDiv.innerText = error.message;
@@ -879,8 +881,8 @@ function renderCalendar() {
 async function renderTimeSlots(date) {
   timeSlotsContainer.innerHTML = '';
   const dateStr = formatDateISO(date);
-  const closedSlots = (await getClosedSlots()).filter(slot => slot.date === dateStr).map(slot => slot.time);
-  const bookedSlots = (await getBookings()).filter(b => b.date === dateStr).map(b => b.time);
+  const closedSlots = await getClosedSlotsForDate(dateStr);
+  const bookedSlots = await getBookingsForDate(dateStr);
   const now = new Date();
   const isToday = dateStr === formatDateISO(now);
   TIME_SLOTS.forEach(time => {
@@ -898,13 +900,31 @@ async function renderTimeSlots(date) {
     btn.innerHTML = `<div class="flex items-center justify-between w-full">${time}${badgeHtml}</div>`;
     btn.classList.add('time-slot-btn', 'p-4', 'border', 'border-white/10', 'rounded-lg', 'hover:bg-white', 'hover:text-black', 'transition-all', 'text-sm', 'font-medium');
     if (time === selectedTime) btn.classList.add('selected');
-    if (closedSlots.includes(time) || bookedSlots.includes(time)) {
+    const isClosed = closedSlots.some(slot => slot.time === time);
+    const isBooked = bookedSlots.some(booking => booking.time === time);
+    if (isClosed || isBooked) {
       btn.classList.add('closed', 'opacity-30', 'pointer-events-none');
     } else {
       btn.onclick = () => selectTime(btn, time);
     }
     timeSlotsContainer.appendChild(btn);
   });
+}
+
+const TIME_SLOTS = [
+  "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
+  "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM",
+  "05:00 PM", "06:00 PM", "07:00 PM", "08:00 PM"
+];
+
+function getTimeSurcharge(time) {
+  let surcharge = 0;
+  if (["06:00 PM", "07:00 PM", "08:00 PM"].includes(time)) surcharge += 20;
+  if (["07:00 PM", "08:00 PM"].includes(time)) surcharge += 50;
+  return surcharge;
+}
+function getFinalPrice(basePrice, time) {
+  return basePrice + getTimeSurcharge(time);
 }
 
 function updateSummary() {
@@ -1058,7 +1078,7 @@ async function confirmBooking() {
     return;
   }
 
-  // Quick availability check (optimistic, but final check happens inside transaction)
+  // Quick optimistic check
   const quickAvailable = await isSlotAvailable(selectedDate, selectedTime);
   if (!quickAvailable) {
     alert('Sorry, this slot is no longer available. Please choose another time.');
@@ -1098,30 +1118,28 @@ async function confirmBooking() {
       reviewGiven: false
     };
 
-    // Firestore transaction to prevent double booking
+    // Firestore transaction
     await db.runTransaction(async (transaction) => {
-      // Get all bookings for the same date
-      const bookingsSnapshot = await transaction.get(db.collection('bookings').where('date', '==', bookingData.date));
-      // Check if the slot is already taken
-      const slotTaken = bookingsSnapshot.docs.some(doc => {
-        const b = doc.data();
-        return b.time === bookingData.time;
-      });
+      // Check bookings for the same date
+      const bookingsSnapshot = await transaction.get(
+        db.collection('bookings').where('date', '==', bookingData.date)
+      );
+      const slotTaken = bookingsSnapshot.docs.some(doc => doc.data().time === bookingData.time);
       if (slotTaken) {
         throw new Error('SLOT_ALREADY_BOOKED');
       }
-      // Also check closed slots (though already checked client-side, but double-check)
-      const closedSnapshot = await transaction.get(db.collection('closedSlots').where('date', '==', bookingData.date).where('time', '==', bookingData.time));
+      // Check closed slots for the same date
+      const closedSnapshot = await transaction.get(
+        db.collection('closedSlots').where('date', '==', bookingData.date).where('time', '==', bookingData.time)
+      );
       if (!closedSnapshot.empty) {
         throw new Error('SLOT_CLOSED');
       }
-      // All good, create the booking
       transaction.set(db.collection('bookings').doc(bookingId), bookingData);
     });
 
-    // If rescheduling, delete the old booking
     if (rescheduleOldBookingId) {
-      await deleteBooking(rescheduleOldBookingId);
+      await db.collection('bookings').doc(rescheduleOldBookingId).delete();
       rescheduleOldBookingId = null;
       alert('Original booking cancelled. Reschedule complete.');
     }
@@ -1150,7 +1168,7 @@ async function confirmBooking() {
 }
 confirmBtn.addEventListener('click', confirmBooking);
 
-// ========== MY BOOKINGS & RESCHEDULE (use userId where possible) ==========
+// ========== MY BOOKINGS & RESCHEDULE ==========
 async function openMyBookings() {
   if (!currentAuthUser && !currentUser) {
     alert('Please sign in to view your bookings.');
@@ -1164,19 +1182,14 @@ async function openMyBookings() {
   const container = document.getElementById('my-bookings-list');
   container.innerHTML = '<div class="loader"></div>';
   try {
-    const bookings = await getBookings();
+    const bookings = await getUserBookings(userId, userEmail);
     const now = new Date();
-    // Filter by userId if available, otherwise by email (backward compatibility)
-    const userBookings = bookings.filter(b => {
-      if (userId && b.userId === userId) return true;
-      if (!userId && userEmail && b.email === userEmail) return true;
-      return false;
-    }).sort((a, b) => a.date.localeCompare(b.date));
-    if (userBookings.length === 0) {
+    bookings.sort((a, b) => a.date.localeCompare(b.date));
+    if (bookings.length === 0) {
       container.innerHTML = '<p class="text-gray-500">No bookings found.</p>';
       return;
     }
-    container.innerHTML = userBookings.map(b => {
+    container.innerHTML = bookings.map(b => {
       const apptDateTime = parseLocalDateTime(b.date, b.time);
       const isPast = apptDateTime < now;
       const isUpcoming = !isPast;
@@ -1209,8 +1222,7 @@ async function openMyBookings() {
 }
 function closeMyBookings() { document.getElementById('my-bookings-modal').classList.add('hidden'); }
 async function rescheduleBooking(bookingId) {
-  const bookings = await getBookings();
-  const booking = bookings.find(b => b.id === bookingId);
+  const booking = (await getUserBookings(currentAuthUser ? currentAuthUser.uid : null, currentUser ? currentUser.email : null)).find(b => b.id === bookingId);
   if (!booking) return;
   const now = new Date();
   const appointmentDateTime = parseLocalDateTime(booking.date, booking.time);
@@ -1230,7 +1242,7 @@ async function rescheduleBooking(bookingId) {
   updateSummary();
 }
 window.cancelMyBooking = async function(bookingId) {
-  const booking = (await getBookings()).find(b => b.id === bookingId);
+  const booking = (await getUserBookings(currentAuthUser ? currentAuthUser.uid : null, currentUser ? currentUser.email : null)).find(b => b.id === bookingId);
   if (!booking) return;
   const now = new Date();
   const appointmentDateTime = parseLocalDateTime(booking.date, booking.time);
@@ -1243,7 +1255,7 @@ window.cancelMyBooking = async function(bookingId) {
   if (diffHours <= 5 && diffHours > 0) {
     alert('A R20 cancellation fee will be charged. Please contact the barber for payment.');
   }
-  await deleteBooking(bookingId);
+  await db.collection('bookings').doc(bookingId).delete();
   closeMyBookings();
   openMyBookings();
   if (!modal.classList.contains('hidden') && selectedDate && formatDateISO(selectedDate) === booking.date) {
@@ -1251,7 +1263,7 @@ window.cancelMyBooking = async function(bookingId) {
   }
 };
 
-// ========== REVIEW FUNCTIONS (ADDED userId) ==========
+// ========== REVIEW FUNCTIONS ==========
 let currentReviewBooking = null;
 function openReviewModal(bookingId) {
   currentReviewBooking = bookingId;
@@ -1286,11 +1298,11 @@ async function submitReview() {
     createdAt: new Date().toISOString()
   };
   await db.collection('reviews').doc(currentReviewBooking).set(reviewData);
-  await updateBooking(currentReviewBooking, { reviewGiven: true });
+  await db.collection('bookings').doc(currentReviewBooking).update({ reviewGiven: true });
   closeReviewModal();
   alert('Thank you for your review!');
   openMyBookings();
-  loadPublicReviews(); // refresh public reviews section
+  loadPublicReviews();
 }
 function closeReviewModal() {
   document.getElementById('review-modal').classList.add('hidden');
@@ -1413,16 +1425,38 @@ auth.onAuthStateChanged(async (user) => {
 });
 
 // ========== REAL-TIME UPDATES ==========
-db.collection('bookings').onSnapshot(() => {
-  if (!modal.classList.contains('hidden') && !document.getElementById('step-time').classList.contains('hidden') && selectedDate) {
-    renderTimeSlots(selectedDate);
-  }
-});
-db.collection('closedSlots').onSnapshot(() => {
-  if (!modal.classList.contains('hidden') && !document.getElementById('step-time').classList.contains('hidden') && selectedDate) {
-    renderTimeSlots(selectedDate);
-  }
-});
+// Use targeted listeners for performance
+let currentBookingsUnsubscribe = null;
+let currentClosedSlotsUnsubscribe = null;
+
+function startRealTimeUpdates(dateStr) {
+  if (currentBookingsUnsubscribe) currentBookingsUnsubscribe();
+  if (currentClosedSlotsUnsubscribe) currentClosedSlotsUnsubscribe();
+  
+  currentBookingsUnsubscribe = db.collection('bookings')
+    .where('date', '==', dateStr)
+    .onSnapshot(() => {
+      if (!modal.classList.contains('hidden') && !document.getElementById('step-time').classList.contains('hidden') && selectedDate) {
+        renderTimeSlots(selectedDate);
+      }
+    });
+  
+  currentClosedSlotsUnsubscribe = db.collection('closedSlots')
+    .where('date', '==', dateStr)
+    .onSnapshot(() => {
+      if (!modal.classList.contains('hidden') && !document.getElementById('step-time').classList.contains('hidden') && selectedDate) {
+        renderTimeSlots(selectedDate);
+      }
+    });
+}
+
+// Override renderTimeSlots to start listeners when date changes
+const originalRenderTimeSlots = renderTimeSlots;
+renderTimeSlots = async function(date) {
+  const dateStr = formatDateISO(date);
+  startRealTimeUpdates(dateStr);
+  await originalRenderTimeSlots(date);
+};
 
 // ========== INIT ==========
 updateAccountUI();

@@ -13,7 +13,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
 <style>
-/* all styles unchanged from previous version */
+/* all styles unchanged */
 body {
   font-family: 'Inter', sans-serif;
   background-color: #050505;
@@ -150,7 +150,6 @@ body {
 .rating-stars i.filled {
   color: #fbbf24;
 }
-/* new style for public reviews */
 .review-card {
   background: rgba(20, 20, 20, 0.6);
   backdrop-filter: blur(8px);
@@ -161,14 +160,10 @@ body {
   transform: translateY(-2px);
   border-color: rgba(255, 255, 255, 0.2);
 }
-.review-star {
-  color: #fbbf24;
-  fill: #fbbf24;
-}
 </style>
 </head>
 <body class="antialiased min-h-screen flex flex-col">
-<!-- Navigation -->
+<!-- Navigation (unchanged) -->
 <nav class="fixed w-full z-50 glass-panel border-b border-white/5">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="flex items-center justify-between h-20">
@@ -241,7 +236,7 @@ body {
   </div>
 </section>
 
-<!-- NEW: Public Reviews Section -->
+<!-- Public Reviews Section -->
 <section class="py-20 bg-black/50 border-t border-white/5">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="text-center mb-12">
@@ -254,7 +249,7 @@ body {
   </div>
 </section>
 
-<!-- Account Modal -->
+<!-- Account Modal (unchanged) -->
 <div id="account-modal" class="fixed inset-0 z-[200] hidden">
   <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity" onclick="closeAccountModal()"></div>
   <div class="relative min-h-full flex items-center justify-center p-4">
@@ -356,7 +351,7 @@ body {
   </div>
 </div>
 
-<!-- Booking Modal (full, identical to previous final version) -->
+<!-- Booking Modal (full, unchanged except for addition of userId) -->
 <div id="booking-modal" class="fixed inset-0 z-[100] hidden">
   <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity" onclick="closeBooking()"></div>
   <div class="relative min-h-full flex items-center justify-center p-4">
@@ -992,7 +987,7 @@ nameInput.addEventListener('input', validateName);
 emailInput.addEventListener('input', validateEmail);
 phoneInput.addEventListener('input', validatePhone);
 
-// ========== CONFIRM BOOKING ==========
+// ========== CONFIRM BOOKING (ADDED userId) ==========
 async function confirmBooking() {
   if (isProcessing) return;
   if (!validateForm()) {
@@ -1031,6 +1026,7 @@ async function confirmBooking() {
       name,
       email,
       phone,
+      userId: currentAuthUser ? currentAuthUser.uid : null, // ADDED
       bookedAt: new Date().toISOString(),
       status: 'upcoming',
       arrivalConfirmed: false,
@@ -1061,14 +1057,15 @@ async function confirmBooking() {
 }
 confirmBtn.addEventListener('click', confirmBooking);
 
-// ========== MY BOOKINGS & RESCHEDULE ==========
+// ========== MY BOOKINGS & RESCHEDULE (use userId where possible) ==========
 async function openMyBookings() {
   if (!currentAuthUser && !currentUser) {
     alert('Please sign in to view your bookings.');
     return;
   }
+  const userId = currentAuthUser ? currentAuthUser.uid : null;
   const userEmail = currentUser ? currentUser.email : (currentAuthUser ? currentAuthUser.email : null);
-  if (!userEmail) return;
+  if (!userId && !userEmail) return;
   const modal = document.getElementById('my-bookings-modal');
   modal.classList.remove('hidden');
   const container = document.getElementById('my-bookings-list');
@@ -1076,7 +1073,12 @@ async function openMyBookings() {
   try {
     const bookings = await getBookings();
     const now = new Date();
-    const userBookings = bookings.filter(b => b.email === userEmail).sort((a, b) => a.date.localeCompare(b.date));
+    // Filter by userId if available, otherwise by email (backward compatibility)
+    const userBookings = bookings.filter(b => {
+      if (userId && b.userId === userId) return true;
+      if (!userId && userEmail && b.email === userEmail) return true;
+      return false;
+    }).sort((a, b) => a.date.localeCompare(b.date));
     if (userBookings.length === 0) {
       container.innerHTML = '<p class="text-gray-500">No bookings found.</p>';
       return;
@@ -1156,7 +1158,7 @@ window.cancelMyBooking = async function(bookingId) {
   }
 };
 
-// ========== REVIEW FUNCTIONS ==========
+// ========== REVIEW FUNCTIONS (ADDED userId) ==========
 let currentReviewBooking = null;
 function openReviewModal(bookingId) {
   currentReviewBooking = bookingId;
@@ -1183,12 +1185,14 @@ async function submitReview() {
     return;
   }
   const comment = document.getElementById('review-comment').value.trim();
-  await db.collection('reviews').doc(currentReviewBooking).set({
+  const reviewData = {
     bookingId: currentReviewBooking,
     rating: window.selectedRating,
     comment: comment,
+    userId: currentAuthUser ? currentAuthUser.uid : null,
     createdAt: new Date().toISOString()
-  });
+  };
+  await db.collection('reviews').doc(currentReviewBooking).set(reviewData);
   await updateBooking(currentReviewBooking, { reviewGiven: true });
   closeReviewModal();
   alert('Thank you for your review!');
@@ -1286,6 +1290,36 @@ async function loadPublicReviews() {
   }
 }
 
+// ========== AUTH STATE OBSERVER (fixes persistence) ==========
+auth.onAuthStateChanged(async (user) => {
+  if (user) {
+    currentAuthUser = user;
+    // Load profile from Firestore
+    const profileDoc = await db.collection('userProfiles').doc(user.uid).get();
+    if (profileDoc.exists) {
+      currentUser = { uid: user.uid, ...profileDoc.data() };
+    } else {
+      currentUser = { uid: user.uid, email: user.email, name: '', phone: '', late: false };
+    }
+    updateAccountUI();
+    if (!modal.classList.contains('hidden')) {
+      nameInput.value = currentUser.name || '';
+      emailInput.value = currentUser.email;
+      phoneInput.value = currentUser.phone || '';
+    }
+    checkLateReminder();
+    document.getElementById('my-bookings-button').classList.remove('hidden');
+    document.getElementById('logout-section').classList.remove('hidden');
+  } else {
+    currentAuthUser = null;
+    currentUser = null;
+    updateAccountUI();
+    if (!modal.classList.contains('hidden')) loadCustomerInfo();
+    document.getElementById('my-bookings-button').classList.add('hidden');
+    document.getElementById('logout-section').classList.add('hidden');
+  }
+});
+
 // ========== REAL-TIME UPDATES ==========
 db.collection('bookings').onSnapshot(() => {
   if (!modal.classList.contains('hidden') && !document.getElementById('step-time').classList.contains('hidden') && selectedDate) {
@@ -1304,4 +1338,3 @@ loadPublicReviews(); // load reviews on page load
 </script>
 </body>
 </html>
-

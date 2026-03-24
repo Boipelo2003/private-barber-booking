@@ -631,9 +631,6 @@ async function getBookings() {
   const snapshot = await db.collection('bookings').get();
   return snapshot.docs.map(doc => doc.data());
 }
-async function saveBooking(booking) {
-  await db.collection('bookings').doc(booking.id).set(booking);
-}
 async function deleteBooking(bookingId) {
   await db.collection('bookings').doc(bookingId).delete();
 }
@@ -1049,7 +1046,7 @@ nameInput.addEventListener('input', validateName);
 emailInput.addEventListener('input', validateEmail);
 phoneInput.addEventListener('input', validatePhone);
 
-// ========== CONFIRM BOOKING (ADDED userId) ==========
+// ========== CONFIRM BOOKING WITH TRANSACTION ==========
 async function confirmBooking() {
   if (isProcessing) return;
   if (!validateForm()) {
@@ -1060,25 +1057,31 @@ async function confirmBooking() {
     alert('Please complete all selection steps before confirming.');
     return;
   }
-  const stillAvailable = await isSlotAvailable(selectedDate, selectedTime);
-  if (!stillAvailable) {
+
+  // Quick availability check (optimistic, but final check happens inside transaction)
+  const quickAvailable = await isSlotAvailable(selectedDate, selectedTime);
+  if (!quickAvailable) {
     alert('Sorry, this slot is no longer available. Please choose another time.');
     renderTimeSlots(selectedDate);
     return;
   }
+
   const infoSaved = await saveCustomerInfo();
   if (!infoSaved) return;
+
   isProcessing = true;
   confirmBtn.disabled = true;
   confirmBtnText.innerText = 'Processing...';
   confirmSpinner.classList.remove('hidden');
+
   try {
     const name = nameInput.value.trim();
     const email = emailInput.value.trim();
     const phone = phoneInput.value.trim();
     const finalPrice = getFinalPrice(selectedService.price, selectedTime);
-    const booking = {
-      id: Date.now() + '-' + Math.random().toString(36).substr(2, 8),
+    const bookingId = Date.now() + '-' + Math.random().toString(36).substr(2, 8);
+    const bookingData = {
+      id: bookingId,
       date: formatDateISO(selectedDate),
       time: selectedTime,
       service: selectedService.name,
@@ -1088,18 +1091,41 @@ async function confirmBooking() {
       name,
       email,
       phone,
-      userId: currentAuthUser ? currentAuthUser.uid : null, // ADDED
+      userId: currentAuthUser ? currentAuthUser.uid : null,
       bookedAt: new Date().toISOString(),
       status: 'upcoming',
       arrivalConfirmed: false,
       reviewGiven: false
     };
-    await saveBooking(booking);
+
+    // Firestore transaction to prevent double booking
+    await db.runTransaction(async (transaction) => {
+      // Get all bookings for the same date
+      const bookingsSnapshot = await transaction.get(db.collection('bookings').where('date', '==', bookingData.date));
+      // Check if the slot is already taken
+      const slotTaken = bookingsSnapshot.docs.some(doc => {
+        const b = doc.data();
+        return b.time === bookingData.time;
+      });
+      if (slotTaken) {
+        throw new Error('SLOT_ALREADY_BOOKED');
+      }
+      // Also check closed slots (though already checked client-side, but double-check)
+      const closedSnapshot = await transaction.get(db.collection('closedSlots').where('date', '==', bookingData.date).where('time', '==', bookingData.time));
+      if (!closedSnapshot.empty) {
+        throw new Error('SLOT_CLOSED');
+      }
+      // All good, create the booking
+      transaction.set(db.collection('bookings').doc(bookingId), bookingData);
+    });
+
+    // If rescheduling, delete the old booking
     if (rescheduleOldBookingId) {
       await deleteBooking(rescheduleOldBookingId);
       rescheduleOldBookingId = null;
       alert('Original booking cancelled. Reschedule complete.');
     }
+
     document.getElementById('success-message').innerText = 'Your slot is reserved.';
     const firstDateStr = selectedDate.toLocaleDateString();
     document.getElementById('success-details').innerHTML = `${selectedService.name}<br>${firstDateStr} at ${selectedTime}<br>Total: R${finalPrice}`;
@@ -1109,7 +1135,12 @@ async function confirmBooking() {
     goToStep('success');
   } catch (err) {
     console.error(err);
-    alert('Something went wrong. Please try again.');
+    if (err.message === 'SLOT_ALREADY_BOOKED' || err.message === 'SLOT_CLOSED') {
+      alert('Sorry, this slot was just taken by another user. Please choose another time.');
+      renderTimeSlots(selectedDate);
+    } else {
+      alert('Something went wrong. Please try again.');
+    }
   } finally {
     isProcessing = false;
     confirmBtn.disabled = false;
@@ -1352,11 +1383,10 @@ async function loadPublicReviews() {
   }
 }
 
-// ========== AUTH STATE OBSERVER (fixes persistence) ==========
+// ========== AUTH STATE OBSERVER ==========
 auth.onAuthStateChanged(async (user) => {
   if (user) {
     currentAuthUser = user;
-    // Load profile from Firestore
     const profileDoc = await db.collection('userProfiles').doc(user.uid).get();
     if (profileDoc.exists) {
       currentUser = { uid: user.uid, ...profileDoc.data() };
@@ -1396,7 +1426,7 @@ db.collection('closedSlots').onSnapshot(() => {
 
 // ========== INIT ==========
 updateAccountUI();
-loadPublicReviews(); // load reviews on page load
+loadPublicReviews();
 </script>
 </body>
 </html>

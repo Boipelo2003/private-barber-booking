@@ -1,1021 +1,614 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PRIVATE BARBER | Book Your Slot</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/lucide@latest"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<!-- Firebase v9 modular -->
-<script type="importmap">
-  {
-    "imports": {
-      "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
-      "firebase/auth": "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js",
-      "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"
-    }
-  }
-</script>
-<style>
-body {
-  font-family: 'Inter', sans-serif;
-  background-color: #050505;
-  color: #ffffff;
-}
-.glass-panel {
-  background: rgba(20, 20, 20, 0.7);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-.calendar-day {
-  transition: all 0.2s;
-}
-.calendar-day:hover:not(.empty):not(.disabled) {
-  background-color: rgba(255, 255, 255, 0.1);
-  transform: scale(1.05);
-}
-.calendar-day.selected {
-  background-color: #ffffff;
-  color: #000000;
-  font-weight: bold;
-}
-.calendar-day.disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-.time-slot-btn.selected,
-.service-btn.selected {
-  background-color: #ffffff;
-  color: #000000;
-  border-color: #ffffff;
-}
-.time-slot-btn.closed {
-  opacity: 0.3;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-::-webkit-scrollbar {
-  width: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #0a0a0a;
-}
-::-webkit-scrollbar-thumb {
-  background: #333;
-  border-radius: 3px;
-}
-.fade-in {
-  animation: fadeIn 0.5s ease-in-out;
-}
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.error-message {
-  color: #f87171;
-  font-size: 0.75rem;
-  margin-top: 0.25rem;
-  display: none;
-}
-.input-error {
-  border-color: #f87171 !important;
-}
-.loader {
-  border: 2px solid rgba(0,0,0,0.2);
-  border-top: 2px solid black;
-  border-radius: 50%;
-  width: 16px;
-  height: 16px;
-  animation: spin 0.6s linear infinite;
-  display: inline-block;
-}
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-.policy-box {
-  background: rgba(255, 255, 255, 0.05);
-  border-left: 3px solid #f59e0b;
-  padding: 0.75rem;
-  border-radius: 0.5rem;
-  font-size: 0.75rem;
-  color: #d1d5db;
-  margin-top: 1rem;
-}
-.policy-box p {
-  margin: 0.25rem 0;
-}
-.policy-box strong {
-  color: #f59e0b;
-}
-.late-reminder {
-  background: rgba(245, 158, 11, 0.2);
-  border-left: 3px solid #f59e0b;
-  padding: 0.75rem;
-  border-radius: 0.5rem;
-  margin-bottom: 1rem;
-  font-size: 0.8rem;
-  color: #fbbf24;
-}
-.step-view {
-  display: block;
-}
-.step-view.hidden {
-  display: none;
-}
-.evening-badge {
-  background: #ff6b6b20;
-  border: 1px solid #ff6b6b;
-  color: #ffb3b3;
-  border-radius: 20px;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.7rem;
-  margin-left: 0.5rem;
-}
-.loading-spinner {
-  text-align: center;
-  padding: 2rem;
-  color: #888;
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PRIVATE BARBER | Book Your Slot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Playfair+Display:ital,wght@1,400;1,600&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #050505;
+            color: #ffffff;
+        }
+        .serif-font { font-family: 'Playfair Display', serif; }
+        .glass-panel {
+            background: rgba(20, 20, 20, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .calendar-day { transition: all 0.2s; }
+        .calendar-day:hover:not(.empty) {
+            background-color: rgba(255, 255, 255, 0.1);
+            transform: scale(1.05);
+        }
+        .calendar-day.selected {
+            background-color: #ffffff;
+            color: #000000;
+            font-weight: bold;
+        }
+        .calendar-day.disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+        .time-slot-btn.selected {
+            background-color: #ffffff;
+            color: #000000;
+            border-color: #ffffff;
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0a0a0a; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+        .loader {
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top: 3px solid #fff;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
 </head>
 <body class="antialiased min-h-screen flex flex-col">
-<nav class="fixed w-full z-50 glass-panel border-b border-white/5">
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    <div class="flex items-center justify-between h-20">
-      <div class="flex-shrink-0 flex items-center gap-3">
-        <img src="https://yourdomain.com/logo.png" alt="Private Barber Logo" class="h-10 w-10 rounded-full border border-white/20 bg-white">
-        <span class="font-bold text-lg tracking-widest uppercase hidden sm:block">Private Barber</span>
-      </div>
-      <div class="flex items-center gap-4">
-        <a href="tel:+27768502521" class="text-sm font-medium hover:text-gray-300 transition-colors flex items-center gap-2">
-          <i data-lucide="phone" class="w-4 h-4"></i>
-          <span class="hidden sm:inline">Call to Book</span>
-        </a>
-        <button id="account-btn" class="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2">
-          <i data-lucide="user" class="w-4 h-4"></i>
-          <span id="account-status">Sign In</span>
-        </button>
-        <a href="admin.html" target="_blank" class="text-sm text-gray-400 hover:text-white transition-colors">Barber Admin</a>
-        <button onclick="openBooking()" class="bg-white text-black hover:bg-gray-200 px-6 py-2 rounded-full text-sm font-bold uppercase tracking-wide transition-all transform hover:scale-105 shadow-lg shadow-white/10">
-          Book Slot
-        </button>
-      </div>
-    </div>
-  </div>
-</nav>
 
-<div class="relative pt-32 pb-20 sm:pt-48 sm:pb-32 overflow-hidden flex items-center justify-center min-h-screen">
-  <div class="absolute inset-0 z-0">
-    <img src="https://yourdomain.com/hero-bg.jpg" alt="Barber Background" class="w-full h-full object-cover opacity-40">
-    <div class="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/80 to-transparent"></div>
-  </div>
-  <div class="relative z-10 max-w-4xl mx-auto px-4 text-center">
-    <div class="inline-block mb-4 px-4 py-1 rounded-full border border-white/20 bg-white/5 backdrop-blur-sm">
-      <span class="text-xs uppercase tracking-widest text-gray-300">Exclusive Appointments Only</span>
-    </div>
-    <h1 class="text-5xl md:text-8xl font-extrabold tracking-tighter mb-6 leading-tight">
-      SECURE YOUR <br/>
-      <span class="text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-400 to-white">TIME SLOT</span>
-    </h1>
-    <p class="mt-4 max-w-xl mx-auto text-lg text-gray-400 mb-10 font-light">
-      Skip the wait. Book your private session directly through our secure calendar.
-      Professional grooming, reserved exclusively for you.
-    </p>
-    <button onclick="openBooking()" class="group relative inline-flex items-center justify-center px-8 py-4 text-base font-bold text-black transition-all duration-200 bg-white rounded-full hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white focus:ring-offset-black">
-      <span>Open Calendar</span>
-      <i data-lucide="calendar" class="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform"></i>
-    </button>
-  </div>
-</div>
-
-<section class="py-20 border-t border-white/5 bg-[#080808]">
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-12 text-center max-w-3xl mx-auto">
-      <div class="flex flex-col items-center">
-        <div class="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-4 text-white">
-          <i data-lucide="shield-check" class="w-6 h-6"></i>
-        </div>
-        <h3 class="text-lg font-bold uppercase mb-2">Secure Booking</h3>
-        <p class="text-gray-500 text-sm">Your data is protected with enterprise-grade encryption.</p>
-      </div>
-      <div class="flex flex-col items-center">
-        <div class="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-4 text-white">
-          <i data-lucide="clock" class="w-6 h-6"></i>
-        </div>
-        <h3 class="text-lg font-bold uppercase mb-2">Real-Time Availability</h3>
-        <p class="text-gray-500 text-sm">See live open slots and book instantly without confirmation delays.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- Account Modal -->
-<div id="account-modal" class="fixed inset-0 z-[200] hidden">
-  <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity" onclick="closeAccountModal()"></div>
-  <div class="relative min-h-full flex items-center justify-center p-4">
-    <div class="relative w-full max-w-md bg-[#111] border border-white/10 rounded-2xl shadow-2xl p-6">
-      <button onclick="closeAccountModal()" class="absolute top-4 right-4 text-gray-500 hover:text-white">
-        <i data-lucide="x" class="w-5 h-5"></i>
-      </button>
-      <div class="text-center mb-6">
-        <img src="https://yourdomain.com/logo.png" alt="Logo" class="h-12 w-12 rounded-full mx-auto mb-2">
-        <h3 class="text-xl font-bold" id="account-modal-title">Welcome</h3>
-        <p class="text-sm text-gray-400" id="account-modal-subtitle">Sign in or create an account</p>
-      </div>
-      <div id="account-login-form">
-        <div class="space-y-4">
-          <div>
-            <input type="email" id="login-email" placeholder="Email" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
-          </div>
-          <div>
-            <input type="password" id="login-password" placeholder="Password" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
-          </div>
-          <button onclick="login()" class="w-full bg-white text-black font-bold py-2 rounded-lg hover:bg-gray-200 transition">Sign In</button>
-          <p class="text-center text-xs text-gray-500">Don't have an account? <button onclick="showRegister()" class="text-white underline">Register</button></p>
-        </div>
-      </div>
-      <div id="account-register-form" class="hidden">
-        <div class="space-y-4">
-          <div>
-            <input type="text" id="reg-name" placeholder="Full Name" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
-          </div>
-          <div>
-            <input type="email" id="reg-email" placeholder="Email" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
-          </div>
-          <div>
-            <input type="tel" id="reg-phone" placeholder="Phone" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
-          </div>
-          <div>
-            <input type="password" id="reg-password" placeholder="Password" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
-          </div>
-          <button onclick="register()" class="w-full bg-white text-black font-bold py-2 rounded-lg hover:bg-gray-200 transition">Create Account</button>
-          <p class="text-center text-xs text-gray-500">Already have an account? <button onclick="showLogin()" class="text-white underline">Sign In</button></p>
-        </div>
-      </div>
-      <div id="account-loggedin-view" class="hidden">
-        <div class="space-y-4">
-          <p class="text-white text-center">Logged in as <span id="loggedin-name"></span></p>
-          <button onclick="logout()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg transition">Logout</button>
-        </div>
-      </div>
-      <p id="account-message" class="text-red-400 text-xs text-center mt-3 hidden"></p>
-    </div>
-  </div>
-</div>
-
-<!-- Booking Modal -->
-<div id="booking-modal" class="fixed inset-0 z-[100] hidden">
-  <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity" onclick="closeBooking()"></div>
-  <div class="relative min-h-full flex items-center justify-center p-4">
-    <div class="relative w-full max-w-5xl bg-[#111] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col lg:flex-row max-h-[90vh] lg:max-h-[800px]">
-      <!-- Sidebar Summary -->
-      <div class="w-full lg:w-80 bg-[#161616] border-r border-white/5 p-6 flex flex-col justify-between">
-        <div>
-          <div class="flex items-center gap-3 mb-8">
-            <img src="https://yourdomain.com/logo.png" alt="Logo" class="h-10 w-10 rounded-full bg-white">
-            <div>
-              <h3 class="font-bold text-sm uppercase tracking-wider">Private Barber</h3>
-              <p class="text-xs text-gray-500">Booking System</p>
+    <nav class="fixed w-full z-50 glass-panel border-b border-white/5">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-20">
+                <div class="flex-shrink-0 flex items-center gap-3">
+                    <img src="https://image.qwenlm.ai/public_source/553aff0e-e70d-4625-9778-1e3f0a132b81/114154e01-1dec-4a89-9641-05c87544b7c7.png" alt="Private Barber Logo" class="h-10 w-10 rounded-full border border-white/20 bg-white">
+                    <span class="font-bold text-lg tracking-widest uppercase hidden sm:block">Private Barber</span>
+                </div>
+                <div class="flex items-center gap-4">
+                    <a href="tel:+1234567890" class="text-sm font-medium hover:text-gray-300 transition-colors flex items-center gap-2">
+                        <i data-lucide="phone" class="w-4 h-4"></i>
+                        <span class="hidden sm:inline">Call to Book</span>
+                    </a>
+                    <button onclick="openBooking()" class="bg-white text-black hover:bg-gray-200 px-6 py-2 rounded-full text-sm font-bold uppercase tracking-wide transition-all transform hover:scale-105 shadow-lg shadow-white/10">
+                        Book Slot
+                    </button>
+                </div>
             </div>
-          </div>
-          <div class="space-y-6">
-            <div><p class="text-xs uppercase text-gray-500 mb-1">Selected Service</p><p id="summary-service" class="text-white font-medium">Not selected</p></div>
-            <div><p class="text-xs uppercase text-gray-500 mb-1">Selected Date</p><p id="summary-date" class="text-white font-medium">Not selected</p></div>
-            <div><p class="text-xs uppercase text-gray-500 mb-1">Selected Time</p><p id="summary-time" class="text-white font-medium">Not selected</p></div>
-          </div>
         </div>
-        <div class="mt-8 pt-6 border-t border-white/5">
-          <div class="flex justify-between items-center mb-2">
-            <span class="text-gray-400 text-sm">Service Price</span>
-            <span id="summary-service-price" class="text-white font-bold">R0</span>
-          </div>
-        </div>
-      </div>
-      <!-- Main Content -->
-      <div class="flex-1 p-6 lg:p-10 overflow-y-auto relative bg-[#111]">
-        <button onclick="closeBooking()" class="absolute top-6 right-6 text-gray-500 hover:text-white transition-colors">
-          <i data-lucide="x" class="w-6 h-6"></i>
-        </button>
-        <!-- Step 1: Calendar -->
-        <div id="step-calendar" class="step-view fade-in">
-          <h2 class="text-3xl font-bold mb-2">Select Date</h2>
-          <p class="text-gray-400 mb-8">Choose an available day for your appointment.</p>
-          <div class="flex items-center justify-between mb-6">
-            <button onclick="prevMonth()" class="p-2 hover:bg-white/10 rounded-full transition-colors"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
-            <h3 id="calendar-month-year" class="text-xl font-bold uppercase tracking-widest"></h3>
-            <button onclick="nextMonth()" class="p-2 hover:bg-white/10 rounded-full transition-colors"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>
-          </div>
-          <div class="grid grid-cols-7 gap-2 mb-2 text-center">
-            <div class="text-xs text-gray-500 font-bold uppercase">Sun</div><div class="text-xs text-gray-500 font-bold uppercase">Mon</div><div class="text-xs text-gray-500 font-bold uppercase">Tue</div><div class="text-xs text-gray-500 font-bold uppercase">Wed</div><div class="text-xs text-gray-500 font-bold uppercase">Thu</div><div class="text-xs text-gray-500 font-bold uppercase">Fri</div><div class="text-xs text-gray-500 font-bold uppercase">Sat</div>
-          </div>
-          <div id="calendar-days" class="grid grid-cols-7 gap-2"></div>
-          <div class="mt-8 flex justify-end">
-            <button onclick="goToStep('time')" id="btn-calendar-next" class="bg-white text-black px-8 py-3 rounded-full font-bold uppercase text-sm hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>Continue</button>
-          </div>
-        </div>
-        <!-- Step 2: Time Slots -->
-        <div id="step-time" class="step-view hidden fade-in">
-          <button onclick="goToStep('calendar')" class="mb-4 text-xs text-gray-500 hover:text-white flex items-center gap-1"><i data-lucide="arrow-left" class="w-3 h-3"></i> Back to Calendar</button>
-          <h2 class="text-3xl font-bold mb-2">Select Time</h2>
-          <p class="text-gray-400 mb-8">Available slots for <span id="time-header-date" class="text-white"></span></p>
-          <div id="time-slots-container" class="grid grid-cols-3 sm:grid-cols-4 gap-4"></div>
-          <div class="mt-8 flex justify-end">
-            <button onclick="goToStep('service')" id="btn-time-next" class="bg-white text-black px-8 py-3 rounded-full font-bold uppercase text-sm hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>Continue</button>
-          </div>
-        </div>
-        <!-- Step 3: Service Selection -->
-        <div id="step-service" class="step-view hidden fade-in">
-          <button onclick="goToStep('time')" class="mb-4 text-xs text-gray-500 hover:text-white flex items-center gap-1"><i data-lucide="arrow-left" class="w-3 h-3"></i> Back to Time</button>
-          <h2 class="text-3xl font-bold mb-2">Choose Your Service</h2>
-          <p class="text-gray-400 mb-8">Select the service that fits your style.</p>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
-            <button class="service-btn p-5 border border-white/10 rounded-xl hover:bg-white hover:text-black transition-all text-left" onclick="selectService(this, 'Any Cut with Dye', 100)">
-              <div class="font-bold text-lg">Any Cut with Dye</div>
-              <div class="text-sm opacity-80">Base R100 · 60 min</div>
-              <div class="text-xs mt-1 text-gray-400">Fresh cut + professional dye</div>
-            </button>
-            <button class="service-btn p-5 border border-white/10 rounded-xl hover:bg-white hover:text-black transition-all text-left" onclick="selectService(this, 'Any Cut (No Dye)', 80)">
-              <div class="font-bold text-lg">Any Cut (No Dye)</div>
-              <div class="text-sm opacity-80">Base R80 · 60 min</div>
-              <div class="text-xs mt-1 text-gray-400">Clean, sharp haircut</div>
-            </button>
-          </div>
-          <div class="mt-8 flex justify-end">
-            <button onclick="goToStep('details')" id="btn-service-next" class="bg-white text-black px-8 py-3 rounded-full font-bold uppercase text-sm hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>Continue to Details</button>
-          </div>
-        </div>
-        <!-- Step 4: Contact Details + Policy -->
-        <div id="step-details" class="step-view hidden fade-in">
-          <button onclick="goToStep('service')" class="mb-4 text-xs text-gray-500 hover:text-white flex items-center gap-1"><i data-lucide="arrow-left" class="w-3 h-3"></i> Back to Services</button>
-          <h2 class="text-3xl font-bold mb-6">Your Information</h2>
-          <div id="late-reminder" class="late-reminder hidden">
-            <p><strong>⚠️ Important:</strong> You were marked as late for a previous appointment. Please remember that being late results in a fee of <strong>R10 per 10 minutes</strong>. We appreciate your punctuality!</p>
-          </div>
-          <div class="space-y-4 max-w-md mx-auto">
-            <div>
-              <label class="block text-sm text-gray-400 mb-1">Full Name *</label>
-              <input type="text" id="customer-name" placeholder="e.g., Thabo Mbeki" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
-              <div id="name-error" class="error-message">Please enter your full name.</div>
+    </nav>
+
+    <div id="customer-section">
+        <div class="relative pt-32 pb-20 sm:pt-48 sm:pb-32 overflow-hidden flex items-center justify-center min-h-screen">
+            <div class="absolute inset-0 z-0">
+                <img src="https://image.qwenlm.ai/public_source/553aff0e-e70d-4625-9778-1e3f0a132b81/1cdda2719-31f9-4a7c-9175-4844aa289a15.png" alt="Barber Background" class="w-full h-full object-cover opacity-40">
+                <div class="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/80 to-transparent"></div>
             </div>
-            <div>
-              <label class="block text-sm text-gray-400 mb-1">Email Address *</label>
-              <input type="email" id="customer-email" placeholder="thabo@example.com" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
-              <div id="email-error" class="error-message">Please enter a valid email address.</div>
+            
+            <div class="relative z-10 max-w-4xl mx-auto px-4 text-center">
+                <div class="inline-block mb-4 px-4 py-1 rounded-full border border-white/20 bg-white/5 backdrop-blur-sm">
+                    <span class="text-xs uppercase tracking-widest text-gray-300">Exclusive Appointments Only</span>
+                </div>
+                <h1 class="text-5xl md:text-8xl font-extrabold tracking-tighter mb-6 leading-tight">
+                    SECURE YOUR <br/>
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-400 to-white">TIME SLOT</span>
+                </h1>
+                <p class="mt-4 max-w-xl mx-auto text-lg text-gray-400 mb-10 font-light">
+                    Skip the wait. Book your private session directly through our secure calendar. 
+                    Professional grooming, reserved exclusively for you.
+                </p>
+                <button onclick="openBooking()" class="group relative inline-flex items-center justify-center px-8 py-4 text-base font-bold text-black transition-all duration-200 bg-white rounded-full hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white focus:ring-offset-black">
+                    <span>Open Calendar</span>
+                    <i data-lucide="calendar" class="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform"></i>
+                </button>
             </div>
-            <div>
-              <label class="block text-sm text-gray-400 mb-1">Phone Number *</label>
-              <input type="tel" id="customer-phone" placeholder="+27 12 345 6789" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
-              <div id="phone-error" class="error-message">Please enter a valid phone number (minimum 10 digits).</div>
-            </div>
-            <div class="policy-box">
-              <p><strong>⏱️ Late Policy</strong> – R10 per every 10 minutes you are late.</p>
-              <p><strong>❌ Cancellation Policy</strong> – If you cancel within 24 hours of your appointment, you will receive <strong>20% off your next cut</strong>.</p>
-              <p><strong>🚫 No‑Show Policy</strong> – Failure to show up without notice may result in a late flag on your account and a reminder for future bookings.</p>
-              <p><strong>👤 Single Seat</strong> – Each booking is for one person only. If you wish to book for multiple people, please make separate bookings.</p>
-              <p class="text-xs text-gray-500 mt-1">By booking, you agree to these terms.</p>
-            </div>
-            <label class="flex items-center gap-2 text-xs text-gray-400 cursor-pointer mt-4">
-              <input type="checkbox" id="agree-policy" class="rounded bg-[#222] border-white/10 text-white focus:ring-0">
-              I agree to the late and cancellation policies.
-            </label>
-          </div>
-          <div class="mt-8 flex justify-end">
-            <button id="confirm-btn" class="bg-white text-black px-8 py-3 rounded-full font-bold uppercase text-sm hover:bg-gray-200 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-              <span id="confirm-btn-text">Confirm Booking</span>
-              <div id="confirm-spinner" class="loader hidden"></div>
-            </button>
-          </div>
         </div>
-        <!-- Step 5: Success -->
-        <div id="step-success" class="step-view hidden fade-in text-center py-10">
-          <div class="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(34,197,94,0.4)]"><i data-lucide="check" class="w-10 h-10 text-black"></i></div>
-          <h2 class="text-3xl font-bold mb-2">Booking Confirmed</h2>
-          <p class="text-gray-400 mb-4 max-w-md mx-auto" id="success-message">Your slot is reserved.</p>
-          <div class="bg-white/5 p-4 rounded-lg inline-block mb-6">
-            <p class="text-sm text-gray-400">Appointment Details</p>
-            <p class="text-xl font-bold" id="success-details">--</p>
-          </div>
-          <div class="flex flex-col sm:flex-row gap-4 justify-center">
-            <a id="whatsapp-link" href="#" target="_blank" class="inline-flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-full font-bold transition-colors">
-              <i data-lucide="message-circle" class="w-5 h-5"></i>
-              Send WhatsApp
-            </a>
-            <button onclick="downloadReceipt()" class="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-full font-bold transition-colors">
-              <i data-lucide="file-text" class="w-5 h-5"></i>
-              Download Receipt (PDF)
-            </button>
-          </div>
-          <br>
-          <button onclick="closeBooking()" class="text-white border-b border-white/30 pb-1 hover:border-white transition-colors">
-            Return to Home
-          </button>
-        </div>
-      </div>
+
+        <section class="py-20 border-t border-white/5 bg-[#080808]">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-12 text-center">
+                    <div class="flex flex-col items-center">
+                        <div class="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-4 text-white">
+                            <i data-lucide="shield-check" class="w-6 h-6"></i>
+                        </div>
+                        <h3 class="text-lg font-bold uppercase mb-2">Secure Booking</h3>
+                        <p class="text-gray-500 text-sm">Your data is protected with enterprise-grade encryption.</p>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-4 text-white">
+                            <i data-lucide="clock" class="w-6 h-6"></i>
+                        </div>
+                        <h3 class="text-lg font-bold uppercase mb-2">Real-Time Availability</h3>
+                        <p class="text-gray-500 text-sm">See live open slots and book instantly without confirmation delays.</p>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-4 text-white">
+                            <i data-lucide="credit-card" class="w-6 h-6"></i>
+                        </div>
+                        <h3 class="text-lg font-bold uppercase mb-2">Safe Payment</h3>
+                        <p class="text-gray-500 text-sm">PCI-DSS compliant payment processing for your peace of mind.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
     </div>
-  </div>
-</div>
 
-<footer class="bg-black py-12 border-t border-white/5 mt-auto">
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6">
-    <div class="text-center md:text-left">
-      <h4 class="font-bold text-lg uppercase tracking-widest mb-2">Private Barber</h4>
-      <p class="text-gray-600 text-xs">© 2025 All Rights Reserved.</p>
-      <p class="text-gray-600 text-xs mt-1">Created by Bokamoso Mothibi</p>
+    <div id="admin-section" class="hidden flex-1 pt-32 pb-20 bg-[#050505]">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+                <div>
+                    <h2 class="text-3xl font-bold uppercase tracking-wider">Barber Dashboard</h2>
+                    <p class="text-gray-400 text-sm mt-1">Manage your exclusive bookings.</p>
+                </div>
+                <div class="flex gap-4">
+                    <button onclick="clearBookings()" class="px-6 py-2 border border-red-500/50 text-red-500 hover:bg-red-500/10 rounded-full text-sm font-bold uppercase transition-colors">
+                        Clear All
+                    </button>
+                    <button onclick="toggleCustomer()" class="px-6 py-2 bg-white text-black hover:bg-gray-200 rounded-full text-sm font-bold uppercase transition-colors">
+                        Exit Admin
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-[#111] border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm whitespace-nowrap">
+                        <thead class="bg-black/50 border-b border-white/10 text-gray-400 uppercase text-xs tracking-wider">
+                            <tr>
+                                <th class="p-5 font-semibold">Date & Time</th>
+                                <th class="p-5 font-semibold">Client Details</th>
+                                <th class="p-5 font-semibold">Contact Info</th>
+                                <th class="p-5 font-semibold">Service Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-table-body" class="divide-y divide-white/5">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
-    <div class="flex gap-6 text-gray-500">
-      <a href="https://www.instagram.com/private_barber_sa?igsh=MWl0bnZ4NnJ3aHJ5cw==" target="_blank" rel="noopener noreferrer" class="hover:text-white transition-colors">
-        <i data-lucide="instagram" class="w-5 h-5"></i>
-      </a>
-      <a href="https://www.facebook.com/yourpage" target="_blank" rel="noopener noreferrer" class="hover:text-white transition-colors">
-        <i data-lucide="facebook" class="w-5 h-5"></i>
-      </a>
-      <a href="https://twitter.com/yourhandle" target="_blank" rel="noopener noreferrer" class="hover:text-white transition-colors">
-        <i data-lucide="twitter" class="w-5 h-5"></i>
-      </a>
+
+    <div id="booking-modal" class="fixed inset-0 z-[100] hidden">
+        <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity" onclick="closeBooking()"></div>
+
+        <div class="relative min-h-full flex items-center justify-center p-4">
+            <div class="relative w-full max-w-5xl bg-[#111] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col lg:flex-row max-h-[90vh] lg:max-h-[800px]">
+                
+                <div class="w-full lg:w-80 bg-[#161616] border-r border-white/5 p-6 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center gap-3 mb-8">
+                            <img src="https://image.qwenlm.ai/public_source/553aff0e-e70d-4625-9778-1e3f0a132b81/114154e01-1dec-4a89-9641-05c87544b7c7.png" alt="Logo" class="h-10 w-10 rounded-full bg-white">
+                            <div>
+                                <h3 class="font-bold text-sm uppercase tracking-wider">Private Barber</h3>
+                                <p class="text-xs text-gray-500">Booking System</p>
+                            </div>
+                        </div>
+
+                        <div class="space-y-6">
+                            <div>
+                                <p class="text-xs uppercase text-gray-500 mb-1">Selected Date</p>
+                                <p id="summary-date" class="text-white font-medium">Not selected</p>
+                            </div>
+                            <div>
+                                <p class="text-xs uppercase text-gray-500 mb-1">Selected Time</p>
+                                <p id="summary-time" class="text-white font-medium">Not selected</p>
+                            </div>
+                            <div>
+                                <p class="text-xs uppercase text-gray-500 mb-1">Session Type</p>
+                                <p class="text-white font-medium">Standard Session (60 min)</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-8 pt-6 border-t border-white/5">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-gray-400 text-sm">Booking Fee</span>
+                            <span class="text-white font-bold">$50.00</span>
+                        </div>
+                        <p class="text-[10px] text-gray-600 mt-2">*Fee is deductible from final service payment.</p>
+                    </div>
+                </div>
+
+                <div class="flex-1 p-6 lg:p-10 overflow-y-auto relative bg-[#111]">
+                    <button onclick="closeBooking()" class="absolute top-6 right-6 text-gray-500 hover:text-white transition-colors">
+                        <i data-lucide="x" class="w-6 h-6"></i>
+                    </button>
+
+                    <div id="step-calendar" class="step-view fade-in">
+                        <h2 class="text-3xl font-bold mb-2">Select Date</h2>
+                        <p class="text-gray-400 mb-8">Choose an available day for your appointment.</p>
+                        
+                        <div class="flex items-center justify-between mb-6">
+                            <button onclick="prevMonth()" class="p-2 hover:bg-white/10 rounded-full transition-colors"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
+                            <h3 id="calendar-month-year" class="text-xl font-bold uppercase tracking-widest"></h3>
+                            <button onclick="nextMonth()" class="p-2 hover:bg-white/10 rounded-full transition-colors"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>
+                        </div>
+
+                        <div class="grid grid-cols-7 gap-2 mb-2 text-center">
+                            <div class="text-xs text-gray-500 font-bold uppercase">Sun</div>
+                            <div class="text-xs text-gray-500 font-bold uppercase">Mon</div>
+                            <div class="text-xs text-gray-500 font-bold uppercase">Tue</div>
+                            <div class="text-xs text-gray-500 font-bold uppercase">Wed</div>
+                            <div class="text-xs text-gray-500 font-bold uppercase">Thu</div>
+                            <div class="text-xs text-gray-500 font-bold uppercase">Fri</div>
+                            <div class="text-xs text-gray-500 font-bold uppercase">Sat</div>
+                        </div>
+                        <div id="calendar-days" class="grid grid-cols-7 gap-2">
+                            </div>
+
+                        <div class="mt-8 flex justify-end">
+                            <button onclick="goToStep('time')" id="btn-calendar-next" class="bg-white text-black px-8 py-3 rounded-full font-bold uppercase text-sm hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                                Continue
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="step-time" class="step-view hidden fade-in">
+                        <button onclick="goToStep('calendar')" class="mb-4 text-xs text-gray-500 hover:text-white flex items-center gap-1">
+                            <i data-lucide="arrow-left" class="w-3 h-3"></i> Back to Calendar
+                        </button>
+                        <h2 class="text-3xl font-bold mb-2">Select Time</h2>
+                        <p class="text-gray-400 mb-8">Available slots for <span id="time-header-date" class="text-white font-semibold"></span></p>
+                        
+                        <div class="grid grid-cols-3 sm:grid-cols-4 gap-4">
+                            <button class="time-slot-btn p-4 border border-white/10 rounded-lg hover:bg-white hover:text-black transition-all text-sm font-medium" onclick="selectTime(this, '09:00 AM')">09:00 AM</button>
+                            <button class="time-slot-btn p-4 border border-white/10 rounded-lg hover:bg-white hover:text-black transition-all text-sm font-medium" onclick="selectTime(this, '10:00 AM')">10:00 AM</button>
+                            <button class="time-slot-btn p-4 border border-white/10 rounded-lg hover:bg-white hover:text-black transition-all text-sm font-medium" onclick="selectTime(this, '11:00 AM')">11:00 AM</button>
+                            <button class="time-slot-btn p-4 border border-white/10 rounded-lg hover:bg-white hover:text-black transition-all text-sm font-medium" onclick="selectTime(this, '01:00 PM')">01:00 PM</button>
+                            <button class="time-slot-btn p-4 border border-white/10 rounded-lg hover:bg-white hover:text-black transition-all text-sm font-medium" onclick="selectTime(this, '02:00 PM')">02:00 PM</button>
+                            <button class="time-slot-btn p-4 border border-white/10 rounded-lg hover:bg-white hover:text-black transition-all text-sm font-medium" onclick="selectTime(this, '03:30 PM')">03:30 PM</button>
+                            <button class="time-slot-btn p-4 border border-white/10 rounded-lg hover:bg-white hover:text-black transition-all text-sm font-medium" onclick="selectTime(this, '04:30 PM')">04:30 PM</button>
+                            <button class="time-slot-btn p-4 border border-white/10 rounded-lg hover:bg-white hover:text-black transition-all text-sm font-medium" onclick="selectTime(this, '05:30 PM')">05:30 PM</button>
+                        </div>
+
+                        <div class="mt-8 flex justify-end">
+                            <button onclick="goToStep('details')" id="btn-time-next" class="bg-white text-black px-8 py-3 rounded-full font-bold uppercase text-sm hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                                Continue
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="step-details" class="step-view hidden fade-in">
+                        <button onclick="goToStep('time')" class="mb-4 text-xs text-gray-500 hover:text-white flex items-center gap-1">
+                            <i data-lucide="arrow-left" class="w-3 h-3"></i> Back to Time
+                        </button>
+                        <h2 class="text-3xl font-bold mb-6">Secure Checkout</h2>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div class="space-y-4">
+                                <h4 class="text-sm font-bold uppercase text-gray-500">Contact Information</h4>
+                                <input type="text" id="client-name" placeholder="Full Name" required class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
+                                <input type="email" id="client-email" placeholder="Email Address" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
+                                <input type="tel" id="client-phone" placeholder="Phone Number" required class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
+                            </div>
+
+                            <div class="space-y-4">
+                                <div class="flex items-center justify-between">
+                                    <h4 class="text-sm font-bold uppercase text-gray-500">Payment Method</h4>
+                                    <div class="flex items-center gap-1 text-green-500 text-xs">
+                                        <i data-lucide="lock" class="w-3 h-3"></i> Secure
+                                    </div>
+                                </div>
+                                <div class="bg-[#1a1a1a] p-4 rounded-lg border border-white/10 space-y-3">
+                                    <div class="relative">
+                                        <input type="text" placeholder="Card Number" class="w-full bg-[#111] border border-white/10 rounded p-3 pl-10 text-white focus:outline-none focus:border-white transition-colors text-sm">
+                                        <i data-lucide="credit-card" class="w-4 h-4 absolute left-3 top-3.5 text-gray-500"></i>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <input type="text" placeholder="MM/YY" class="w-full bg-[#111] border border-white/10 rounded p-3 text-white focus:outline-none focus:border-white transition-colors text-sm">
+                                        <input type="text" placeholder="CVC" class="w-full bg-[#111] border border-white/10 rounded p-3 text-white focus:outline-none focus:border-white transition-colors text-sm">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+                            <label class="flex items-center gap-2 text-xs text-gray-400 cursor-pointer">
+                                <input type="checkbox" id="terms-checkbox" class="rounded bg-[#222] border-white/10 text-white focus:ring-0">
+                                I agree to the cancellation policy (24h notice required).
+                            </label>
+                            <button onclick="processPayment()" class="w-full sm:w-auto bg-white text-black px-8 py-3 rounded-full font-bold uppercase text-sm hover:bg-gray-200 transition-colors flex justify-center items-center gap-2">
+                                <span id="pay-btn-text">Confirm Booking</span>
+                                <div id="pay-loader" class="loader hidden"></div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="step-success" class="step-view hidden fade-in text-center py-10">
+                        <div class="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(34,197,94,0.4)]">
+                            <i data-lucide="check" class="w-10 h-10 text-black"></i>
+                        </div>
+                        <h2 class="text-3xl font-bold mb-2">Booking Confirmed</h2>
+                        <p class="text-gray-400 mb-8 max-w-md mx-auto">
+                            Your slot is reserved. A confirmation email with directions has been sent to you.
+                        </p>
+                        <div class="bg-white/5 p-4 rounded-lg inline-block mb-8">
+                            <p class="text-sm text-gray-400">Appointment Details</p>
+                            <p class="text-xl font-bold" id="success-details">--</p>
+                        </div>
+                        <br>
+                        <button onclick="closeBooking()" class="text-white border-b border-white/30 pb-1 hover:border-white transition-colors">
+                            Return to Home
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
     </div>
-  </div>
-</footer>
 
-<script type="module">
-  import { initializeApp } from "firebase/app";
-  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
-  import { getFirestore, collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, query, where, runTransaction, onSnapshot } from "firebase/firestore";
+    <footer class="bg-black py-12 border-t border-white/5 mt-auto z-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6">
+            <div class="text-center md:text-left">
+                <h4 class="font-bold text-lg uppercase tracking-widest mb-2">Private Barber</h4>
+                <p class="text-gray-600 text-xs mb-2">© 2026 All Rights Reserved.</p>
+                <a onclick="toggleAdmin()" class="text-xs text-gray-700 hover:text-white cursor-pointer transition-colors uppercase tracking-widest font-bold">Admin Portal</a>
+            </div>
+            <div class="flex gap-6 text-gray-500">
+                <i data-lucide="instagram" class="w-5 h-5 hover:text-white cursor-pointer transition-colors"></i>
+                <i data-lucide="facebook" class="w-5 h-5 hover:text-white cursor-pointer transition-colors"></i>
+                <i data-lucide="twitter" class="w-5 h-5 hover:text-white cursor-pointer transition-colors"></i>
+            </div>
+        </div>
+    </footer>
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyB05r9ei92egPbcnbFKQNK0mso25DHcBss",
-    authDomain: "private-barber-booking-67cde.firebaseapp.com",
-    projectId: "private-barber-booking-67cde",
-    storageBucket: "private-barber-booking-67cde.firebasestorage.app",
-    messagingSenderId: "889141435520",
-    appId: "1:889141435520:web:bf645a2b8584b853225a65",
-    measurementId: "G-KNCJ003KNP"
-  };
+    <script>
+        // Initialize Icons
+        lucide.createIcons();
 
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
+        // State variables
+        let currentDate = new Date();
+        let selectedDate = null;
+        let selectedTime = null;
 
-  // ========== DOM ELEMENTS ==========
-  const modal = document.getElementById('booking-modal');
-  const calendarDays = document.getElementById('calendar-days');
-  const monthYearLabel = document.getElementById('calendar-month-year');
-  const timeSlotsContainer = document.getElementById('time-slots-container');
-  const summaryService = document.getElementById('summary-service');
-  const summaryDate = document.getElementById('summary-date');
-  const summaryTime = document.getElementById('summary-time');
-  const summaryServicePrice = document.getElementById('summary-service-price');
-  const nameInput = document.getElementById('customer-name');
-  const emailInput = document.getElementById('customer-email');
-  const phoneInput = document.getElementById('customer-phone');
-  const agreeCheck = document.getElementById('agree-policy');
-  const nameError = document.getElementById('name-error');
-  const emailError = document.getElementById('email-error');
-  const phoneError = document.getElementById('phone-error');
-  const confirmBtn = document.getElementById('confirm-btn');
-  const confirmBtnText = document.getElementById('confirm-btn-text');
-  const confirmSpinner = document.getElementById('confirm-spinner');
-  const whatsappLink = document.getElementById('whatsapp-link');
-
-  // ========== USER AUTH ==========
-  let currentUser = null;
-
-  onAuthStateChanged(auth, async (user) => {
-    if (user) {
-      const userDocRef = doc(db, 'profiles', user.uid);
-      const userDoc = await getDoc(userDocRef);
-      currentUser = {
-        uid: user.uid,
-        email: user.email,
-        ...userDoc.data()
-      };
-    } else {
-      currentUser = null;
-    }
-    updateAccountUI();
-    if (!modal.classList.contains('hidden')) {
-      loadCustomerInfo();
-      checkLateReminder();
-    }
-  });
-
-  function updateAccountUI() {
-    const statusSpan = document.getElementById('account-status');
-    if (currentUser) {
-      statusSpan.innerHTML = `${currentUser.name || currentUser.email} <span class="text-xs">▼</span>`;
-    } else {
-      statusSpan.innerText = 'Sign In';
-    }
-  }
-
-  function openAccountModal() {
-    const modalEl = document.getElementById('account-modal');
-    modalEl.classList.remove('hidden');
-    if (currentUser) {
-      document.getElementById('account-login-form').classList.add('hidden');
-      document.getElementById('account-register-form').classList.add('hidden');
-      document.getElementById('account-loggedin-view').classList.remove('hidden');
-      document.getElementById('loggedin-name').innerText = currentUser.name || currentUser.email;
-      document.getElementById('account-modal-title').innerText = 'Account';
-      document.getElementById('account-modal-subtitle').innerText = 'You are logged in';
-    } else {
-      showLogin();
-    }
-    lucide.createIcons();
-  }
-
-  function closeAccountModal() {
-    document.getElementById('account-modal').classList.add('hidden');
-  }
-
-  function showLogin() {
-    document.getElementById('account-login-form').classList.remove('hidden');
-    document.getElementById('account-register-form').classList.add('hidden');
-    document.getElementById('account-loggedin-view').classList.add('hidden');
-    document.getElementById('account-message').classList.add('hidden');
-    document.getElementById('account-modal-title').innerText = 'Welcome';
-    document.getElementById('account-modal-subtitle').innerText = 'Sign in or create an account';
-  }
-
-  function showRegister() {
-    document.getElementById('account-login-form').classList.add('hidden');
-    document.getElementById('account-register-form').classList.remove('hidden');
-    document.getElementById('account-loggedin-view').classList.add('hidden');
-    document.getElementById('account-message').classList.add('hidden');
-    document.getElementById('account-modal-title').innerText = 'Create Account';
-    document.getElementById('account-modal-subtitle').innerText = 'Please fill in the details';
-  }
-
-  async function login() {
-    const email = document.getElementById('login-email').value.trim();
-    const password = document.getElementById('login-password').value;
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      closeAccountModal();
-    } catch (error) {
-      const msgDiv = document.getElementById('account-message');
-      msgDiv.innerText = error.message;
-      msgDiv.classList.remove('hidden');
-    }
-  }
-
-  async function register() {
-    const name = document.getElementById('reg-name').value.trim();
-    const email = document.getElementById('reg-email').value.trim();
-    const phone = document.getElementById('reg-phone').value.trim();
-    const password = document.getElementById('reg-password').value;
-    if (!name || !email || !phone || !password) {
-      alert('Please fill all fields.');
-      return;
-    }
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const userDocRef = doc(db, 'profiles', userCredential.user.uid);
-      await setDoc(userDocRef, { name, phone, email, late: false });
-      closeAccountModal();
-    } catch (error) {
-      const msgDiv = document.getElementById('account-message');
-      msgDiv.innerText = error.message;
-      msgDiv.classList.remove('hidden');
-    }
-  }
-
-  async function logout() {
-    await signOut(auth);
-    closeAccountModal();
-  }
-
-  window.login = login;
-  window.register = register;
-  window.logout = logout;
-  window.showLogin = showLogin;
-  window.showRegister = showRegister;
-  window.openAccountModal = openAccountModal;
-  window.closeAccountModal = closeAccountModal;
-
-  // ========== DATA LAYER ==========
-  const TIME_SLOTS = [
-    "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
-    "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM",
-    "05:00 PM", "06:00 PM", "07:00 PM", "08:00 PM"
-  ];
-
-  function getTimeSurcharge(time) {
-    const hourMap = { "06:00 PM": 18, "07:00 PM": 19, "08:00 PM": 20 };
-    if (hourMap[time] && hourMap[time] >= 18) return 20;
-    return 0;
-  }
-
-  function getFinalPrice(basePrice, time) {
-    return basePrice + getTimeSurcharge(time);
-  }
-
-  async function getClosedSlots() {
-    const snapshot = await getDocs(collection(db, 'closedSlots'));
-    return snapshot.docs.map(doc => doc.data());
-  }
-
-  async function getBookingsForDate(dateStr) {
-    const bookingsRef = collection(db, 'bookings');
-    const q = query(bookingsRef, where('date', '==', dateStr));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => doc.data());
-  }
-
-  // ========== STATE ==========
-  let currentDate = new Date();
-  let selectedDate = null;
-  let selectedTime = null;
-  let selectedService = null;
-  let isProcessing = false;
-  let unsubscribeBookings = null;
-  let unsubscribeClosedSlots = null;
-
-  function attachListeners() {
-    if (unsubscribeBookings) unsubscribeBookings();
-    if (unsubscribeClosedSlots) unsubscribeClosedSlots();
-
-    unsubscribeBookings = onSnapshot(collection(db, 'bookings'), () => {
-      if (!modal.classList.contains('hidden') && !document.getElementById('step-time').classList.contains('hidden') && selectedDate) {
-        renderTimeSlots(selectedDate);
-      }
-    });
-    unsubscribeClosedSlots = onSnapshot(collection(db, 'closedSlots'), () => {
-      if (!modal.classList.contains('hidden') && !document.getElementById('step-time').classList.contains('hidden') && selectedDate) {
-        renderTimeSlots(selectedDate);
-      }
-    });
-  }
-
-  function detachListeners() {
-    if (unsubscribeBookings) {
-      unsubscribeBookings();
-      unsubscribeBookings = null;
-    }
-    if (unsubscribeClosedSlots) {
-      unsubscribeClosedSlots();
-      unsubscribeClosedSlots = null;
-    }
-  }
-
-  function openBooking() {
-    modal.classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
-    renderCalendar();
-    goToStep('calendar');
-    resetSelection();
-    loadCustomerInfo();
-    lucide.createIcons();
-    checkLateReminder();
-    attachListeners();
-  }
-
-  function closeBooking() {
-    modal.classList.add('hidden');
-    document.body.style.overflow = 'auto';
-    detachListeners();
-  }
-
-  window.openBooking = openBooking;
-  window.closeBooking = closeBooking;
-
-  function resetSelection() {
-    selectedDate = null;
-    selectedTime = null;
-    selectedService = null;
-    updateSummary();
-    document.querySelectorAll('.calendar-day.selected, .time-slot-btn.selected, .service-btn.selected').forEach(el => el.classList.remove('selected'));
-    document.getElementById('btn-calendar-next').disabled = true;
-    document.getElementById('btn-time-next').disabled = true;
-    document.getElementById('btn-service-next').disabled = true;
-    [nameInput, emailInput, phoneInput].forEach(i => i.classList.remove('input-error'));
-    [nameError, emailError, phoneError].forEach(e => e.style.display = 'none');
-    agreeCheck.checked = false;
-  }
-
-  function goToStep(stepName) {
-    document.querySelectorAll('.step-view').forEach(el => el.classList.add('hidden'));
-    document.getElementById(`step-${stepName}`).classList.remove('hidden');
-    if (stepName === 'time' && selectedDate) {
-      document.getElementById('time-header-date').innerText = selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-      renderTimeSlots(selectedDate);
-    }
-    if (stepName === 'details') {
-      checkLateReminder();
-    }
-  }
-
-  window.goToStep = goToStep;
-
-  function renderCalendar() {
-    calendarDays.innerHTML = '';
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    monthYearLabel.innerText = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    const firstDay = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    for (let i = 0; i < firstDay; i++) {
-      const emptyDiv = document.createElement('div');
-      emptyDiv.classList.add('empty');
-      calendarDays.appendChild(emptyDiv);
-    }
-    for (let i = 1; i <= daysInMonth; i++) {
-      const dayBtn = document.createElement('button');
-      dayBtn.innerText = i;
-      dayBtn.classList.add('calendar-day', 'h-12', 'w-12', 'mx-auto', 'rounded-full', 'flex', 'items-center', 'justify-center', 'text-sm');
-      const checkDate = new Date(year, month, i);
-      if (checkDate < today) {
-        dayBtn.classList.add('disabled');
-      } else {
-        dayBtn.onclick = () => selectDate(dayBtn, checkDate);
-      }
-      calendarDays.appendChild(dayBtn);
-    }
-  }
-
-  function prevMonth() { currentDate.setMonth(currentDate.getMonth() - 1); renderCalendar(); }
-  function nextMonth() { currentDate.setMonth(currentDate.getMonth() + 1); renderCalendar(); }
-
-  window.prevMonth = prevMonth;
-  window.nextMonth = nextMonth;
-
-  function selectDate(element, date) {
-    document.querySelectorAll('.calendar-day').forEach(el => el.classList.remove('selected'));
-    element.classList.add('selected');
-    selectedDate = date;
-    document.getElementById('btn-calendar-next').disabled = false;
-    updateSummary();
-  }
-
-  async function renderTimeSlots(date) {
-    timeSlotsContainer.innerHTML = '<div class="loading-spinner">Loading slots...</div>';
-    const dateStr = date.toISOString().split('T')[0];
-    const closedSlots = (await getClosedSlots()).filter(slot => slot.date === dateStr).map(slot => slot.time);
-    const bookings = await getBookingsForDate(dateStr);
-    const bookedSlots = bookings.map(b => b.time);
-    
-    timeSlotsContainer.innerHTML = '';
-    TIME_SLOTS.forEach(time => {
-      const btn = document.createElement('button');
-      const surcharge = getTimeSurcharge(time);
-      const isEvening = surcharge > 0;
-      btn.innerHTML = `<div class="flex items-center justify-between w-full">${time}${isEvening ? '<span class="evening-badge">+R20</span>' : ''}</div>`;
-      btn.classList.add('time-slot-btn', 'p-4', 'border', 'border-white/10', 'rounded-lg', 'hover:bg-white', 'hover:text-black', 'transition-all', 'text-sm', 'font-medium');
-      if (closedSlots.includes(time) || bookedSlots.includes(time)) {
-        btn.classList.add('closed', 'opacity-30', 'pointer-events-none');
-      } else {
-        btn.onclick = () => selectTime(btn, time);
-      }
-      timeSlotsContainer.appendChild(btn);
-    });
-  }
-
-  function selectTime(element, time) {
-    document.querySelectorAll('.time-slot-btn').forEach(el => el.classList.remove('selected'));
-    element.classList.add('selected');
-    selectedTime = time;
-    document.getElementById('btn-time-next').disabled = false;
-    updateSummary();
-  }
-
-  function selectService(element, serviceName, servicePrice) {
-    document.querySelectorAll('.service-btn').forEach(el => el.classList.remove('selected'));
-    element.classList.add('selected');
-    selectedService = { name: serviceName, price: servicePrice };
-    document.getElementById('btn-service-next').disabled = false;
-    updateSummary();
-  }
-
-  window.selectService = selectService;
-
-  function updateSummary() {
-    summaryService.innerText = selectedService ? selectedService.name : 'Not selected';
-    summaryDate.innerText = selectedDate ? selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not selected';
-    summaryTime.innerText = selectedTime || 'Not selected';
-    if (selectedService && selectedTime) {
-      const finalPrice = getFinalPrice(selectedService.price, selectedTime);
-      summaryServicePrice.innerText = `R${finalPrice}`;
-    } else {
-      summaryServicePrice.innerText = `R${selectedService ? selectedService.price : 0}`;
-    }
-  }
-
-  async function isSlotAvailable(date, time) {
-    const dateStr = date.toISOString().split('T')[0];
-    const closedSlots = (await getClosedSlots()).filter(s => s.date === dateStr).map(s => s.time);
-    const bookings = await getBookingsForDate(dateStr);
-    const bookedSlots = bookings.map(b => b.time);
-    return !closedSlots.includes(time) && !bookedSlots.includes(time);
-  }
-
-  function downloadReceipt() {
-    if (typeof window.jspdf === 'undefined') {
-      alert('PDF library not loaded. Please try again.');
-      return;
-    }
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    const service = selectedService ? selectedService.name : 'N/A';
-    const dateStr = selectedDate ? selectedDate.toLocaleDateString() : 'N/A';
-    const timeStr = selectedTime || 'N/A';
-    const finalPrice = (selectedService && selectedTime) ? getFinalPrice(selectedService.price, selectedTime) : (selectedService ? selectedService.price : 0);
-    const price = `R${finalPrice}`;
-    const name = nameInput.value.trim();
-    const email = emailInput.value.trim();
-    const phone = phoneInput.value.trim();
-    
-    doc.setFontSize(20);
-    doc.text('Private Barber - Booking Receipt', 20, 20);
-    doc.setFontSize(12);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 30);
-    doc.text(`Customer: ${name}`, 20, 40);
-    doc.text(`Email: ${email}`, 20, 45);
-    doc.text(`Phone: ${phone}`, 20, 50);
-    doc.text(`Service: ${service}`, 20, 60);
-    doc.text(`Appointment: ${dateStr} at ${timeStr}`, 20, 65);
-    doc.text(`Price: ${price}`, 20, 70);
-    if (selectedTime && getTimeSurcharge(selectedTime) > 0) {
-      doc.text(`(Includes R20 evening surcharge)`, 20, 75);
-    }
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text('Policies:', 20, 90);
-    doc.text('• Late fee: R10 per 10 minutes late.', 20, 95);
-    doc.text('• Cancellation within 24h: 20% off next cut.', 20, 100);
-    doc.text('• No‑show may result in a late flag on your account.', 20, 105);
-    doc.text('• Each booking is for one person only.', 20, 110);
-    doc.text('Thank you for choosing Private Barber.', 20, 125);
-    doc.save(`Receipt_${name}_${dateStr.replace(/\//g, '-')}.pdf`);
-  }
-
-  window.downloadReceipt = downloadReceipt;
-
-  async function confirmBooking() {
-    if (isProcessing) return;
-    if (!validateForm()) {
-      alert('Please fix the errors in the form.');
-      return;
-    }
-    if (!selectedDate || !selectedTime || !selectedService) {
-      alert('Please complete all selection steps before confirming.');
-      return;
-    }
-
-    isProcessing = true;
-    confirmBtn.disabled = true;
-    confirmBtnText.innerText = 'Processing...';
-    confirmSpinner.classList.remove('hidden');
-
-    const dateStr = selectedDate.toISOString().split('T')[0];
-    const name = nameInput.value.trim();
-    const email = emailInput.value.trim();
-    const phone = phoneInput.value.trim();
-    const finalPrice = getFinalPrice(selectedService.price, selectedTime);
-
-    try {
-      await runTransaction(db, async (transaction) => {
-        const closedSlotsQuery = query(collection(db, 'closedSlots'), where('date', '==', dateStr), where('time', '==', selectedTime));
-        const closedSlotsSnap = await getDocs(closedSlotsQuery);
-        if (!closedSlotsSnap.empty) {
-          throw new Error('Slot is closed by admin');
-        }
-        const bookingsQuery = query(collection(db, 'bookings'), where('date', '==', dateStr), where('time', '==', selectedTime));
-        const bookingsSnap = await getDocs(bookingsQuery);
-        if (!bookingsSnap.empty) {
-          throw new Error('Slot already booked');
+        // DOM Elements
+        const modal = document.getElementById('booking-modal');
+        const calendarDays = document.getElementById('calendar-days');
+        const monthYearLabel = document.getElementById('calendar-month-year');
+        
+        // Functions to switch between Site and Admin Dashboard
+        function toggleAdmin() {
+            document.getElementById('customer-section').classList.add('hidden');
+            document.getElementById('admin-section').classList.remove('hidden');
+            loadBookings(); // Load data when opening admin
+            window.scrollTo(0,0);
         }
 
-        const bookingId = Date.now() + '-' + Math.random().toString(36).substr(2, 8);
-        const bookingRef = doc(db, 'bookings', bookingId);
-        const bookingData = {
-          id: bookingId,
-          date: dateStr,
-          time: selectedTime,
-          service: selectedService.name,
-          price: finalPrice,
-          basePrice: selectedService.price,
-          eveningSurcharge: getTimeSurcharge(selectedTime),
-          name,
-          email,
-          phone,
-          bookedAt: new Date().toISOString(),
-          userId: currentUser?.uid || null
-        };
-        transaction.set(bookingRef, bookingData);
-      });
+        function toggleCustomer() {
+            document.getElementById('admin-section').classList.add('hidden');
+            document.getElementById('customer-section').classList.remove('hidden');
+            window.scrollTo(0,0);
+        }
 
-      if (currentUser) {
-        const profileRef = doc(db, 'profiles', currentUser.uid);
-        await updateDoc(profileRef, { name, phone, email });
-      } else {
-        localStorage.setItem('customerName', name);
-        localStorage.setItem('customerEmail', email);
-        localStorage.setItem('customerPhone', phone);
-      }
+        // Booking Modal Flow Functions
+        function openBooking() {
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+            renderCalendar();
+            goToStep('calendar');
+        }
 
-      document.getElementById('success-message').innerText = 'Your slot is reserved.';
-      const firstDateStr = selectedDate.toLocaleDateString();
-      document.getElementById('success-details').innerHTML = `${selectedService.name}<br>${firstDateStr} at ${selectedTime}<br>Total: R${finalPrice}`;
+        function closeBooking() {
+            modal.classList.add('hidden');
+            document.body.style.overflow = 'auto';
+            // Reset state after animation
+            setTimeout(() => {
+                selectedDate = null;
+                selectedTime = null;
+                updateSummary();
+                document.querySelectorAll('.time-slot-btn').forEach(btn => btn.classList.remove('selected'));
+                
+                // Clear input fields
+                document.getElementById('client-name').value = '';
+                document.getElementById('client-email').value = '';
+                document.getElementById('client-phone').value = '';
+                document.getElementById('terms-checkbox').checked = false;
+                
+                // Reset buttons
+                document.getElementById('btn-calendar-next').disabled = true;
+                document.getElementById('btn-time-next').disabled = true;
+            }, 300);
+        }
 
-      const barberPhone = "27768502521";
-      const message = `New booking: ${selectedService.name} on ${selectedDate.toLocaleDateString()} at ${selectedTime}. Client: ${name} (${phone}) - Total: R${finalPrice}`;
-      const whatsappUrl = `https://wa.me/${barberPhone}?text=${encodeURIComponent(message)}`;
-      whatsappLink.href = whatsappUrl;
+        function goToStep(stepName) {
+            document.querySelectorAll('.step-view').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`step-${stepName}`).classList.remove('hidden');
+            
+            if(stepName === 'time' && selectedDate) {
+                document.getElementById('time-header-date').innerText = selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+            }
+        }
 
-      goToStep('success');
-    } catch (err) {
-      console.error(err);
-      alert(err.message || 'Something went wrong. Please try again.');
-    } finally {
-      isProcessing = false;
-      confirmBtn.disabled = false;
-      confirmBtnText.innerText = 'Confirm Booking';
-      confirmSpinner.classList.add('hidden');
-    }
-  }
+        function renderCalendar() {
+            calendarDays.innerHTML = '';
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            
+            monthYearLabel.innerText = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
-  confirmBtn.addEventListener('click', confirmBooking);
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const today = new Date();
 
-  function validateName() {
-    const value = nameInput.value.trim();
-    if (value === '') {
-      nameInput.classList.add('input-error');
-      nameError.style.display = 'block';
-      return false;
-    } else {
-      nameInput.classList.remove('input-error');
-      nameError.style.display = 'none';
-      return true;
-    }
-  }
+            // Empty slots for previous month
+            for (let i = 0; i < firstDay; i++) {
+                const emptyDiv = document.createElement('div');
+                emptyDiv.classList.add('empty');
+                calendarDays.appendChild(emptyDiv);
+            }
 
-  function validateEmail() {
-    const value = emailInput.value.trim();
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(value)) {
-      emailInput.classList.add('input-error');
-      emailError.style.display = 'block';
-      return false;
-    } else {
-      emailInput.classList.remove('input-error');
-      emailError.style.display = 'none';
-      return true;
-    }
-  }
+            // Days
+            for (let i = 1; i <= daysInMonth; i++) {
+                const dayBtn = document.createElement('button');
+                dayBtn.innerText = i;
+                dayBtn.classList.add('calendar-day', 'h-12', 'w-12', 'mx-auto', 'rounded-full', 'flex', 'items-center', 'justify-center', 'text-sm');
+                
+                const checkDate = new Date(year, month, i);
+                
+                // Disable past dates
+                if (checkDate < new Date(today.getFullYear(), today.getMonth(), today.getDate())) {
+                    dayBtn.classList.add('disabled');
+                } else {
+                    dayBtn.onclick = () => selectDate(dayBtn, checkDate);
+                }
 
-  function validatePhone() {
-    const value = phoneInput.value.trim();
-    const digits = value.replace(/\D/g, '');
-    if (digits.length < 10) {
-      phoneInput.classList.add('input-error');
-      phoneError.style.display = 'block';
-      return false;
-    } else {
-      phoneInput.classList.remove('input-error');
-      phoneError.style.display = 'none';
-      return true;
-    }
-  }
+                // If a date was already selected, keep it visually selected when changing months back
+                if (selectedDate && checkDate.getTime() === selectedDate.getTime()) {
+                    dayBtn.classList.add('selected');
+                }
 
-  function validateForm() {
-    return validateName() && validateEmail() && validatePhone() && agreeCheck.checked;
-  }
+                calendarDays.appendChild(dayBtn);
+            }
+        }
 
-  nameInput.addEventListener('input', validateName);
-  emailInput.addEventListener('input', validateEmail);
-  phoneInput.addEventListener('input', validatePhone);
+        function prevMonth() {
+            currentDate.setMonth(currentDate.getMonth() - 1);
+            renderCalendar();
+        }
 
-  function loadCustomerInfo() {
-    if (currentUser) {
-      nameInput.value = currentUser.name || '';
-      emailInput.value = currentUser.email;
-      phoneInput.value = currentUser.phone || '';
-    } else {
-      const savedName = localStorage.getItem('customerName');
-      const savedEmail = localStorage.getItem('customerEmail');
-      const savedPhone = localStorage.getItem('customerPhone');
-      if (savedName) nameInput.value = savedName;
-      if (savedEmail) emailInput.value = savedEmail;
-      if (savedPhone) phoneInput.value = savedPhone;
-    }
-  }
+        function nextMonth() {
+            currentDate.setMonth(currentDate.getMonth() + 1);
+            renderCalendar();
+        }
 
-  function checkLateReminder() {
-    const reminderDiv = document.getElementById('late-reminder');
-    if (currentUser && currentUser.late) {
-      reminderDiv.classList.remove('hidden');
-    } else {
-      reminderDiv.classList.add('hidden');
-    }
-  }
+        function selectDate(element, date) {
+            document.querySelectorAll('.calendar-day').forEach(el => el.classList.remove('selected'));
+            element.classList.add('selected');
+            
+            selectedDate = date;
+            document.getElementById('btn-calendar-next').disabled = false;
+            updateSummary();
+        }
 
-  document.addEventListener('DOMContentLoaded', () => {
-    lucide.createIcons();
-  });
-</script>
+        function selectTime(element, time) {
+            document.querySelectorAll('.time-slot-btn').forEach(el => el.classList.remove('selected'));
+            element.classList.add('selected');
+            
+            selectedTime = time;
+            document.getElementById('btn-time-next').disabled = false;
+            updateSummary();
+        }
+
+        function updateSummary() {
+            const dateEl = document.getElementById('summary-date');
+            const timeEl = document.getElementById('summary-time');
+            
+            if (selectedDate) {
+                dateEl.innerText = selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            } else {
+                dateEl.innerText = 'Not selected';
+            }
+
+            if (selectedTime) {
+                timeEl.innerText = selectedTime;
+            } else {
+                timeEl.innerText = 'Not selected';
+            }
+        }
+
+        // Save Data and "Process Payment"
+        function processPayment() {
+            const nameInput = document.getElementById('client-name').value;
+            const emailInput = document.getElementById('client-email').value;
+            const phoneInput = document.getElementById('client-phone').value;
+            const termsChecked = document.getElementById('terms-checkbox').checked;
+
+            // Simple validation
+            if (!nameInput || !phoneInput) {
+                alert("Please provide your Name and Phone Number.");
+                return;
+            }
+            if (!termsChecked) {
+                alert("Please agree to the cancellation policy to proceed.");
+                return;
+            }
+
+            const btnText = document.getElementById('pay-btn-text');
+            const loader = document.getElementById('pay-loader');
+            
+            btnText.innerText = "Processing...";
+            loader.classList.remove('hidden');
+            
+            // Simulate API/Payment Processing Delay
+            setTimeout(() => {
+                // 1. Create the booking object
+                const newBooking = {
+                    name: nameInput,
+                    email: emailInput || 'No email provided',
+                    phone: phoneInput,
+                    dateStr: selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                    rawDate: selectedDate, // Used for sorting in admin
+                    time: selectedTime,
+                    service: "Standard Session (60 min)"
+                };
+
+                // 2. Save to Local Storage for Admin Dashboard
+                let bookings = JSON.parse(localStorage.getItem('premiumBarberBookings')) || [];
+                bookings.push(newBooking);
+                localStorage.setItem('premiumBarberBookings', JSON.stringify(bookings));
+
+                // 3. Move to Success Screen
+                goToStep('success');
+                document.getElementById('success-details').innerText = `${newBooking.dateStr} at ${selectedTime}`;
+                
+                // Reset button UI for next time
+                btnText.innerText = "Confirm Booking";
+                loader.classList.add('hidden');
+            }, 2000);
+        }
+
+        // Admin Dashboard Functions
+        function loadBookings() {
+            let bookings = JSON.parse(localStorage.getItem('premiumBarberBookings')) || [];
+            
+            // Sort by the date they booked
+            bookings.sort((a, b) => new Date(a.rawDate) - new Date(b.rawDate));
+
+            let tbody = document.getElementById('admin-table-body');
+            tbody.innerHTML = ''; 
+
+            if(bookings.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="p-8 text-center text-gray-500 italic">No exclusive bookings yet.</td></tr>';
+                return;
+            }
+
+            // Create table rows for each booking
+            bookings.forEach(booking => {
+                let row = `
+                <tr class="hover:bg-white/5 transition-colors group">
+                    <td class="p-5">
+                        <div class="font-bold text-white">${booking.dateStr}</div>
+                        <div class="text-xs text-gray-400 mt-1">${booking.time}</div>
+                    </td>
+                    <td class="p-5">
+                        <div class="font-bold text-white">${booking.name}</div>
+                        <div class="text-xs text-gray-400 mt-1">${booking.service}</div>
+                    </td>
+                    <td class="p-5">
+                        <div class="text-sm text-gray-300">${booking.phone}</div>
+                        <div class="text-xs text-gray-500 mt-1">${booking.email}</div>
+                    </td>
+                    <td class="p-5">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
+                            Confirmed
+                        </span>
+                    </td>
+                </tr>`;
+                tbody.innerHTML += row;
+            });
+        }
+
+        function clearBookings() {
+            if(confirm("Are you sure you want to delete ALL bookings? This cannot be undone.")) {
+                localStorage.removeItem('premiumBarberBookings');
+                loadBookings();
+            }
+        }
+    </script>
 </body>
 </html>

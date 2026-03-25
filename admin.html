@@ -3,41 +3,45 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Barber Admin | Dashboard (SAST)</title>
+<title>Barber Admin | Dashboard</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/lucide@latest"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+<!-- Firebase v9 modular -->
+<script type="importmap">
+  {
+    "imports": {
+      "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
+      "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"
+    }
+  }
+</script>
 <style>
-body { font-family: 'Inter', sans-serif; background-color: #0a0a0a; color: #ffffff; }
-.glass-panel { background: rgba(20, 20, 20, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #0a0a0a;
+  color: #ffffff;
+}
+.glass-panel {
+  background: rgba(20, 20, 20, 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
 .hidden { display: none !important; }
 .slot-btn.closed { background-color: #2d2d2d; color: #888; border-color: #444; }
 .slot-btn.open { background-color: #1a1a1a; border-color: #333; }
 .btn-disabled { opacity: 0.6; cursor: not-allowed; pointer-events: none; }
-.evening-badge, .after-hours-badge {
-  display: inline-block;
+.evening-badge {
+  background: #ff6b6b20;
+  border: 1px solid #ff6b6b;
+  color: #ffb3b3;
   border-radius: 20px;
   padding: 0.25rem 0.5rem;
   font-size: 0.7rem;
   margin-left: 0.5rem;
 }
-.evening-badge { background: #ff6b6b20; border: 1px solid #ff6b6b; color: #ffb3b3; }
-.after-hours-badge { background: #ff450020; border: 1px solid #ff4500; color: #ffb3b3; }
 .user-card { transition: all 0.2s; }
 .user-card:hover { background: rgba(255,255,255,0.05); }
-.loading-spinner {
-  border: 2px solid rgba(255,255,255,0.2);
-  border-top: 2px solid #fff;
-  border-radius: 50%;
-  width: 24px;
-  height: 24px;
-  animation: spin 0.8s linear infinite;
-  margin: 20px auto;
-}
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-.timezone-note { font-size: 0.7rem; color: #aaa; margin-top: 0.5rem; text-align: center; }
 </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
@@ -45,26 +49,27 @@ body { font-family: 'Inter', sans-serif; background-color: #0a0a0a; color: #ffff
 <!-- Login Container -->
 <div id="login-container" class="glass-panel rounded-2xl p-8 w-full max-w-md">
   <div class="text-center mb-8">
-    <img src="https://image.qwenlm.ai/public_source/8b83e0df-dcfb-4b73-8354-600aa9e2a523/1beedd3c3-727f-4ecf-9df2-28663b4efe0b.png" alt="Logo" class="h-16 w-16 rounded-full border border-white/20 mx-auto mb-4">
+    <img src="https://yourdomain.com/logo.png" alt="Logo" class="h-16 w-16 rounded-full border border-white/20 mx-auto mb-4">
     <h1 class="text-2xl font-bold">Barber Admin</h1>
     <p class="text-gray-400 text-sm mt-2">Enter password to access dashboard</p>
   </div>
   <div class="space-y-4">
     <div>
       <label class="block text-sm text-gray-400 mb-1">Password</label>
-      <input type="password" id="admin-password" placeholder="••••••••" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white">
+      <input type="password" id="admin-password" placeholder="••••••••" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors">
     </div>
     <button onclick="checkPassword()" class="w-full bg-white text-black hover:bg-gray-200 font-bold py-3 rounded-lg transition-colors">Login</button>
     <p id="login-error" class="text-red-500 text-sm text-center hidden">Incorrect password</p>
   </div>
+  <p class="text-xs text-gray-600 text-center mt-6">(Password: voka2026)</p>
 </div>
 
 <!-- Admin Panel -->
 <div id="admin-panel" class="hidden w-full">
-  <div class="max-w-7xl mx-auto px-4 py-6">
+  <div class="max-w-7xl mx-auto">
     <div class="flex items-center justify-between mb-8">
       <div class="flex items-center gap-3">
-        <img src="https://image.qwenlm.ai/public_source/8b83e0df-dcfb-4b73-8354-600aa9e2a523/1beedd3c3-727f-4ecf-9df2-28663b4efe0b.png" alt="Logo" class="h-12 w-12 rounded-full border border-white/20">
+        <img src="https://yourdomain.com/logo.png" alt="Logo" class="h-12 w-12 rounded-full border border-white/20">
         <h1 class="text-3xl font-bold tracking-tight">Barber Admin</h1>
       </div>
       <div class="flex items-center gap-4">
@@ -79,9 +84,9 @@ body { font-family: 'Inter', sans-serif; background-color: #0a0a0a; color: #ffff
       <!-- LEFT: Manage Slots -->
       <div class="glass-panel rounded-2xl p-6">
         <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><i data-lucide="calendar-x" class="w-5 h-5"></i> Close / Open Slots</h2>
-        <p class="text-sm text-gray-400 mb-6">Select a date and toggle individual slots. Surcharges: <span class="evening-badge">6 PM → +R20</span> <span class="after-hours-badge">7 PM–8 PM → +R70</span></p>
+        <p class="text-sm text-gray-400 mb-6">Select a date and toggle individual slots. Slots after 6 PM include a <span class="evening-badge inline-block">+R20</span> surcharge.</p>
         <div class="mb-6">
-          <label class="block text-xs uppercase text-gray-500 mb-2">Select Date (SAST)</label>
+          <label class="block text-xs uppercase text-gray-500 mb-2">Select Date</label>
           <input type="date" id="slot-date" class="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-white">
         </div>
         <div class="flex gap-3 mb-6">
@@ -90,18 +95,17 @@ body { font-family: 'Inter', sans-serif; background-color: #0a0a0a; color: #ffff
         </div>
         <div id="admin-slots-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 min-h-[200px]"></div>
         <p id="no-slots-message" class="text-sm text-gray-500 mt-4 hidden">Select a date to manage slots.</p>
-        <div class="timezone-note">All dates/times are in South Africa Standard Time (SAST, UTC+2).</div>
       </div>
 
       <!-- MIDDLE: Upcoming Bookings -->
       <div class="glass-panel rounded-2xl p-6">
         <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><i data-lucide="calendar-check" class="w-5 h-5"></i> Upcoming Bookings</h2>
-        <p class="text-sm text-gray-400 mb-6">Manage arrivals, completions, and cancellations.</p>
+        <p class="text-sm text-gray-400 mb-6">Click the ✕ to cancel a booking.</p>
         <div id="bookings-list" class="space-y-3 max-h-[500px] overflow-y-auto pr-2"></div>
         <p id="no-bookings" class="text-sm text-gray-500 mt-4">No bookings yet.</p>
       </div>
 
-      <!-- RIGHT: Registered Users -->
+      <!-- RIGHT: Registered Users (from profiles) -->
       <div class="glass-panel rounded-2xl p-6">
         <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><i data-lucide="users" class="w-5 h-5"></i> Registered Users</h2>
         <p class="text-sm text-gray-400 mb-6">Toggle "Late" flag to remind user on next booking.</p>
@@ -110,426 +114,330 @@ body { font-family: 'Inter', sans-serif; background-color: #0a0a0a; color: #ffff
       </div>
     </div>
 
-    <p class="text-center text-xs text-gray-600 mt-10">Changes reflect immediately on the public booking site. All times are SAST (UTC+2).</p>
+    <p class="text-center text-xs text-gray-600 mt-10">Changes reflect immediately on the public booking site.</p>
   </div>
 </div>
 
-<script>
-lucide.createIcons();
+<script type="module">
+  import { initializeApp } from "firebase/app";
+  import { getFirestore, collection, doc, getDocs, updateDoc, deleteDoc, onSnapshot, query, where, writeBatch } from "firebase/firestore";
 
-// ========== SAST TIMEZONE HELPERS (same as public site) ==========
-function getBarberCurrentDateTime() {
-  const now = new Date();
-  const formatter = new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Johannesburg', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-  const parts = formatter.formatToParts(now);
-  const year = parseInt(parts.find(p => p.type === 'year').value);
-  const month = parseInt(parts.find(p => p.type === 'month').value);
-  const day = parseInt(parts.find(p => p.type === 'day').value);
-  const hour = parseInt(parts.find(p => p.type === 'hour').value);
-  const minute = parseInt(parts.find(p => p.type === 'minute').value);
-  const second = parseInt(parts.find(p => p.type === 'second').value);
-  const utcTimestamp = Date.UTC(year, month-1, day, hour-2, minute, second);
-  return new Date(utcTimestamp);
-}
+  const firebaseConfig = {
+    apiKey: "AIzaSyB05r9ei92egPbcnbFKQNK0mso25DHcBss",
+    authDomain: "private-barber-booking-67cde.firebaseapp.com",
+    projectId: "private-barber-booking-67cde",
+    storageBucket: "private-barber-booking-67cde.firebasestorage.app",
+    messagingSenderId: "889141435520",
+    appId: "1:889141435520:web:bf645a2b8584b853225a65",
+    measurementId: "G-KNCJ003KNP"
+  };
 
-function getBarberCurrentDateMidnight() {
-  const barberNow = getBarberCurrentDateTime();
-  const utcMidnight = Date.UTC(barberNow.getUTCFullYear(), barberNow.getUTCMonth(), barberNow.getUTCDate(), -2, 0, 0);
-  return new Date(utcMidnight);
-}
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
 
-function formatBarberDate(date) {
-  const formatter = new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Johannesburg', year: 'numeric', month: '2-digit', day: '2-digit' });
-  const parts = formatter.formatToParts(date);
-  const year = parts.find(p => p.type === 'year').value;
-  const month = parts.find(p => p.type === 'month').value;
-  const day = parts.find(p => p.type === 'day').value;
-  return `${year}-${month}-${day}`;
-}
+  // ========== PASSWORD ==========
+  const CORRECT_PASSWORD = "voka2026";
 
-function parseBarberDate(dateStr) {
-  const [year, month, day] = dateStr.split('-').map(Number);
-  const utcTimestamp = Date.UTC(year, month-1, day, -2, 0, 0);
-  return new Date(utcTimestamp);
-}
+  let unsubBookings = null;
+  let unsubClosedSlots = null;
+  let unsubUsers = null;
 
-function parseBarberDateTime(dateStr, timeStr) {
-  const date = parseBarberDate(dateStr);
-  const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
-  if (!match) return new Date(NaN);
-  let hour = parseInt(match[1], 10);
-  const minute = parseInt(match[2], 10);
-  const period = match[3].toUpperCase();
-  if (period === 'PM' && hour !== 12) hour += 12;
-  if (period === 'AM' && hour === 12) hour = 0;
-  // Set UTC hour/minute adjusting for SAST offset (+2)
-  date.setUTCHours(hour, minute, 0, 0);
-  return date;
-}
+  window.checkPassword = function() {
+    const input = document.getElementById('admin-password').value;
+    const error = document.getElementById('login-error');
+    if (input === CORRECT_PASSWORD) {
+      document.getElementById('login-container').classList.add('hidden');
+      document.getElementById('admin-panel').classList.remove('hidden');
+      lucide.createIcons();
 
-function getTimeMinutesFromMidnight(timeStr) {
-  const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
-  if (!match) return 0;
-  let hour = parseInt(match[1], 10);
-  const minute = parseInt(match[2], 10);
-  const period = match[3].toUpperCase();
-  if (period === 'PM' && hour !== 12) hour += 12;
-  if (period === 'AM' && hour === 12) hour = 0;
-  return hour * 60 + minute;
-}
+      renderSlotManager();
+      renderBookings();
+      renderUsers();
 
-function isTimeSlotPassedForDate(date, timeStr) {
-  const todayMidnight = getBarberCurrentDateMidnight();
-  const checkMidnight = new Date(date);
-  checkMidnight.setUTCHours(0,0,0,0);
-  if (checkMidnight.getTime() !== todayMidnight.getTime()) return false;
-  const slotMinutes = getTimeMinutesFromMidnight(timeStr);
-  const nowBarber = getBarberCurrentDateTime();
-  const currentMinutes = nowBarber.getUTCHours() * 60 + nowBarber.getUTCMinutes();
-  return slotMinutes < currentMinutes;
-}
+      if (unsubBookings) unsubBookings();
+      if (unsubClosedSlots) unsubClosedSlots();
+      if (unsubUsers) unsubUsers();
 
-// ========== FIREBASE ==========
-const firebaseConfig = {
-  apiKey: "AIzaSyB05r9ei92egPbcnbFKQNK0mso25DHcBss",
-  authDomain: "private-barber-booking-67cde.firebaseapp.com",
-  projectId: "private-barber-booking-67cde",
-  storageBucket: "private-barber-booking-67cde.firebasestorage.app",
-  messagingSenderId: "889141435520",
-  appId: "1:889141435520:web:bf645a2b8584b853225a65",
-  measurementId: "G-KNCJ003KNP"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+      unsubBookings = onSnapshot(collection(db, 'bookings'), () => {
+        renderBookings();
+        renderSlotManager();
+      });
+      unsubClosedSlots = onSnapshot(collection(db, 'closedSlots'), () => renderSlotManager());
+      unsubUsers = onSnapshot(collection(db, 'profiles'), () => renderUsers());
+    } else {
+      error.classList.remove('hidden');
+    }
+  };
 
-const CORRECT_PASSWORD = "voka2026";
-let unsubBookings = null, unsubClosedSlots = null, unsubUsers = null;
-
-function checkPassword() {
-  const input = document.getElementById('admin-password').value;
-  const error = document.getElementById('login-error');
-  if (input === CORRECT_PASSWORD) {
-    document.getElementById('login-container').classList.add('hidden');
-    document.getElementById('admin-panel').classList.remove('hidden');
-    lucide.createIcons();
-
-    renderSlotManager();
-    renderBookings();
-    renderUsers();
-
+  window.logout = function() {
     if (unsubBookings) unsubBookings();
     if (unsubClosedSlots) unsubClosedSlots();
     if (unsubUsers) unsubUsers();
+    unsubBookings = unsubClosedSlots = unsubUsers = null;
 
-    unsubBookings = db.collection('bookings').onSnapshot(() => {
-      renderBookings();
-      renderSlotManager();
+    document.getElementById('admin-panel').classList.add('hidden');
+    document.getElementById('login-container').classList.remove('hidden');
+    document.getElementById('admin-password').value = '';
+    document.getElementById('login-error').classList.add('hidden');
+  };
+
+  // ========== DATA HELPERS ==========
+  const TIME_SLOTS = [
+    "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
+    "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM",
+    "05:00 PM", "06:00 PM", "07:00 PM", "08:00 PM"
+  ];
+
+  async function getClosedSlots() {
+    const snapshot = await getDocs(collection(db, 'closedSlots'));
+    return snapshot.docs.map(doc => doc.data());
+  }
+
+  async function setClosedSlots(slots) {
+    const batch = writeBatch(db);
+    const existing = await getDocs(collection(db, 'closedSlots'));
+    existing.forEach(doc => batch.delete(doc.ref));
+    slots.forEach(slot => {
+      const docRef = doc(collection(db, 'closedSlots'));
+      batch.set(docRef, slot);
     });
-    unsubClosedSlots = db.collection('closedSlots').onSnapshot(() => renderSlotManager());
-    unsubUsers = db.collection('users').onSnapshot(() => renderUsers());
-  } else {
-    error.classList.remove('hidden');
+    await batch.commit();
   }
-}
 
-function logout() {
-  if (unsubBookings) unsubBookings();
-  if (unsubClosedSlots) unsubClosedSlots();
-  if (unsubUsers) unsubUsers();
-  unsubBookings = unsubClosedSlots = unsubUsers = null;
-  document.getElementById('admin-panel').classList.add('hidden');
-  document.getElementById('login-container').classList.remove('hidden');
-  document.getElementById('admin-password').value = '';
-  document.getElementById('login-error').classList.add('hidden');
-}
-
-// ========== DATA HELPERS ==========
-const TIME_SLOTS = [
-  "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
-  "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM",
-  "05:00 PM", "06:00 PM", "07:00 PM", "08:00 PM"
-];
-
-async function getClosedSlots() {
-  const snap = await db.collection('closedSlots').get();
-  return snap.docs.map(doc => doc.data());
-}
-async function setClosedSlots(slots) {
-  const batch = db.batch();
-  const existing = await db.collection('closedSlots').get();
-  existing.forEach(doc => batch.delete(doc.ref));
-  slots.forEach(slot => {
-    const ref = db.collection('closedSlots').doc();
-    batch.set(ref, slot);
-  });
-  await batch.commit();
-}
-async function getBookings() {
-  const snap = await db.collection('bookings').get();
-  return snap.docs.map(doc => doc.data());
-}
-async function updateBooking(id, data) {
-  await db.collection('bookings').doc(id).update(data);
-}
-async function deleteBooking(id) {
-  await db.collection('bookings').doc(id).delete();
-}
-async function getUsers() {
-  const snap = await db.collection('users').get();
-  return snap.docs.map(doc => doc.data());
-}
-async function updateUserLate(email, late) {
-  await db.collection('users').doc(email).update({ late });
-}
-
-function getSurchargeBadge(time) {
-  if (time === "06:00 PM") return '<span class="evening-badge">+R20</span>';
-  if (time === "07:00 PM" || time === "08:00 PM") return '<span class="after-hours-badge">+R70</span>';
-  return '';
-}
-
-function isSlotBooked(bookingsOnDate, time) {
-  return bookingsOnDate.includes(time);
-}
-
-// ========== SLOT MANAGER (SAST aware) ==========
-const dateInput = document.getElementById('slot-date');
-const slotsContainer = document.getElementById('admin-slots-container');
-const noSlotsMsg = document.getElementById('no-slots-message');
-
-function setMinDateToBarberToday() {
-  const todayMidnight = getBarberCurrentDateMidnight();
-  const todayStr = formatBarberDate(todayMidnight);
-  dateInput.min = todayStr;
-  if (!dateInput.value) dateInput.value = todayStr;
-}
-setMinDateToBarberToday();
-dateInput.addEventListener('change', renderSlotManager);
-
-async function renderSlotManager() {
-  const date = dateInput.value;
-  if (!date) {
-    slotsContainer.innerHTML = '';
-    noSlotsMsg.classList.remove('hidden');
-    return;
+  async function getBookings() {
+    const snapshot = await getDocs(collection(db, 'bookings'));
+    return snapshot.docs.map(doc => doc.data());
   }
-  noSlotsMsg.classList.add('hidden');
 
-  const closedSlots = (await getClosedSlots()).filter(s => s.date === date).map(s => s.time);
-  const bookingsOnDate = (await getBookings()).filter(b => b.date === date).map(b => b.time);
+  async function deleteBooking(bookingId) {
+    await deleteDoc(doc(db, 'bookings', bookingId));
+  }
 
-  slotsContainer.innerHTML = '';
-  TIME_SLOTS.forEach(time => {
-    const isClosed = closedSlots.includes(time);
-    const isBooked = bookingsOnDate.includes(time);
-    const badge = getSurchargeBadge(time);
-    const isPassedToday = isTimeSlotPassedForDate(parseBarberDate(date), time);
+  async function getUsers() {
+    const snapshot = await getDocs(collection(db, 'profiles'));
+    return snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
+  }
 
-    const btn = document.createElement('button');
-    btn.className = `slot-btn p-4 rounded-lg border text-left transition-all ${isClosed ? 'closed bg-[#2d2d2d] text-gray-400' : 'open bg-[#1a1a1a] hover:bg-[#252525]'}`;
-    btn.innerHTML = `
-      <div class="font-medium flex items-center justify-between">
-        ${time}
-        ${badge}
-      </div>
-      <div class="text-xs mt-1 ${isClosed ? 'text-gray-500' : 'text-gray-400'}">${isClosed ? '🔴 Closed' : '🟢 Open'}</div>
-      ${isBooked ? '<div class="text-xs text-yellow-500 mt-1">⚠️ Has booking</div>' : ''}
-      ${isPassedToday && !isBooked ? '<div class="text-xs text-gray-500 mt-1">⏰ Passed today</div>' : ''}
-    `;
-    if (isPassedToday && !isBooked) {
-      btn.style.opacity = '0.6';
-      btn.style.cursor = 'not-allowed';
-    } else {
-      btn.onclick = () => toggleSlot(date, time, isClosed, isBooked);
+  async function updateUserLate(uid, late) {
+    await updateDoc(doc(db, 'profiles', uid), { late });
+  }
+
+  // ========== DOM ELEMENTS ==========
+  const dateInput = document.getElementById('slot-date');
+  const slotsContainer = document.getElementById('admin-slots-container');
+  const noSlotsMsg = document.getElementById('no-slots-message');
+  const bookingsList = document.getElementById('bookings-list');
+  const noBookingsMsg = document.getElementById('no-bookings');
+  const usersList = document.getElementById('users-list');
+  const noUsersMsg = document.getElementById('no-users');
+
+  const today = new Date().toISOString().split('T')[0];
+  if (dateInput) {
+    dateInput.value = today;
+    dateInput.min = today;
+    dateInput.addEventListener('change', renderSlotManager);
+  }
+
+  function isEvening(time) {
+    return ["06:00 PM", "07:00 PM", "08:00 PM"].includes(time);
+  }
+
+  async function renderSlotManager() {
+    if (!dateInput) return;
+    const date = dateInput.value;
+    if (!date) {
+      slotsContainer.innerHTML = '';
+      noSlotsMsg.classList.remove('hidden');
+      return;
     }
-    slotsContainer.appendChild(btn);
-  });
-}
+    noSlotsMsg.classList.add('hidden');
 
-async function toggleSlot(date, time, currentlyClosed, hasBooking) {
-  if (hasBooking) {
-    alert('Cannot close this slot – there is a booking already.');
-    return;
-  }
-  if (isTimeSlotPassedForDate(parseBarberDate(date), time)) {
-    alert('Cannot modify a time slot that has already passed for today.');
-    return;
-  }
-  let closedSlots = await getClosedSlots();
-  if (currentlyClosed) {
-    closedSlots = closedSlots.filter(s => !(s.date === date && s.time === time));
-  } else {
-    closedSlots.push({ date, time });
-  }
-  await setClosedSlots(closedSlots);
-  await renderSlotManager();
-}
-
-let processing = false;
-
-async function closeAllSlots() {
-  if (processing) return;
-  const date = dateInput.value;
-  if (!date) { alert('Please select a date first.'); return; }
-  if (!confirm(`Close ALL available slots on ${new Date(date).toLocaleDateString()}?`)) return;
-  processing = true;
-  const closeBtn = document.getElementById('close-all-btn');
-  const openBtn = document.getElementById('open-all-btn');
-  closeBtn.classList.add('btn-disabled');
-  openBtn.classList.add('btn-disabled');
-  try {
-    const closedSlots = await getClosedSlots();
+    const closedSlots = (await getClosedSlots()).filter(s => s.date === date).map(s => s.time);
     const bookingsOnDate = (await getBookings()).filter(b => b.date === date).map(b => b.time);
-    const newClosed = [...closedSlots];
+
+    slotsContainer.innerHTML = '';
     TIME_SLOTS.forEach(time => {
-      if (closedSlots.some(s => s.date === date && s.time === time)) return;
-      if (bookingsOnDate.includes(time)) return;
-      if (isTimeSlotPassedForDate(parseBarberDate(date), time)) return;
-      newClosed.push({ date, time });
+      const isClosed = closedSlots.includes(time);
+      const isBooked = bookingsOnDate.includes(time);
+      const evening = isEvening(time);
+      
+      const btn = document.createElement('button');
+      btn.className = `slot-btn p-4 rounded-lg border text-left transition-all ${isClosed ? 'closed bg-[#2d2d2d] text-gray-400' : 'open bg-[#1a1a1a] hover:bg-[#252525]'}`;
+      btn.innerHTML = `
+        <div class="font-medium flex items-center justify-between">
+          ${time}
+          ${evening ? '<span class="evening-badge">+R20</span>' : ''}
+        </div>
+        <div class="text-xs mt-1 ${isClosed ? 'text-gray-500' : 'text-gray-400'}">${isClosed ? '🔴 Closed' : '🟢 Open'}</div>
+        ${isBooked ? '<div class="text-xs text-yellow-500 mt-1">⚠️ Has booking</div>' : ''}
+      `;
+      btn.onclick = () => toggleSlot(date, time, isClosed, isBooked);
+      slotsContainer.appendChild(btn);
     });
-    await setClosedSlots(newClosed);
-    await renderSlotManager();
-    alert('All available slots closed.');
-  } finally {
-    processing = false;
-    closeBtn.classList.remove('btn-disabled');
-    openBtn.classList.remove('btn-disabled');
   }
-}
 
-async function openAllSlots() {
-  if (processing) return;
-  const date = dateInput.value;
-  if (!date) { alert('Please select a date first.'); return; }
-  if (!confirm(`Open all closed slots on ${new Date(date).toLocaleDateString()}?`)) return;
-  processing = true;
-  const closeBtn = document.getElementById('close-all-btn');
-  const openBtn = document.getElementById('open-all-btn');
-  closeBtn.classList.add('btn-disabled');
-  openBtn.classList.add('btn-disabled');
-  try {
-    const closedSlots = await getClosedSlots();
-    const newClosed = closedSlots.filter(s => s.date !== date);
-    await setClosedSlots(newClosed);
+  async function toggleSlot(date, time, currentlyClosed, hasBooking) {
+    if (hasBooking) {
+      alert('Cannot close this slot – there is a booking already.');
+      return;
+    }
+    let closedSlots = await getClosedSlots();
+    if (currentlyClosed) {
+      closedSlots = closedSlots.filter(s => !(s.date === date && s.time === time));
+    } else {
+      closedSlots.push({ date, time });
+    }
+    await setClosedSlots(closedSlots);
     await renderSlotManager();
-    alert('All closed slots opened.');
-  } finally {
-    processing = false;
-    closeBtn.classList.remove('btn-disabled');
-    openBtn.classList.remove('btn-disabled');
   }
-}
 
-// ========== BOOKINGS (SAST aware) ==========
-async function renderBookings() {
-  let bookings = (await getBookings()).sort((a, b) => {
-    if (a.date !== b.date) return a.date.localeCompare(b.date);
-    return a.time.localeCompare(b.time);
-  });
-  if (bookings.length === 0) {
-    document.getElementById('bookings-list').innerHTML = '';
-    document.getElementById('no-bookings').classList.remove('hidden');
-    return;
-  }
-  document.getElementById('no-bookings').classList.add('hidden');
-  const nowBarber = getBarberCurrentDateTime();
-  const bookingsHtml = bookings.map(b => {
-    const apptDateTime = parseBarberDateTime(b.date, b.time);
-    const isPast = apptDateTime < nowBarber;
-    const canArrive = !b.arrivalConfirmed && !isPast;
-    const canComplete = (b.arrivalConfirmed || isPast) && b.status !== 'completed';
-    return `
+  let processing = false;
+
+  window.closeAllSlots = async function() {
+    if (processing) return;
+    const date = dateInput.value;
+    if (!date) { alert('Please select a date first.'); return; }
+    if (!confirm(`Close ALL available slots on ${new Date(date).toLocaleDateString()}?`)) return;
+
+    processing = true;
+    const closeBtn = document.getElementById('close-all-btn');
+    const openBtn = document.getElementById('open-all-btn');
+    closeBtn.classList.add('btn-disabled');
+    openBtn.classList.add('btn-disabled');
+
+    try {
+      const closedSlots = await getClosedSlots();
+      const bookingsOnDate = (await getBookings()).filter(b => b.date === date).map(b => b.time);
+      const newClosed = [...closedSlots];
+      TIME_SLOTS.forEach(time => {
+        if (closedSlots.some(s => s.date === date && s.time === time)) return;
+        if (bookingsOnDate.includes(time)) return;
+        newClosed.push({ date, time });
+      });
+      await setClosedSlots(newClosed);
+      await renderSlotManager();
+      alert('All available slots closed.');
+    } finally {
+      processing = false;
+      closeBtn.classList.remove('btn-disabled');
+      openBtn.classList.remove('btn-disabled');
+    }
+  };
+
+  window.openAllSlots = async function() {
+    if (processing) return;
+    const date = dateInput.value;
+    if (!date) { alert('Please select a date first.'); return; }
+    if (!confirm(`Open all closed slots on ${new Date(date).toLocaleDateString()}?`)) return;
+
+    processing = true;
+    const closeBtn = document.getElementById('close-all-btn');
+    const openBtn = document.getElementById('open-all-btn');
+    closeBtn.classList.add('btn-disabled');
+    openBtn.classList.add('btn-disabled');
+
+    try {
+      const closedSlots = await getClosedSlots();
+      const newClosed = closedSlots.filter(s => s.date !== date);
+      await setClosedSlots(newClosed);
+      await renderSlotManager();
+      alert('All closed slots opened.');
+    } finally {
+      processing = false;
+      closeBtn.classList.remove('btn-disabled');
+      openBtn.classList.remove('btn-disabled');
+    }
+  };
+
+  async function renderBookings() {
+    let bookings = (await getBookings()).sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      return a.time.localeCompare(b.time);
+    });
+    if (bookings.length === 0) {
+      bookingsList.innerHTML = '';
+      noBookingsMsg.classList.remove('hidden');
+      return;
+    }
+    noBookingsMsg.classList.add('hidden');
+    bookingsList.innerHTML = bookings.map(b => `
       <div class="bg-[#1a1a1a] border border-white/5 rounded-xl p-4 relative group">
         <div class="flex justify-between items-start">
           <div>
             <h3 class="font-bold">${escapeHtml(b.service)}</h3>
             <p class="text-sm text-gray-300">${escapeHtml(b.name)} · ${escapeHtml(b.phone)}</p>
             <p class="text-xs text-gray-500">${escapeHtml(b.email)}</p>
-            <div class="flex gap-2 mt-2">
-              ${b.arrivalConfirmed ? '<span class="text-xs text-green-400">✓ Arrived</span>' : ''}
-              ${b.status === 'completed' ? '<span class="text-xs text-blue-400">✓ Completed</span>' : ''}
-              ${b.cancellationFeeApplied ? '<span class="text-xs text-yellow-400">⚠️ Cancel fee</span>' : ''}
-            </div>
           </div>
           <div class="text-right">
-            <div class="text-sm font-medium">${new Date(b.date).toLocaleDateString('en-ZA')}</div>
+            <div class="text-sm font-medium">${new Date(b.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
             <div class="text-sm text-gray-400">${b.time}</div>
             <div class="text-xs text-gray-500 mt-1">R${b.price}</div>
           </div>
         </div>
-        <div class="flex gap-2 mt-3">
-          ${canArrive ? `<button onclick="markArrived('${b.id}')" class="text-xs px-3 py-1 bg-green-600 hover:bg-green-700 rounded-full">Confirm Arrival</button>` : ''}
-          ${canComplete ? `<button onclick="markCompleted('${b.id}')" class="text-xs px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-full">Mark Completed</button>` : ''}
-          <button onclick="cancelBooking('${b.id}')" class="text-xs px-3 py-1 bg-red-600 hover:bg-red-700 rounded-full">Cancel</button>
+        <button onclick="cancelBooking('${b.id}')" class="cancel-btn absolute top-2 right-2 text-red-400 hover:text-red-300 transition-colors" title="Cancel booking">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+    `).join('');
+    lucide.createIcons();
+  }
+
+  window.cancelBooking = async function(bookingId) {
+    if (!confirm('Cancel this booking? This cannot be undone.')) return;
+    await deleteBooking(bookingId);
+    await renderBookings();
+    await renderSlotManager();
+  };
+
+  async function renderUsers() {
+    const users = await getUsers();
+    if (users.length === 0) {
+      usersList.innerHTML = '';
+      noUsersMsg.classList.remove('hidden');
+      return;
+    }
+    noUsersMsg.classList.add('hidden');
+    usersList.innerHTML = users.map(user => `
+      <div class="bg-[#1a1a1a] border border-white/5 rounded-xl p-4 user-card">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="font-bold">${escapeHtml(user.name)}</p>
+            <p class="text-sm text-gray-300">${escapeHtml(user.email)}</p>
+            <p class="text-xs text-gray-400">${escapeHtml(user.phone)}</p>
+          </div>
+          <div class="flex flex-col items-end">
+            <button onclick="toggleLateFlag('${user.uid}')" class="text-xs px-3 py-1 rounded-full ${user.late ? 'bg-yellow-600 text-white' : 'bg-gray-700 text-gray-300'} hover:bg-yellow-500 transition-colors">
+              ${user.late ? '⚠️ Late' : '✓ On Time'}
+            </button>
+          </div>
         </div>
       </div>
-    `;
-  }).join('');
-  document.getElementById('bookings-list').innerHTML = bookingsHtml;
-  lucide.createIcons();
-}
-
-window.markArrived = async function(id) {
-  await updateBooking(id, { arrivalConfirmed: true, arrivalTime: new Date().toISOString() });
-  await renderBookings();
-};
-window.markCompleted = async function(id) {
-  await updateBooking(id, { status: 'completed', completedAt: new Date().toISOString() });
-  await renderBookings();
-};
-window.cancelBooking = async function(id) {
-  if (!confirm('Cancel this booking? This cannot be undone.')) return;
-  await deleteBooking(id);
-  await renderBookings();
-  await renderSlotManager();
-};
-
-// ========== USERS ==========
-async function renderUsers() {
-  const users = await getUsers();
-  if (users.length === 0) {
-    document.getElementById('users-list').innerHTML = '';
-    document.getElementById('no-users').classList.remove('hidden');
-    return;
+    `).join('');
+    lucide.createIcons();
   }
-  document.getElementById('no-users').classList.add('hidden');
-  const usersHtml = users.map(user => `
-    <div class="bg-[#1a1a1a] border border-white/5 rounded-xl p-4 user-card">
-      <div class="flex justify-between items-start">
-        <div>
-          <p class="font-bold">${escapeHtml(user.name)}</p>
-          <p class="text-sm text-gray-300">${escapeHtml(user.email)}</p>
-          <p class="text-xs text-gray-400">${escapeHtml(user.phone)}</p>
-        </div>
-        <div>
-          <button onclick="toggleLateFlag('${user.email}')" class="text-xs px-3 py-1 rounded-full ${user.late ? 'bg-yellow-600 text-white' : 'bg-gray-700 text-gray-300'} hover:bg-yellow-500 transition-colors">
-            ${user.late ? '⚠️ Late' : '✓ On Time'}
-          </button>
-        </div>
-      </div>
-    </div>
-  `).join('');
-  document.getElementById('users-list').innerHTML = usersHtml;
-  lucide.createIcons();
-}
 
-window.toggleLateFlag = async function(email) {
-  const users = await getUsers();
-  const user = users.find(u => u.email === email);
-  if (user) {
-    await updateUserLate(email, !user.late);
-    await renderUsers();
+  function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>]/g, function(m) {
+      if (m === '&') return '&amp;';
+      if (m === '<') return '&lt;';
+      if (m === '>') return '&gt;';
+      return m;
+    });
   }
-};
 
-function escapeHtml(str) {
-  return String(str).replace(/[&<>]/g, function(m) {
-    if (m === '&') return '&amp;';
-    if (m === '<') return '&lt;';
-    if (m === '>') return '&gt;';
-    return m;
+  window.toggleLateFlag = async function(uid) {
+    const users = await getUsers();
+    const user = users.find(u => u.uid === uid);
+    if (user) {
+      await updateUserLate(uid, !user.late);
+      await renderUsers();
+    }
+  };
+
+  document.addEventListener('DOMContentLoaded', () => {
+    lucide.createIcons();
   });
-}
 </script>
 </body>
 </html>

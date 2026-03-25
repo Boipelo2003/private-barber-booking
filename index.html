@@ -38,6 +38,14 @@
             color: #000000;
             border-color: #ffffff;
         }
+        .time-slot-btn.booked {
+            opacity: 0.4;
+            background: #2a2a2a;
+            border-color: #2a2a2a;
+            cursor: not-allowed;
+            text-decoration: line-through;
+            pointer-events: none;
+        }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #0a0a0a; }
         ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
@@ -57,6 +65,27 @@
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
+        }
+        /* Print styles for receipt */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            .receipt-print-area, .receipt-print-area * {
+                visibility: visible;
+            }
+            .receipt-print-area {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                padding: 20px;
+                background: white;
+                color: black;
+            }
+            .no-print {
+                display: none;
+            }
         }
     </style>
 </head>
@@ -255,15 +284,8 @@
                         <h2 class="text-3xl font-bold mb-2">Select Time</h2>
                         <p class="text-gray-400 mb-8">Available slots for <span id="time-header-date" class="text-white font-semibold"></span></p>
                         
-                        <div class="grid grid-cols-3 sm:grid-cols-4 gap-4">
-                            <button class="time-slot-btn p-4 border border-white/10 rounded-lg hover:bg-white hover:text-black transition-all text-sm font-medium" onclick="selectTime(this, '09:00 AM')">09:00 AM</button>
-                            <button class="time-slot-btn p-4 border border-white/10 rounded-lg hover:bg-white hover:text-black transition-all text-sm font-medium" onclick="selectTime(this, '10:00 AM')">10:00 AM</button>
-                            <button class="time-slot-btn p-4 border border-white/10 rounded-lg hover:bg-white hover:text-black transition-all text-sm font-medium" onclick="selectTime(this, '11:00 AM')">11:00 AM</button>
-                            <button class="time-slot-btn p-4 border border-white/10 rounded-lg hover:bg-white hover:text-black transition-all text-sm font-medium" onclick="selectTime(this, '01:00 PM')">01:00 PM</button>
-                            <button class="time-slot-btn p-4 border border-white/10 rounded-lg hover:bg-white hover:text-black transition-all text-sm font-medium" onclick="selectTime(this, '02:00 PM')">02:00 PM</button>
-                            <button class="time-slot-btn p-4 border border-white/10 rounded-lg hover:bg-white hover:text-black transition-all text-sm font-medium" onclick="selectTime(this, '03:30 PM')">03:30 PM</button>
-                            <button class="time-slot-btn p-4 border border-white/10 rounded-lg hover:bg-white hover:text-black transition-all text-sm font-medium" onclick="selectTime(this, '04:30 PM')">04:30 PM</button>
-                            <button class="time-slot-btn p-4 border border-white/10 rounded-lg hover:bg-white hover:text-black transition-all text-sm font-medium" onclick="selectTime(this, '05:30 PM')">05:30 PM</button>
+                        <div id="time-slots-container" class="grid grid-cols-3 sm:grid-cols-4 gap-4">
+                            <!-- Time slots will be populated dynamically -->
                         </div>
 
                         <div class="mt-8 flex justify-end">
@@ -319,22 +341,35 @@
                         </div>
                     </div>
 
-                    <div id="step-success" class="step-view hidden fade-in text-center py-10">
+                    <div id="step-success" class="step-view hidden fade-in text-center py-6">
                         <div class="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(34,197,94,0.4)]">
                             <i data-lucide="check" class="w-10 h-10 text-black"></i>
                         </div>
                         <h2 class="text-3xl font-bold mb-2">Booking Confirmed</h2>
-                        <p class="text-gray-400 mb-8 max-w-md mx-auto">
-                            Your slot is reserved. A confirmation email with directions has been sent to you.
-                        </p>
-                        <div class="bg-white/5 p-4 rounded-lg inline-block mb-8">
-                            <p class="text-sm text-gray-400">Appointment Details</p>
-                            <p class="text-xl font-bold" id="success-details">--</p>
+                        <p class="text-gray-400 mb-6 max-w-md mx-auto">Your slot is reserved. A confirmation email has been sent to you.</p>
+                        
+                        <!-- Receipt area -->
+                        <div id="receipt-content" class="bg-white/5 p-6 rounded-xl text-left mb-8 max-w-lg mx-auto receipt-print-area">
+                            <h3 class="text-xl font-bold mb-4 text-center">✂️ PRIVATE BARBER - RECEIPT</h3>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex justify-between border-b border-white/10 pb-2"><span class="text-gray-400">Client:</span><span id="receipt-name" class="font-medium"></span></div>
+                                <div class="flex justify-between border-b border-white/10 pb-2"><span class="text-gray-400">Date:</span><span id="receipt-date"></span></div>
+                                <div class="flex justify-between border-b border-white/10 pb-2"><span class="text-gray-400">Time:</span><span id="receipt-time"></span></div>
+                                <div class="flex justify-between border-b border-white/10 pb-2"><span class="text-gray-400">Service:</span><span>Signature 60 min</span></div>
+                                <div class="flex justify-between border-b border-white/10 pb-2"><span class="text-gray-400">Phone:</span><span id="receipt-phone"></span></div>
+                                <div class="flex justify-between pt-2"><span class="text-gray-400">Payment:</span><span>Pay in store</span></div>
+                            </div>
+                            <div class="mt-4 text-xs text-center text-gray-500">Thank you for choosing Private Barber</div>
                         </div>
-                        <br>
-                        <button onclick="closeBooking()" class="text-white border-b border-white/30 pb-1 hover:border-white transition-colors">
-                            Return to Home
-                        </button>
+                        
+                        <div class="flex gap-4 justify-center flex-wrap">
+                            <button onclick="window.print()" class="bg-white text-black px-6 py-2 rounded-full text-sm font-bold uppercase hover:bg-gray-200 transition-colors flex items-center gap-2 no-print">
+                                <i data-lucide="printer" class="w-4 h-4"></i> Print Receipt
+                            </button>
+                            <button onclick="closeBooking()" class="text-white border border-white/30 px-6 py-2 rounded-full text-sm hover:bg-white/10 transition-colors no-print">
+                                Close
+                            </button>
+                        </div>
                     </div>
 
                 </div>
@@ -371,11 +406,33 @@
         const calendarDays = document.getElementById('calendar-days');
         const monthYearLabel = document.getElementById('calendar-month-year');
         
+        // Helper: get YYYY-MM-DD from Date
+        function getDateKey(date) {
+            return date.toISOString().split('T')[0];
+        }
+        
+        // Get all bookings from localStorage
+        function getBookings() {
+            return JSON.parse(localStorage.getItem('premiumBarberBookings')) || [];
+        }
+        
+        // Save bookings
+        function saveBookings(bookings) {
+            localStorage.setItem('premiumBarberBookings', JSON.stringify(bookings));
+        }
+        
+        // Check if a slot is already booked
+        function isSlotBooked(date, time) {
+            const dateKey = getDateKey(date);
+            const bookings = getBookings();
+            return bookings.some(booking => booking.dateKey === dateKey && booking.time === time);
+        }
+        
         // Functions to switch between Site and Admin Dashboard
         function toggleAdmin() {
             document.getElementById('customer-section').classList.add('hidden');
             document.getElementById('admin-section').classList.remove('hidden');
-            loadBookings(); // Load data when opening admin
+            loadBookings();
             window.scrollTo(0,0);
         }
 
@@ -384,6 +441,46 @@
             document.getElementById('customer-section').classList.remove('hidden');
             window.scrollTo(0,0);
         }
+        
+        // Render time slots for selected date, marking booked ones
+        function renderTimeSlots() {
+            const container = document.getElementById('time-slots-container');
+            if (!selectedDate) return;
+            container.innerHTML = '';
+            const timeSlots = ["09:00 AM", "10:00 AM", "11:00 AM", "01:00 PM", "02:00 PM", "03:30 PM", "04:30 PM", "05:30 PM"];
+            
+            timeSlots.forEach(slot => {
+                const booked = isSlotBooked(selectedDate, slot);
+                const btn = document.createElement('button');
+                btn.innerText = slot;
+                btn.className = `time-slot-btn p-4 border border-white/10 rounded-lg hover:bg-white hover:text-black transition-all text-sm font-medium ${booked ? 'booked' : ''} ${selectedTime === slot ? 'selected' : ''}`;
+                if (!booked) {
+                    btn.onclick = () => selectTime(btn, slot);
+                }
+                container.appendChild(btn);
+            });
+            
+            // Re-enable next button only if a time is selected
+            document.getElementById('btn-time-next').disabled = !selectedTime;
+        }
+        
+        function selectTime(element, time) {
+            // Double-check availability (prevent race condition)
+            if (isSlotBooked(selectedDate, time)) {
+                alert("Sorry, this time slot is no longer available. Please choose another time.");
+                renderTimeSlots(); // refresh to mark it booked
+                selectedTime = null;
+                document.getElementById('btn-time-next').disabled = true;
+                updateSummary();
+                return;
+            }
+            
+            document.querySelectorAll('.time-slot-btn').forEach(el => el.classList.remove('selected'));
+            element.classList.add('selected');
+            selectedTime = time;
+            document.getElementById('btn-time-next').disabled = false;
+            updateSummary();
+        }
 
         // Booking Modal Flow Functions
         function openBooking() {
@@ -391,28 +488,23 @@
             document.body.style.overflow = 'hidden';
             renderCalendar();
             goToStep('calendar');
+            // Reset selections
+            selectedDate = null;
+            selectedTime = null;
+            updateSummary();
+            document.getElementById('btn-calendar-next').disabled = true;
+            document.getElementById('btn-time-next').disabled = true;
+            document.getElementById('client-name').value = '';
+            document.getElementById('client-email').value = '';
+            document.getElementById('client-phone').value = '';
+            document.getElementById('terms-checkbox').checked = false;
         }
 
         function closeBooking() {
             modal.classList.add('hidden');
             document.body.style.overflow = 'auto';
-            // Reset state after animation
-            setTimeout(() => {
-                selectedDate = null;
-                selectedTime = null;
-                updateSummary();
-                document.querySelectorAll('.time-slot-btn').forEach(btn => btn.classList.remove('selected'));
-                
-                // Clear input fields
-                document.getElementById('client-name').value = '';
-                document.getElementById('client-email').value = '';
-                document.getElementById('client-phone').value = '';
-                document.getElementById('terms-checkbox').checked = false;
-                
-                // Reset buttons
-                document.getElementById('btn-calendar-next').disabled = true;
-                document.getElementById('btn-time-next').disabled = true;
-            }, 300);
+            selectedDate = null;
+            selectedTime = null;
         }
 
         function goToStep(stepName) {
@@ -421,6 +513,7 @@
             
             if(stepName === 'time' && selectedDate) {
                 document.getElementById('time-header-date').innerText = selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+                renderTimeSlots(); // refresh slots each time we open time step
             }
         }
 
@@ -481,16 +574,8 @@
             element.classList.add('selected');
             
             selectedDate = date;
+            selectedTime = null; // reset time when date changes
             document.getElementById('btn-calendar-next').disabled = false;
-            updateSummary();
-        }
-
-        function selectTime(element, time) {
-            document.querySelectorAll('.time-slot-btn').forEach(el => el.classList.remove('selected'));
-            element.classList.add('selected');
-            
-            selectedTime = time;
-            document.getElementById('btn-time-next').disabled = false;
             updateSummary();
         }
 
@@ -511,20 +596,27 @@
             }
         }
 
-        // Save Data and "Confirm Booking" (No Payment)
+        // Final booking with double-check
         function confirmBooking() {
-            const nameInput = document.getElementById('client-name').value;
-            const emailInput = document.getElementById('client-email').value;
-            const phoneInput = document.getElementById('client-phone').value;
+            const nameInput = document.getElementById('client-name').value.trim();
+            const emailInput = document.getElementById('client-email').value.trim();
+            const phoneInput = document.getElementById('client-phone').value.trim();
             const termsChecked = document.getElementById('terms-checkbox').checked;
 
-            // Simple validation
             if (!nameInput || !phoneInput) {
                 alert("Please provide your Name and Phone Number.");
                 return;
             }
             if (!termsChecked) {
                 alert("Please agree to the cancellation policy to proceed.");
+                return;
+            }
+            
+            // Double-check availability before final save
+            if (isSlotBooked(selectedDate, selectedTime)) {
+                alert("Sorry, this time slot was just taken. Please choose another time.");
+                goToStep('time');
+                renderTimeSlots();
                 return;
             }
 
@@ -534,40 +626,54 @@
             btnText.innerText = "Confirming...";
             loader.classList.remove('hidden');
             
-            // Simulate API Processing Delay
+            // Simulate processing delay
             setTimeout(() => {
-                // 1. Create the booking object
+                // Final check again (in case of race)
+                if (isSlotBooked(selectedDate, selectedTime)) {
+                    alert("Slot became unavailable. Please select a different time.");
+                    btnText.innerText = "Confirm Booking";
+                    loader.classList.add('hidden');
+                    goToStep('time');
+                    renderTimeSlots();
+                    return;
+                }
+                
+                const dateKey = getDateKey(selectedDate);
                 const newBooking = {
                     name: nameInput,
                     email: emailInput || 'No email provided',
                     phone: phoneInput,
                     dateStr: selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-                    rawDate: selectedDate, // Used for sorting in admin
+                    rawDate: selectedDate.toISOString(),
+                    dateKey: dateKey,
                     time: selectedTime,
                     service: "Standard Session (60 min)"
                 };
 
-                // 2. Save to Local Storage for Admin Dashboard
-                let bookings = JSON.parse(localStorage.getItem('premiumBarberBookings')) || [];
+                let bookings = getBookings();
                 bookings.push(newBooking);
-                localStorage.setItem('premiumBarberBookings', JSON.stringify(bookings));
-
-                // 3. Move to Success Screen
-                goToStep('success');
-                document.getElementById('success-details').innerText = `${newBooking.dateStr} at ${selectedTime}`;
+                saveBookings(bookings);
                 
-                // Reset button UI for next time
+                // Fill receipt details
+                document.getElementById('receipt-name').innerText = nameInput;
+                document.getElementById('receipt-date').innerText = newBooking.dateStr;
+                document.getElementById('receipt-time').innerText = selectedTime;
+                document.getElementById('receipt-phone').innerText = phoneInput;
+                
+                // Move to Success Step
+                goToStep('success');
+                
                 btnText.innerText = "Confirm Booking";
                 loader.classList.add('hidden');
-            }, 1500);
+            }, 800);
         }
 
         // Admin Dashboard Functions
         function loadBookings() {
-            let bookings = JSON.parse(localStorage.getItem('premiumBarberBookings')) || [];
+            let bookings = getBookings();
             
-            // Sort by the date they booked
-            bookings.sort((a, b) => new Date(a.rawDate) - new Date(b.rawDate));
+            // Sort by date (newest first)
+            bookings.sort((a, b) => new Date(b.rawDate) - new Date(a.rawDate));
 
             let tbody = document.getElementById('admin-table-body');
             tbody.innerHTML = ''; 
@@ -577,29 +683,38 @@
                 return;
             }
 
-            // Create table rows for each booking
             bookings.forEach(booking => {
                 let row = `
                 <tr class="hover:bg-white/5 transition-colors group">
                     <td class="p-5">
                         <div class="font-bold text-white">${booking.dateStr}</div>
                         <div class="text-xs text-gray-400 mt-1">${booking.time}</div>
-                    </td>
+                     </td>
                     <td class="p-5">
-                        <div class="font-bold text-white">${booking.name}</div>
+                        <div class="font-bold text-white">${escapeHtml(booking.name)}</div>
                         <div class="text-xs text-gray-400 mt-1">${booking.service}</div>
-                    </td>
+                     </td>
                     <td class="p-5">
-                        <div class="text-sm text-gray-300">${booking.phone}</div>
-                        <div class="text-xs text-gray-500 mt-1">${booking.email}</div>
-                    </td>
+                        <div class="text-sm text-gray-300">${escapeHtml(booking.phone)}</div>
+                        <div class="text-xs text-gray-500 mt-1">${escapeHtml(booking.email)}</div>
+                     </td>
                     <td class="p-5">
                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
                             Confirmed
                         </span>
-                    </td>
+                     </td>
                 </tr>`;
                 tbody.innerHTML += row;
+            });
+        }
+        
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
             });
         }
 
@@ -609,7 +724,35 @@
                 loadBookings();
             }
         }
+        
+        // Re-run icon initialization after dynamic content
+        function refreshIcons() {
+            lucide.createIcons();
+        }
+        
+        // Ensure icons are refreshed after step changes
+        const originalGoToStep = goToStep;
+        window.goToStep = function(stepName) {
+            originalGoToStep(stepName);
+            refreshIcons();
+        };
+        
+        // Reassign global functions to ensure they work
+        window.openBooking = openBooking;
+        window.closeBooking = closeBooking;
+        window.prevMonth = prevMonth;
+        window.nextMonth = nextMonth;
+        window.selectDate = selectDate;
+        window.selectTime = selectTime;
+        window.goToStep = goToStep;
+        window.confirmBooking = confirmBooking;
+        window.toggleAdmin = toggleAdmin;
+        window.toggleCustomer = toggleCustomer;
+        window.loadBookings = loadBookings;
+        window.clearBookings = clearBookings;
+        
+        // Initial icon creation
+        refreshIcons();
     </script>
 </body>
 </html>
-

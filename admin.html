@@ -3,10 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>PRIVATE BARBER | Admin Dashboard</title>
+    <title>PRIVATE BARBER | Admin Dashboard + Analytics</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Playfair+Display:ital,wght@1,400;1,600&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js for analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * {
             -webkit-tap-highlight-color: transparent;
@@ -37,13 +39,11 @@
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        /* Custom scrollbar */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #0a0a0a; }
         ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #555; }
         
-        /* Mobile friendly touch targets */
         button, .action-btn {
             cursor: pointer;
             transition: all 0.2s;
@@ -52,13 +52,11 @@
             transform: scale(0.96);
         }
         
-        /* Table container for horizontal scroll */
         .table-wrapper {
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
         }
         
-        /* Stats cards responsive */
         .stats-grid {
             display: grid;
             grid-template-columns: 1fr;
@@ -68,7 +66,6 @@
             .stats-grid { grid-template-columns: repeat(3, 1fr); }
         }
         
-        /* Make table cells easier to read on small screens */
         .booking-table th, .booking-table td {
             padding: 0.75rem 0.5rem;
             white-space: nowrap;
@@ -80,7 +77,6 @@
             }
         }
         
-        /* Status badges */
         .badge-confirmed {
             background-color: rgba(34, 197, 94, 0.1);
             color: #4ade80;
@@ -91,11 +87,57 @@
             color: #f87171;
             border: 1px solid rgba(248, 113, 113, 0.2);
         }
+        /* Analytics cards */
+        .chart-card {
+            background: rgba(20,20,20,0.6);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 1rem;
+            padding: 1rem;
+        }
+        .view-toggle-btn {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: all 0.2s;
+        }
+        .view-toggle-btn.active {
+            background: white;
+            color: black;
+            border-color: white;
+        }
     </style>
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.2/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, query, where, updateDoc, doc, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.2/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyB05r9ei92egPbcnbFKQNK0mso25DHcBss",
+            authDomain: "private-barber-booking-67cde.firebaseapp.com",
+            projectId: "private-barber-booking-67cde",
+            storageBucket: "private-barber-booking-67cde.firebasestorage.app",
+            messagingSenderId: "889141435520",
+            appId: "1:889141435520:web:bf645a2b8584b853225a65",
+            measurementId: "G-KNCJ003KNP"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        window.db = db;
+        window.collection = collection;
+        window.addDoc = addDoc;
+        window.getDocs = getDocs;
+        window.query = query;
+        window.where = where;
+        window.updateDoc = updateDoc;
+        window.doc = doc;
+        window.deleteDoc = deleteDoc;
+        window.getDoc = getDoc;
+    </script>
 </head>
 <body class="antialiased min-h-screen flex flex-col">
 
-    <!-- LOGIN OVERLAY (mobile friendly) -->
+    <!-- LOGIN OVERLAY -->
     <div id="login-overlay" class="fixed inset-0 z-[100] bg-[#050505] flex items-center justify-center p-4">
         <div class="absolute inset-0 bg-[url('https://image.qwenlm.ai/public_source/553aff0e-e70d-4625-9778-1e3f0a132b81/1cdda2719-31f9-4a7c-9175-4844aa289a15.png')] bg-cover bg-center opacity-20"></div>
         <div class="relative w-full max-w-md bg-[#111] border border-white/10 rounded-2xl p-6 sm:p-8 shadow-2xl fade-in">
@@ -106,7 +148,6 @@
                 <h2 class="text-xl sm:text-2xl font-bold uppercase tracking-widest">Restricted Access</h2>
                 <p class="text-gray-500 text-xs sm:text-sm mt-1">Authorized Personnel Only</p>
             </div>
-
             <form id="login-form" onsubmit="handleLogin(event)" class="space-y-4">
                 <div>
                     <label class="block text-xs uppercase text-gray-500 mb-1">Username</label>
@@ -123,7 +164,6 @@
                     </div>
                 </div>
                 <div id="login-error" class="text-red-500 text-xs text-center hidden">Invalid credentials</div>
-                
                 <button type="submit" class="w-full bg-white text-black font-bold uppercase tracking-wider py-3 rounded-lg hover:bg-gray-200 transition-colors mt-2 active:scale-95">
                     Enter Dashboard
                 </button>
@@ -139,7 +179,7 @@
     <!-- DASHBOARD CONTENT (hidden until login) -->
     <div id="dashboard-content" class="hidden min-h-screen flex flex-col">
         
-        <!-- Sticky Navbar -->
+        <!-- Sticky Navbar with Analytics toggle -->
         <nav class="glass-panel border-b border-white/5 sticky top-0 z-40">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex items-center justify-between h-16 sm:h-20">
@@ -150,9 +190,14 @@
                             <span class="text-[10px] sm:text-xs text-green-500 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> Live System</span>
                         </div>
                     </div>
-                    <button onclick="logout()" class="text-xs sm:text-sm font-medium text-gray-400 hover:text-white transition-colors px-3 py-2 rounded-full active:bg-white/10">
-                        Logout
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <button id="toggleViewBtn" onclick="toggleView()" class="text-xs sm:text-sm font-medium text-gray-400 hover:text-white transition-colors px-3 py-2 rounded-full active:bg-white/10">
+                            📊 Analytics
+                        </button>
+                        <button onclick="logout()" class="text-xs sm:text-sm font-medium text-gray-400 hover:text-white transition-colors px-3 py-2 rounded-full active:bg-white/10">
+                            Logout
+                        </button>
+                    </div>
                 </div>
             </div>
         </nav>
@@ -160,7 +205,7 @@
         <!-- Main Content -->
         <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 w-full">
             
-            <!-- Stats Row - Responsive -->
+            <!-- Stats Row - always visible -->
             <div class="stats-grid mb-8">
                 <div class="glass-panel p-4 sm:p-6 rounded-2xl flex items-center justify-between">
                     <div>
@@ -194,8 +239,8 @@
                 </div>
             </div>
 
-            <!-- Bookings Table -->
-            <div class="glass-panel rounded-2xl overflow-hidden shadow-2xl border border-white/5">
+            <!-- VIEW 1: Appointments Table -->
+            <div id="appointments-view" class="glass-panel rounded-2xl overflow-hidden shadow-2xl border border-white/5">
                 <div class="p-4 sm:p-6 border-b border-white/5 flex flex-col sm:flex-row justify-between items-center gap-3">
                     <h2 class="text-lg sm:text-xl font-bold uppercase tracking-wider">Appointment Log</h2>
                     <div class="flex gap-2">
@@ -207,11 +252,10 @@
                         </button>
                     </div>
                 </div>
-                
                 <div class="table-wrapper">
                     <table class="booking-table w-full text-left text-xs sm:text-sm">
                         <thead class="bg-white/5 text-gray-400 uppercase text-[10px] sm:text-xs tracking-wider">
-                            <tr>
+                            废水
                                 <th class="p-3 sm:p-4 font-semibold">Client</th>
                                 <th class="p-3 sm:p-4 font-semibold">Date & Time</th>
                                 <th class="p-3 sm:p-4 font-semibold">Contact</th>
@@ -220,13 +264,9 @@
                                 <th class="p-3 sm:p-4 font-semibold text-right">Action</th>
                             </tr>
                         </thead>
-                        <tbody id="bookings-table-body" class="divide-y divide-white/5">
-                            <!-- dynamic rows -->
-                        </tbody>
+                        <tbody id="bookings-table-body" class="divide-y divide-white/5"></tbody>
                     </table>
                 </div>
-                
-                <!-- Empty State -->
                 <div id="empty-state" class="hidden p-8 sm:p-12 text-center">
                     <div class="w-14 h-14 sm:w-16 sm:h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-3 text-gray-500">
                         <i data-lucide="inbox" class="w-7 h-7 sm:w-8 sm:h-8"></i>
@@ -235,18 +275,63 @@
                     <p class="text-gray-500 text-xs sm:text-sm mt-1">Bookings made on the public site will appear here.</p>
                 </div>
             </div>
+
+            <!-- VIEW 2: Analytics Dashboard (hidden initially) -->
+            <div id="analytics-view" class="hidden space-y-6">
+                <div class="text-center text-sm text-gray-400 mb-2">
+                    <span class="bg-white/5 px-3 py-1 rounded-full">📈 Business Intelligence</span>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="chart-card">
+                        <h3 class="text-sm font-bold uppercase tracking-wider mb-3 text-gray-400">Bookings (Last 14 Days)</h3>
+                        <canvas id="bookingsTrendChart" height="200"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3 class="text-sm font-bold uppercase tracking-wider mb-3 text-gray-400">Revenue Trend (Last 14 Days)</h3>
+                        <canvas id="revenueTrendChart" height="200"></canvas>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="chart-card">
+                        <h3 class="text-sm font-bold uppercase tracking-wider mb-3 text-gray-400">Service Popularity</h3>
+                        <canvas id="serviceChart" height="200"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3 class="text-sm font-bold uppercase tracking-wider mb-3 text-gray-400">Time Slot Popularity</h3>
+                        <canvas id="timeSlotChart" height="200"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3 class="text-sm font-bold uppercase tracking-wider mb-3 text-gray-400">Customer Retention</h3>
+                    <div class="flex flex-col sm:flex-row justify-around items-center gap-4">
+                        <div class="text-center">
+                            <p class="text-3xl font-bold text-green-400" id="repeat-customers">0</p>
+                            <p class="text-xs text-gray-500">Repeat customers</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-3xl font-bold text-blue-400" id="total-customers">0</p>
+                            <p class="text-xs text-gray-500">Unique customers</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-3xl font-bold text-yellow-400" id="retention-rate">0%</p>
+                            <p class="text-xs text-gray-500">Retention rate</p>
+                        </div>
+                    </div>
+                    <canvas id="retentionChart" height="100" class="mt-4"></canvas>
+                </div>
+            </div>
         </main>
     </div>
 
     <script>
-        // Storage key – must match the public booking system
-        const STORAGE_KEY = 'premiumBarberBookings';
-        
-        // Admin credentials
+        // ---------- Global variables ----------
         const ADMIN_USER = "admin";
         const ADMIN_PASS = "admin123";
         
-        // Helper: parse local date+time to Date object (same as public system)
+        let bookingsChart, revenueChart, serviceChart, timeSlotChart, retentionChart;
+        let currentView = 'appointments'; // 'appointments' or 'analytics'
+
+        // ---------- Helper functions ----------
         function parseLocalDateTime(dateKey, timeStr) {
             const [year, month, day] = dateKey.split('-').map(Number);
             const [timePart, modifier] = timeStr.split(' ');
@@ -255,37 +340,32 @@
             if (modifier === 'AM' && hour === 12) hour = 0;
             return new Date(year, month - 1, day, hour, minute);
         }
-        
-        // Compute late fee based on time (same rule as public)
-        function computeLateFee(timeStr) {
-            return timeStr === "07:30 PM" ? 50 : 0;
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
         }
-        
-        // Get all bookings from localStorage
-        function getBookings() {
-            return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+
+        // ---------- Firestore CRUD ----------
+        async function getAllBookings() {
+            const querySnapshot = await getDocs(collection(window.db, "bookings"));
+            const bookings = [];
+            querySnapshot.forEach(doc => {
+                bookings.push({ id: doc.id, ...doc.data() });
+            });
+            return bookings;
         }
-        
-        // Save bookings
-        function saveBookings(bookings) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings));
-        }
-        
-        // Format date for display
-        function formatDisplayDate(dateKey) {
-            if (!dateKey) return 'Invalid date';
-            const [year, month, day] = dateKey.split('-').map(Number);
-            const d = new Date(year, month - 1, day);
-            return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-        }
-        
-        // Update stats and table
-        function loadBookings() {
-            const bookings = getBookings();
+
+        async function loadAppointments() {
+            const bookings = await getAllBookings();
             const tbody = document.getElementById('bookings-table-body');
             const emptyState = document.getElementById('empty-state');
             
-            // Calculate stats
             const total = bookings.length;
             const activeBookings = bookings.filter(b => !b.cancelled);
             const activeCount = activeBookings.length;
@@ -296,7 +376,6 @@
             document.getElementById('stat-revenue').innerHTML = `R${totalRevenue.toFixed(2)}`;
             
             tbody.innerHTML = '';
-            
             if (bookings.length === 0) {
                 emptyState.classList.remove('hidden');
                 return;
@@ -304,61 +383,39 @@
                 emptyState.classList.add('hidden');
             }
             
-            // Sort by date (newest first)
             const sorted = [...bookings].sort((a, b) => new Date(b.rawDate) - new Date(a.rawDate));
-            
             sorted.forEach(booking => {
                 const row = document.createElement('tr');
-                row.className = "hover:bg-white/5 transition-colors group";
-                
                 const isCancelled = booking.cancelled === true;
                 const statusBadge = isCancelled 
                     ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium badge-cancelled">Cancelled</span>'
                     : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium badge-confirmed">Confirmed</span>';
-                
-                // Action button: if confirmed -> Cancel; if cancelled -> Delete
                 const actionBtn = isCancelled
                     ? `<button onclick="deleteBookingPermanent('${booking.id}')" class="text-red-500 hover:text-red-400 transition-colors p-2 hover:bg-red-500/10 rounded-lg action-btn" title="Permanently delete"><i data-lucide="trash-2" class="w-4 h-4"></i></button>`
                     : `<button onclick="cancelBookingById('${booking.id}')" class="text-gray-500 hover:text-red-500 transition-colors p-2 hover:bg-red-500/10 rounded-lg action-btn" title="Cancel appointment"><i data-lucide="x-circle" class="w-4 h-4"></i></button>`;
-                
                 row.innerHTML = `
-                    <td class="p-3 sm:p-4">
-                        <div class="font-bold text-white text-sm sm:text-base">${escapeHtml(booking.name)}</div>
-                        <div class="text-[10px] sm:text-xs text-gray-500">${escapeHtml(booking.service)}</div>
-                    </td>
-                    <td class="p-3 sm:p-4">
-                        <div class="text-white text-sm sm:text-base">${booking.dateStr || formatDisplayDate(booking.dateKey)}</div>
-                        <div class="text-[10px] sm:text-xs text-gray-400">${booking.time}</div>
-                    </td>
-                    <td class="p-3 sm:p-4">
-                        <div class="text-gray-300 text-sm sm:text-base">${escapeHtml(booking.phone)}</div>
-                        <div class="text-gray-500 text-[10px] sm:text-xs truncate max-w-[140px] sm:max-w-[200px]">${escapeHtml(booking.email || '—')}</div>
-                    </td>
-                    <td class="p-3 sm:p-4 font-medium text-green-400 whitespace-nowrap">
-                        R${(booking.totalPrice || 0).toFixed(2)}
-                        ${booking.lateFee ? `<div class="text-[9px] text-gray-500">+R${booking.lateFee} late</div>` : ''}
-                    </td>
+                    <td class="p-3 sm:p-4"><div class="font-bold text-white text-sm sm:text-base">${escapeHtml(booking.name)}</div><div class="text-[10px] sm:text-xs text-gray-500">${escapeHtml(booking.service)}</div></td>
+                    <td class="p-3 sm:p-4"><div class="text-white text-sm sm:text-base">${booking.dateStr || ''}</div><div class="text-[10px] sm:text-xs text-gray-400">${booking.time}</div></td>
+                    <td class="p-3 sm:p-4"><div class="text-gray-300 text-sm sm:text-base">${escapeHtml(booking.phone)}</div><div class="text-gray-500 text-[10px] sm:text-xs truncate max-w-[140px] sm:max-w-[200px]">${escapeHtml(booking.email || '—')}</div></td>
+                    <td class="p-3 sm:p-4 font-medium text-green-400 whitespace-nowrap">R${(booking.totalPrice || 0).toFixed(2)}${booking.lateFee ? `<div class="text-[9px] text-gray-500">+R${booking.lateFee} late</div>` : ''}</td>
                     <td class="p-3 sm:p-4">${statusBadge}</td>
                     <td class="p-3 sm:p-4 text-right">${actionBtn}</td>
                 `;
                 tbody.appendChild(row);
             });
-            
-            // Reinitialize icons for new elements
-            if (typeof lucide !== 'undefined') lucide.createIcons();
+            lucide.createIcons();
         }
-        
-        // Cancel a confirmed booking (marks as cancelled, applies fee if within 5h)
-        function cancelBookingById(bookingId) {
-            const bookings = getBookings();
-            const booking = bookings.find(b => b.id == bookingId);
-            if (!booking) return;
+
+        async function cancelBookingById(bookingId) {
+            const bookingRef = doc(window.db, "bookings", bookingId);
+            const bookingSnap = await getDoc(bookingRef);
+            if (!bookingSnap.exists()) return;
+            const booking = bookingSnap.data();
             if (booking.cancelled) {
                 alert("This booking is already cancelled.");
                 return;
             }
             
-            // Check time until appointment
             const appointmentTime = parseLocalDateTime(booking.dateKey, booking.time);
             const now = new Date();
             const hoursDiff = (appointmentTime - now) / (1000 * 60 * 60);
@@ -373,85 +430,179 @@
             }
             
             if (confirm(confirmMsg)) {
-                booking.cancelled = true;
-                if (fee > 0) booking.cancellationFee = fee;
-                else if (hoursDiff <= 0) booking.cancellationFee = 0;
-                // Keep totalPrice as is, but we could optionally subtract? For simplicity, we keep original total.
-                saveBookings(bookings);
-                loadBookings();
+                await updateDoc(bookingRef, { cancelled: true, cancellationFee: fee });
+                await loadAppointments();
+                if (currentView === 'analytics') await computeAnalytics();
                 alert("Booking has been cancelled.");
             }
         }
         
-        // Permanently delete a cancelled booking
-        function deleteBookingPermanent(bookingId) {
-            if (confirm("⚠️ This will permanently remove the booking from the system. This action cannot be undone. Continue?")) {
-                let bookings = getBookings();
-                const filtered = bookings.filter(b => b.id != bookingId);
-                if (filtered.length === bookings.length) {
-                    alert("Booking not found.");
-                    return;
-                }
-                saveBookings(filtered);
-                loadBookings();
+        async function deleteBookingPermanent(bookingId) {
+            if (confirm("⚠️ This will permanently remove the booking. Continue?")) {
+                await deleteDoc(doc(window.db, "bookings", bookingId));
+                await loadAppointments();
+                if (currentView === 'analytics') await computeAnalytics();
                 alert("Booking permanently deleted.");
             }
         }
         
-        // Clear entire database (all bookings)
-        function clearAllData() {
+        async function clearAllData() {
             if (confirm("🚨 WARNING: This will delete ALL booking records (including cancelled). This action is irreversible. Are you absolutely sure?")) {
-                localStorage.removeItem(STORAGE_KEY);
-                loadBookings();
-                alert("All bookings have been cleared.");
+                const querySnapshot = await getDocs(collection(window.db, "bookings"));
+                const batch = [];
+                querySnapshot.forEach(doc => {
+                    batch.push(deleteDoc(doc.ref));
+                });
+                await Promise.all(batch);
+                await loadAppointments();
+                if (currentView === 'analytics') await computeAnalytics();
+                alert("All bookings cleared.");
             }
         }
         
-        function refreshData() {
-            loadBookings();
+        async function refreshData() {
+            await loadAppointments();
+            if (currentView === 'analytics') await computeAnalytics();
         }
         
-        // Helper to escape HTML
-        function escapeHtml(str) {
-            if (!str) return '';
-            return str.replace(/[&<>]/g, function(m) {
-                if (m === '&') return '&amp;';
-                if (m === '<') return '&lt;';
-                if (m === '>') return '&gt;';
-                return m;
+        // ---------- Analytics ----------
+        async function computeAnalytics() {
+            const bookings = await getAllBookings();
+            const confirmedBookings = bookings.filter(b => !b.cancelled);
+            
+            // Bookings trend (last 14 days)
+            const today = new Date();
+            const last14Days = [];
+            for (let i = 13; i >= 0; i--) {
+                const d = new Date(today);
+                d.setDate(today.getDate() - i);
+                last14Days.push(d.toISOString().slice(0,10));
+            }
+            const bookingsByDay = {};
+            const revenueByDay = {};
+            last14Days.forEach(day => { bookingsByDay[day] = 0; revenueByDay[day] = 0; });
+            confirmedBookings.forEach(b => {
+                const day = b.dateKey;
+                if (bookingsByDay[day] !== undefined) {
+                    bookingsByDay[day]++;
+                    revenueByDay[day] += b.totalPrice;
+                }
+            });
+            const bookingCounts = last14Days.map(day => bookingsByDay[day]);
+            const revenueCounts = last14Days.map(day => revenueByDay[day]);
+            
+            // Service popularity
+            const serviceCounts = {};
+            confirmedBookings.forEach(b => { serviceCounts[b.service] = (serviceCounts[b.service] || 0) + 1; });
+            const serviceLabels = Object.keys(serviceCounts);
+            const serviceData = Object.values(serviceCounts);
+            
+            // Time slot popularity
+            const timeCounts = {};
+            const allSlots = ["09:00 AM","10:00 AM","11:00 AM","01:00 PM","02:00 PM","03:30 PM","04:30 PM","05:30 PM","07:30 PM"];
+            allSlots.forEach(slot => timeCounts[slot] = 0);
+            confirmedBookings.forEach(b => { timeCounts[b.time] = (timeCounts[b.time] || 0) + 1; });
+            const timeData = allSlots.map(slot => timeCounts[slot]);
+            
+            // Customer retention
+            const customerMap = new Map();
+            confirmedBookings.forEach(b => {
+                const key = b.phone + (b.email || '');
+                customerMap.set(key, (customerMap.get(key) || 0) + 1);
+            });
+            const totalCustomers = customerMap.size;
+            const repeatCustomers = Array.from(customerMap.values()).filter(c => c > 1).length;
+            const retentionRate = totalCustomers ? Math.round((repeatCustomers / totalCustomers) * 100) : 0;
+            
+            document.getElementById('repeat-customers').innerText = repeatCustomers;
+            document.getElementById('total-customers').innerText = totalCustomers;
+            document.getElementById('retention-rate').innerText = `${retentionRate}%`;
+            
+            // Destroy old charts
+            if (bookingsChart) bookingsChart.destroy();
+            if (revenueChart) revenueChart.destroy();
+            if (serviceChart) serviceChart.destroy();
+            if (timeSlotChart) timeSlotChart.destroy();
+            if (retentionChart) retentionChart.destroy();
+            
+            // Create new charts
+            const ctxBookings = document.getElementById('bookingsTrendChart').getContext('2d');
+            bookingsChart = new Chart(ctxBookings, {
+                type: 'line',
+                data: { labels: last14Days.map(d => d.slice(5)), datasets: [{ label: 'Bookings', data: bookingCounts, borderColor: '#4ade80', backgroundColor: 'rgba(74,222,128,0.1)', fill: true, tension: 0.3 }] },
+                options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { labels: { color: '#fff' } } }, scales: { y: { ticks: { color: '#fff' }, grid: { color: 'rgba(255,255,255,0.1)' } }, x: { ticks: { color: '#fff' }, grid: { display: false } } } }
+            });
+            const ctxRevenue = document.getElementById('revenueTrendChart').getContext('2d');
+            revenueChart = new Chart(ctxRevenue, {
+                type: 'line',
+                data: { labels: last14Days.map(d => d.slice(5)), datasets: [{ label: 'Revenue (R)', data: revenueCounts, borderColor: '#fbbf24', backgroundColor: 'rgba(251,191,36,0.1)', fill: true, tension: 0.3 }] },
+                options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { labels: { color: '#fff' } } }, scales: { y: { ticks: { color: '#fff' }, grid: { color: 'rgba(255,255,255,0.1)' } }, x: { ticks: { color: '#fff' }, grid: { display: false } } } }
+            });
+            const ctxService = document.getElementById('serviceChart').getContext('2d');
+            serviceChart = new Chart(ctxService, {
+                type: 'bar',
+                data: { labels: serviceLabels, datasets: [{ label: 'Number of bookings', data: serviceData, backgroundColor: '#3b82f6', borderRadius: 8 }] },
+                options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { labels: { color: '#fff' } } }, scales: { y: { ticks: { color: '#fff' }, grid: { color: 'rgba(255,255,255,0.1)' } }, x: { ticks: { color: '#fff' }, grid: { display: false } } } }
+            });
+            const ctxTime = document.getElementById('timeSlotChart').getContext('2d');
+            timeSlotChart = new Chart(ctxTime, {
+                type: 'bar',
+                data: { labels: allSlots.map(s => s.replace(' AM','').replace(' PM','')), datasets: [{ label: 'Bookings', data: timeData, backgroundColor: '#ec489a', borderRadius: 8 }] },
+                options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { labels: { color: '#fff' } } }, scales: { y: { ticks: { color: '#fff' }, grid: { color: 'rgba(255,255,255,0.1)' } }, x: { ticks: { color: '#fff', maxRotation: 45, minRotation: 45 }, grid: { display: false } } } }
+            });
+            const ctxRetention = document.getElementById('retentionChart').getContext('2d');
+            retentionChart = new Chart(ctxRetention, {
+                type: 'doughnut',
+                data: { labels: ['Repeat customers', 'One-time customers'], datasets: [{ data: [repeatCustomers, totalCustomers - repeatCustomers], backgroundColor: ['#4ade80', '#6b7280'], borderWidth: 0 }] },
+                options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { labels: { color: '#fff' } } } }
             });
         }
         
-        // --- Authentication ---
-        function checkSession() {
-            if (sessionStorage.getItem('barberAuth') === 'true') {
-                document.getElementById('login-overlay').classList.add('hidden');
-                document.getElementById('dashboard-content').classList.remove('hidden');
-                loadBookings();
-                // Auto-refresh every 30 seconds (optional)
-                if (window.autoRefreshInterval) clearInterval(window.autoRefreshInterval);
-                window.autoRefreshInterval = setInterval(() => {
-                    if (document.getElementById('dashboard-content') && !document.getElementById('dashboard-content').classList.contains('hidden')) {
-                        loadBookings();
-                    }
-                }, 30000);
+        // ---------- Toggle between views ----------
+        async function toggleView() {
+            const appointmentsDiv = document.getElementById('appointments-view');
+            const analyticsDiv = document.getElementById('analytics-view');
+            const toggleBtn = document.getElementById('toggleViewBtn');
+            if (currentView === 'appointments') {
+                appointmentsDiv.classList.add('hidden');
+                analyticsDiv.classList.remove('hidden');
+                toggleBtn.innerHTML = '📅 Appointments';
+                currentView = 'analytics';
+                await computeAnalytics();
+            } else {
+                appointmentsDiv.classList.remove('hidden');
+                analyticsDiv.classList.add('hidden');
+                toggleBtn.innerHTML = '📊 Analytics';
+                currentView = 'appointments';
+                await loadAppointments();
             }
+            lucide.createIcons();
         }
         
+        // ---------- Authentication ----------
+  async function checkSession() {
+    if (sessionStorage.getItem('barberAuth') === 'true') {
+        document.getElementById('login-overlay').classList.add('hidden');
+        document.getElementById('dashboard-content').classList.remove('hidden');
+        await loadAppointments();                    // ← added await
+        if (window.autoRefreshInterval) clearInterval(window.autoRefreshInterval);
+        window.autoRefreshInterval = setInterval(async () => {
+            if (document.getElementById('dashboard-content') && !document.getElementById('dashboard-content').classList.contains('hidden')) {
+                await loadAppointments();
+                if (currentView === 'analytics') await computeAnalytics();
+            }
+        }, 30000);
+    }
+}
         function handleLogin(e) {
             e.preventDefault();
             const user = document.getElementById('username').value;
             const pass = document.getElementById('password').value;
-            const errorMsg = document.getElementById('login-error');
-            
             if (user === ADMIN_USER && pass === ADMIN_PASS) {
                 sessionStorage.setItem('barberAuth', 'true');
                 checkSession();
             } else {
-                errorMsg.classList.remove('hidden');
-                const form = document.getElementById('login-form');
-                form.classList.add('animate-pulse');
-                setTimeout(() => form.classList.remove('animate-pulse'), 500);
+                document.getElementById('login-error').classList.remove('hidden');
             }
         }
         
@@ -461,21 +612,20 @@
             location.reload();
         }
         
-        // Expose functions to global scope
+        // Expose global functions
         window.handleLogin = handleLogin;
         window.logout = logout;
-        window.loadBookings = loadBookings;
         window.cancelBookingById = cancelBookingById;
         window.deleteBookingPermanent = deleteBookingPermanent;
         window.clearAllData = clearAllData;
         window.refreshData = refreshData;
+        window.toggleView = toggleView;
         
-        // Initialize icons and session check
+        // Initialization
         document.addEventListener('DOMContentLoaded', () => {
-            if (typeof lucide !== 'undefined') lucide.createIcons();
+            lucide.createIcons();
             checkSession();
         });
     </script>
 </body>
 </html>
-

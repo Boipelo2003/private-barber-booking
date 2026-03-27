@@ -153,6 +153,47 @@
             .no-print { display: none; }
         }
     </style>
+
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script>
+    (function(){
+        emailjs.init({
+            publicKey: "kPJxV4OcpoS6AFdgA",   // <-- your Public Key
+        });
+    })();
+</script>
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.2/firebase-app.js";
+  import { getFirestore, collection, addDoc, getDocs, query, where, updateDoc, doc, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.2/firebase-firestore.js";
+  // Your web app's Firebase configuration
+  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyB05r9ei92egPbcnbFKQNK0mso25DHcBss",
+  authDomain: "private-barber-booking-67cde.firebaseapp.com",
+  projectId: "private-barber-booking-67cde",
+  storageBucket: "private-barber-booking-67cde.firebasestorage.app",
+  messagingSenderId: "889141435520",
+  appId: "1:889141435520:web:bf645a2b8584b853225a65",
+  measurementId: "G-KNCJ003KNP"
+};
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // Make db globally accessible (so we can use it in other scripts)
+  window.db = db;
+  window.collection = collection;
+  window.addDoc = addDoc;
+  window.getDocs = getDocs;
+  window.query = query;
+  window.where = where;
+  window.updateDoc = updateDoc;
+  window.doc = doc;
+  window.deleteDoc = deleteDoc;
+</script>
 </head>
 <body class="antialiased min-h-screen flex flex-col">
 
@@ -352,35 +393,522 @@
     </div>
 
     <footer class="bg-black py-8 border-t border-white/5 mt-auto"><div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs"><div class="text-center"><h4 class="font-bold text-sm uppercase">Private Barber</h4><p class="text-gray-600">© 2026</p><button onclick="toggleAdmin()" class="text-gray-600 hover:text-white mt-1 underline">Admin Portal</button></div><div class="flex gap-5 text-gray-500"><i data-lucide="instagram" class="w-4 h-4"></i><i data-lucide="facebook" class="w-4 h-4"></i><i data-lucide="twitter" class="w-4 h-4"></i></div></div></footer>
-
-    <script>
+<script>
         lucide.createIcons();
-        // Utility functions
+
+        // ---------- Utility functions ----------
         function formatLocalDate(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
         function parseLocalDateTime(dateKey,timeStr){let [year,month,day]=dateKey.split('-').map(Number);let [t,mod]=timeStr.split(' ');let [hour,minute]=t.split(':').map(Number);if(mod==='PM'&&hour!==12)hour+=12;if(mod==='AM'&&hour===12)hour=0;return new Date(year,month-1,day,hour,minute);}
         let currentDate=new Date(),selectedDate=null,selectedTime=null,selectedService=null,lateFee=0;
         const timeSlots=["09:00 AM","10:00 AM","11:00 AM","01:00 PM","02:00 PM","03:30 PM","04:30 PM","05:30 PM","07:30 PM"];
-        function getBookings(){return JSON.parse(localStorage.getItem('premiumBarberBookings'))||[];}
-        function saveBookings(b){localStorage.setItem('premiumBarberBookings',JSON.stringify(b));}
-        function isSlotBooked(date,time,excludeId=null){let key=formatLocalDate(date),bookings=getBookings();return bookings.some(b=>b.dateKey===key&&b.time===time&&!b.cancelled&&b.id!==excludeId);}
+        
         function computeLateFee(t){return t==="07:30 PM"?50:0;}
-        function updateSummary(){document.getElementById('summary-date').innerText=selectedDate?selectedDate.toLocaleDateString('en-US',{month:'short',day:'numeric'}):'—';document.getElementById('summary-time').innerText=selectedTime||'—';if(selectedService){document.getElementById('summary-service').innerText=selectedService.name;let base=selectedService.price,late=computeLateFee(selectedTime);lateFee=late;document.getElementById('summary-base-price').innerText=`R${base}`;document.getElementById('summary-late-fee').innerText=late?`R${late}`:'R0';document.getElementById('summary-total-price').innerText=`R${base+late}`;}else{document.getElementById('summary-service').innerText='—';}}
-        function renderCalendar(){let year=currentDate.getFullYear(),month=currentDate.getMonth(),container=document.getElementById('calendar-days');container.innerHTML='';document.getElementById('calendar-month-year').innerText=currentDate.toLocaleDateString('en-US',{month:'long',year:'numeric'});let firstDay=new Date(year,month,1).getDay(),daysInMonth=new Date(year,month+1,0).getDate(),today=new Date();today.setHours(0,0,0,0);for(let i=0;i<firstDay;i++){let e=document.createElement('div');container.appendChild(e);}for(let i=1;i<=daysInMonth;i++){let btn=document.createElement('button');btn.innerText=i;btn.className='calendar-day';let checkDate=new Date(year,month,i);if(checkDate<today)btn.classList.add('disabled','opacity-30');else btn.onclick=()=>{document.querySelectorAll('#calendar-days .calendar-day').forEach(b=>b.classList.remove('selected','bg-white','text-black'));btn.classList.add('selected','bg-white','text-black');selectedDate=checkDate;selectedTime=null;document.getElementById('btn-calendar-next').disabled=false;updateSummary();};if(selectedDate&&checkDate.getTime()===selectedDate.getTime())btn.classList.add('selected','bg-white','text-black');container.appendChild(btn);}}
+        
+        // ---------- Firestore helpers ----------
+        async function isSlotBooked(date, time, excludeBookingId = null) {
+            const dateKey = formatLocalDate(date);
+            const q = query(collection(window.db, "bookings"), 
+                where("dateKey", "==", dateKey), 
+                where("time", "==", time), 
+                where("cancelled", "==", false));
+            const querySnapshot = await getDocs(q);
+            if (excludeBookingId) {
+                return querySnapshot.docs.some(doc => doc.id !== excludeBookingId);
+            }
+            return !querySnapshot.empty;
+        }
+        
+        function updateSummary(){
+            document.getElementById('summary-date').innerText=selectedDate?selectedDate.toLocaleDateString('en-US',{month:'short',day:'numeric'}):'—';
+            document.getElementById('summary-time').innerText=selectedTime||'—';
+            if(selectedService){
+                document.getElementById('summary-service').innerText=selectedService.name;
+                let base=selectedService.price, late=computeLateFee(selectedTime);
+                lateFee=late;
+                document.getElementById('summary-base-price').innerText=`R${base}`;
+                document.getElementById('summary-late-fee').innerText=late?`R${late}`:'R0';
+                document.getElementById('summary-total-price').innerText=`R${base+late}`;
+            }else{
+                document.getElementById('summary-service').innerText='—';
+            }
+        }
+        
+        // ---------- Calendar ----------
+        function renderCalendar(){
+            let year=currentDate.getFullYear(),month=currentDate.getMonth(),container=document.getElementById('calendar-days');
+            container.innerHTML='';
+            document.getElementById('calendar-month-year').innerText=currentDate.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+            let firstDay=new Date(year,month,1).getDay(),daysInMonth=new Date(year,month+1,0).getDate(),today=new Date();
+            today.setHours(0,0,0,0);
+            for(let i=0;i<firstDay;i++){let e=document.createElement('div');container.appendChild(e);}
+            for(let i=1;i<=daysInMonth;i++){
+                let btn=document.createElement('button');
+                btn.innerText=i;
+                btn.className='calendar-day';
+                let checkDate=new Date(year,month,i);
+                if(checkDate<today)btn.classList.add('disabled','opacity-30');
+                else btn.onclick=()=>{
+                    document.querySelectorAll('#calendar-days .calendar-day').forEach(b=>b.classList.remove('selected','bg-white','text-black'));
+                    btn.classList.add('selected','bg-white','text-black');
+                    selectedDate=checkDate;
+                    selectedTime=null;
+                    document.getElementById('btn-calendar-next').disabled=false;
+                    updateSummary();
+                };
+                if(selectedDate&&checkDate.getTime()===selectedDate.getTime())btn.classList.add('selected','bg-white','text-black');
+                container.appendChild(btn);
+            }
+        }
         function prevMonth(){currentDate.setMonth(currentDate.getMonth()-1);renderCalendar();}
         function nextMonth(){currentDate.setMonth(currentDate.getMonth()+1);renderCalendar();}
-        function renderTimeSlots(){let cont=document.getElementById('time-slots-container');if(!selectedDate)return;cont.innerHTML='';timeSlots.forEach(slot=>{let booked=isSlotBooked(selectedDate,slot);let btn=document.createElement('button');btn.innerText=slot;btn.className=`time-slot-btn ${booked?'booked':''} ${selectedTime===slot?'selected':''}`;if(!booked)btn.onclick=()=>{if(isSlotBooked(selectedDate,slot)){alert('Slot taken');renderTimeSlots();return;}document.querySelectorAll('.time-slot-btn').forEach(b=>b.classList.remove('selected'));btn.classList.add('selected');selectedTime=slot;document.getElementById('btn-time-next').disabled=false;updateSummary();};cont.appendChild(btn);});document.getElementById('btn-time-next').disabled=!selectedTime;}
-        function goToStep(step){document.querySelectorAll('.step-view').forEach(el=>el.classList.add('hidden'));document.getElementById(`step-${step}`).classList.remove('hidden');if(step==='time'&&selectedDate){document.getElementById('time-header-date').innerText=selectedDate.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});renderTimeSlots();}if(step==='service'&&selectedService){let id=selectedService.name==='Any Cut with Dye'?'service-dye':'service-no-dye';document.getElementById(id).classList.add('selected');document.getElementById('btn-service-next').disabled=false;}lucide.createIcons();}
-        function confirmBooking(){let name=document.getElementById('client-name').value.trim(),phone=document.getElementById('client-phone').value.trim(),terms=document.getElementById('terms-checkbox').checked;if(!name||!phone)return alert('Name & phone required');if(!terms)return alert('Accept cancellation policy');if(!selectedService)return;if(isSlotBooked(selectedDate,selectedTime)){alert('Slot no longer available');goToStep('time');return;}let btn=document.getElementById('pay-btn-text'),loader=document.getElementById('pay-loader');btn.innerText='Confirming...';loader.classList.remove('hidden');setTimeout(()=>{if(isSlotBooked(selectedDate,selectedTime)){alert('Slot taken');btn.innerText='Confirm Booking';loader.classList.add('hidden');goToStep('time');return;}let key=formatLocalDate(selectedDate),base=selectedService.price,late=computeLateFee(selectedTime),total=base+late,booking={id:Date.now(),name,email:document.getElementById('client-email').value.trim()||'no email',phone,dateStr:selectedDate.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),rawDate:selectedDate.toISOString(),dateKey:key,time:selectedTime,service:selectedService.name,basePrice:base,lateFee:late,totalPrice:total,cancellationFee:0,cancelled:false};let bookings=getBookings();bookings.push(booking);saveBookings(bookings);document.getElementById('receipt-name').innerText=name;document.getElementById('receipt-date').innerText=booking.dateStr;document.getElementById('receipt-time').innerText=selectedTime;document.getElementById('receipt-service').innerText=selectedService.name;document.getElementById('receipt-price').innerText=`R${total}`;goToStep('success');btn.innerText='Confirm Booking';loader.classList.add('hidden');},700);}
-        function initServiceSelection(){let dye=document.getElementById('service-dye'),noDye=document.getElementById('service-no-dye');dye.onclick=()=>{selectedService={name:'Any Cut with Dye',price:100};document.querySelectorAll('.service-card').forEach(c=>c.classList.remove('selected'));dye.classList.add('selected');updateSummary();document.getElementById('btn-service-next').disabled=false;};noDye.onclick=()=>{selectedService={name:'Any Cut without Dye',price:80};document.querySelectorAll('.service-card').forEach(c=>c.classList.remove('selected'));noDye.classList.add('selected');updateSummary();document.getElementById('btn-service-next').disabled=false;};}
-        let modal=document.getElementById('booking-modal');function openBooking(){modal.classList.remove('hidden');document.body.style.overflow='hidden';renderCalendar();goToStep('calendar');selectedDate=null;selectedTime=null;selectedService=null;updateSummary();document.getElementById('btn-calendar-next').disabled=true;document.getElementById('btn-time-next').disabled=true;document.getElementById('btn-service-next').disabled=true;document.getElementById('client-name').value='';document.getElementById('client-email').value='';document.getElementById('client-phone').value='';document.getElementById('terms-checkbox').checked=false;}function closeBooking(){modal.classList.add('hidden');document.body.style.overflow='auto';}
-        window.openBooking=openBooking;window.closeBooking=closeBooking;window.prevMonth=prevMonth;window.nextMonth=nextMonth;window.goToStep=goToStep;window.confirmBooking=confirmBooking;window.toggleAdmin=()=>{document.getElementById('customer-section').classList.add('hidden');document.getElementById('admin-section').classList.remove('hidden');loadBookings();};window.toggleCustomer=()=>{document.getElementById('admin-section').classList.add('hidden');document.getElementById('customer-section').classList.remove('hidden');};window.clearBookings=()=>{if(confirm('Delete ALL bookings?')){localStorage.removeItem('premiumBarberBookings');loadBookings();}};
-        function loadBookings(){let b=getBookings().sort((a,b)=>new Date(b.rawDate)-new Date(a.rawDate)),tbody=document.getElementById('admin-table-body');tbody.innerHTML='';if(!b.length){tbody.innerHTML='<tr><td colspan="4" class="p-6 text-center text-gray-500">No bookings</td></tr>';return;}b.forEach(book=>{let cancelBtn=!book.cancelled?`<button onclick="cancelBookingById(${book.id})" class="text-red-400 text-xs underline">Cancel</button>`:'';tbody.innerHTML+=`<tr class="hover:bg-white/5"><td class="p-3"><div class="font-bold">${book.dateStr}</div><div class="text-xs text-gray-400">${book.time}</div></td><td class="p-3"><div>${escapeHtml(book.name)}</div><div class="text-xs text-gray-400">${book.phone}</div></td><td class="p-3">${book.service}<div class="text-green-400 font-bold text-sm">R${book.totalPrice}</div></td><td class="p-3">${book.cancelled?'<span class="text-red-400 text-xs">Cancelled</span>':cancelBtn}</td></tr>`;});}
+        
+        // ---------- Time slots (async) ----------
+        async function renderTimeSlots(){
+            const container = document.getElementById('time-slots-container');
+            if(!selectedDate) return;
+            container.innerHTML = '<div class="text-center text-gray-500">Loading available times...</div>';
+            
+            let slotsHtml = [];
+            for (const slot of timeSlots) {
+                const booked = await isSlotBooked(selectedDate, slot);
+                const isSelected = selectedTime === slot;
+                slotsHtml.push(`
+                    <button class="time-slot-btn ${booked ? 'booked' : ''} ${isSelected ? 'selected' : ''}"
+                        ${!booked ? `onclick="selectTime(this, '${slot}')"` : 'disabled'}>
+                        ${slot}
+                    </button>
+                `);
+            }
+            container.innerHTML = slotsHtml.join('');
+            document.getElementById('btn-time-next').disabled = !selectedTime;
+        }
+        
+        async function selectTime(element, time){
+            if (await isSlotBooked(selectedDate, time)) {
+                alert("Sorry, this time slot is no longer available. Please choose another time.");
+                renderTimeSlots();
+                selectedTime = null;
+                document.getElementById('btn-time-next').disabled = true;
+                updateSummary();
+                return;
+            }
+            document.querySelectorAll('.time-slot-btn').forEach(el=>el.classList.remove('selected'));
+            element.classList.add('selected');
+            selectedTime = time;
+            document.getElementById('btn-time-next').disabled = false;
+            updateSummary();
+        }
+        
+        // ---------- Step navigation ----------
+        function goToStep(step){
+            document.querySelectorAll('.step-view').forEach(el=>el.classList.add('hidden'));
+            document.getElementById(`step-${step}`).classList.remove('hidden');
+            if(step==='time'&&selectedDate){
+                document.getElementById('time-header-date').innerText=selectedDate.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+                renderTimeSlots();
+            }
+            if(step==='service'&&selectedService){
+                let id=selectedService.name==='Any Cut with Dye'?'service-dye':'service-no-dye';
+                document.getElementById(id).classList.add('selected');
+                document.getElementById('btn-service-next').disabled=false;
+            }
+            lucide.createIcons();
+        }
+        
+        // ---------- Confirm booking (Firestore) ----------
+        async function confirmBooking(){
+            let name = document.getElementById('client-name').value.trim();
+            let phone = document.getElementById('client-phone').value.trim();
+            let email = document.getElementById('client-email').value.trim();
+            let terms = document.getElementById('terms-checkbox').checked;
+            
+            if (!name || !phone) return alert('Name & phone required');
+            if (!terms) return alert('Accept cancellation policy');
+            if (!selectedService) return;
+            if (await isSlotBooked(selectedDate, selectedTime)) {
+                alert('Slot no longer available');
+                goToStep('time');
+                return;
+            }
+            
+            let btn = document.getElementById('pay-btn-text');
+            let loader = document.getElementById('pay-loader');
+            btn.innerText = 'Confirming...';
+            loader.classList.remove('hidden');
+            
+            try {
+                let key = formatLocalDate(selectedDate);
+                let base = selectedService.price;
+                let late = computeLateFee(selectedTime);
+                let total = base + late;
+                let bookingData = {
+                    name: name,
+                    email: email || 'no email',
+                    phone: phone,
+                    dateStr: selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                    rawDate: selectedDate.toISOString(),
+                    dateKey: key,
+                    time: selectedTime,
+                    service: selectedService.name,
+                    basePrice: base,
+                    lateFee: late,
+                    totalPrice: total,
+                    cancellationFee: 0,
+                    cancelled: false,
+                    createdAt: new Date().toISOString()
+                };
+                
+                // Save to Firestore
+                const docRef = await addDoc(collection(window.db, "bookings"), bookingData);
+                console.log("Booking saved with ID:", docRef.id);
+                
+                // Send email
+                const templateParams = {
+                    customer_email: email,
+                    name: name,
+                    date: bookingData.dateStr,
+                    time: selectedTime,
+                    service: selectedService.name,
+                    total: `R${total}`,
+                    email: email
+                };
+                emailjs.send("service_u6e9y47", "template_4fg78jn", templateParams)
+                    .then(() => console.log('✅ Email sent successfully'))
+                    .catch((error) => console.error('❌ Email failed:', error));
+                
+                document.getElementById('receipt-name').innerText = name;
+                document.getElementById('receipt-date').innerText = bookingData.dateStr;
+                document.getElementById('receipt-time').innerText = selectedTime;
+                document.getElementById('receipt-service').innerText = selectedService.name;
+                document.getElementById('receipt-price').innerText = `R${total}`;
+                
+                goToStep('success');
+            } catch (error) {
+                console.error("Error adding document: ", error);
+                alert("There was a problem saving your booking. Please try again.");
+            } finally {
+                btn.innerText = 'Confirm Booking';
+                loader.classList.add('hidden');
+            }
+        }
+        
+        // ---------- Service selection ----------
+        function initServiceSelection(){
+            let dye=document.getElementById('service-dye'),noDye=document.getElementById('service-no-dye');
+            dye.onclick=()=>{
+                selectedService={name:'Any Cut with Dye',price:100};
+                document.querySelectorAll('.service-card').forEach(c=>c.classList.remove('selected'));
+                dye.classList.add('selected');
+                updateSummary();
+                document.getElementById('btn-service-next').disabled=false;
+            };
+            noDye.onclick=()=>{
+                selectedService={name:'Any Cut without Dye',price:80};
+                document.querySelectorAll('.service-card').forEach(c=>c.classList.remove('selected'));
+                noDye.classList.add('selected');
+                updateSummary();
+                document.getElementById('btn-service-next').disabled=false;
+            };
+        }
+        
+        // ---------- Modal open/close ----------
+        let modal=document.getElementById('booking-modal');
+        function openBooking(){
+            modal.classList.remove('hidden');
+            document.body.style.overflow='hidden';
+            renderCalendar();
+            goToStep('calendar');
+            selectedDate=null; selectedTime=null; selectedService=null;
+            updateSummary();
+            document.getElementById('btn-calendar-next').disabled=true;
+            document.getElementById('btn-time-next').disabled=true;
+            document.getElementById('btn-service-next').disabled=true;
+            document.getElementById('client-name').value='';
+            document.getElementById('client-email').value='';
+            document.getElementById('client-phone').value='';
+            document.getElementById('terms-checkbox').checked=false;
+        }
+        function closeBooking(){modal.classList.add('hidden');document.body.style.overflow='auto';}
+        
+        // ---------- Admin section (Firestore version) ----------
+        async function loadBookings(){
+            const querySnapshot = await getDocs(collection(window.db, "bookings"));
+            const bookings = [];
+            querySnapshot.forEach(doc => {
+                bookings.push({ id: doc.id, ...doc.data() });
+            });
+            bookings.sort((a,b) => new Date(b.rawDate) - new Date(a.rawDate));
+            const tbody = document.getElementById('admin-table-body');
+            tbody.innerHTML = '';
+            if (bookings.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="p-6 text-center text-gray-500">No bookings</td></tr>';
+                return;
+            }
+            bookings.forEach(book => {
+                let cancelBtn = !book.cancelled ? `<button onclick="cancelBookingById('${book.id}')" class="text-red-400 text-xs underline">Cancel</button>` : '';
+                tbody.innerHTML += `
+                    <tr class="hover:bg-white/5">
+                        <td class="p-3"><div class="font-bold">${book.dateStr}</div><div class="text-xs text-gray-400">${book.time}</div></td>
+                        <td class="p-3"><div>${escapeHtml(book.name)}</div><div class="text-xs text-gray-400">${book.phone}</div></td>
+                        <td class="p-3">${book.service}<div class="text-green-400 font-bold text-sm">R${book.totalPrice}</div></td>
+                        <td class="p-3">${book.cancelled ? '<span class="text-red-400 text-xs">Cancelled</span>' : cancelBtn}</td>
+                    </tr>
+                `;
+            });
+        }
+        
         function escapeHtml(s){if(!s)return'';return s.replace(/[&<>]/g,function(m){if(m==='&')return'&amp;';if(m==='<')return'&lt;';if(m==='>')return'&gt;';return m;});}
-        window.cancelBookingById=(id)=>{let bookings=getBookings(),booking=bookings.find(b=>b.id===id);if(!booking||booking.cancelled)return;let aptTime=parseLocalDateTime(booking.dateKey,booking.time),now=new Date(),diff=(aptTime-now)/(1000*3600);if(diff<=0){alert("Cannot cancel past appointment");return;}let msg=diff<=5?`Cancel within 5h (${diff.toFixed(1)}h left) incurs R20 fee. Proceed?`:'Cancel this booking?';if(confirm(msg)){booking.cancelled=true;if(diff<=5&&diff>0)booking.cancellationFee=20;saveBookings(bookings);if(!document.getElementById('admin-section').classList.contains('hidden'))loadBookings();fetchUserBookings();}};
-        window.openManageBookings=()=>{document.getElementById('manage-bookings-modal').classList.remove('hidden');document.getElementById('booking-phone-step').classList.remove('hidden');document.getElementById('bookings-list').classList.add('hidden');document.getElementById('reschedule-view').classList.add('hidden');document.getElementById('booking-phone-input').value='';document.body.style.overflow='hidden';};window.closeManageBookings=()=>{document.getElementById('manage-bookings-modal').classList.add('hidden');document.body.style.overflow='auto';};
-        window.fetchUserBookings=()=>{let phone=document.getElementById('booking-phone-input').value.trim();if(!phone)return alert('Enter phone number');let bookings=getBookings().filter(b=>b.phone===phone&&!b.cancelled&&parseLocalDateTime(b.dateKey,b.time)>new Date());if(!bookings.length){alert('No upcoming bookings');return;}let container=document.getElementById('bookings-list');container.innerHTML='';bookings.forEach(b=>{let div=document.createElement('div');div.className='bg-[#1a1a1a] p-4 rounded-xl flex flex-wrap justify-between items-center gap-2';div.innerHTML=`<div><div class="font-medium">${b.dateStr} ${b.time}</div><div class="text-xs text-gray-400">${b.service}</div><div class="text-green-400 text-sm">R${b.totalPrice}</div></div><div class="flex gap-2"><button onclick="startReschedule(${b.id})" class="px-4 py-2 bg-white/10 rounded-lg text-sm">Reschedule</button><button onclick="cancelBookingById(${b.id});setTimeout(fetchUserBookings,200);" class="px-4 py-2 bg-red-500/20 rounded-lg text-sm">Cancel</button></div>`;container.appendChild(div);});document.getElementById('booking-phone-step').classList.add('hidden');container.classList.remove('hidden');lucide.createIcons();};
-        let resCtx={};window.startReschedule=(id)=>{let bookings=getBookings(),booking=bookings.find(b=>b.id===id);if(!booking)return;resCtx={booking,id,selectedDate:null,selectedTime:null};document.getElementById('bookings-list').classList.add('hidden');document.getElementById('reschedule-view').classList.remove('hidden');renderRescheduleCalendar();};function renderRescheduleCalendar(){let container=document.getElementById('reschedule-calendar-container');container.innerHTML=`<div class="flex justify-between mb-3"><button onclick="window.reschedulePrevMonth()" class="p-2"><i data-lucide="chevron-left"></i></button><span id="res-month-year" class="font-bold"></span><button onclick="window.rescheduleNextMonth()" class="p-2"><i data-lucide="chevron-right"></i></button></div><div class="grid grid-cols-7 gap-1 text-center text-xs">${'Su Mo Tu We Th Fr Sa'.split(' ').map(d=>`<span>${d}</span>`).join('')}</div><div id="res-days" class="grid grid-cols-7 gap-1 mt-2"></div>`;resCtx.currentMonth=new Date();resCtx.currentMonth.setHours(0,0,0,0);renderRescheduleDays();}function renderRescheduleDays(){let year=resCtx.currentMonth.getFullYear(),month=resCtx.currentMonth.getMonth(),firstDay=new Date(year,month,1).getDay(),daysInMonth=new Date(year,month+1,0).getDate(),today=new Date();today.setHours(0,0,0,0);let daysDiv=document.getElementById('res-days');daysDiv.innerHTML='';document.getElementById('res-month-year').innerText=resCtx.currentMonth.toLocaleDateString('en-US',{month:'long',year:'numeric'});for(let i=0;i<firstDay;i++)daysDiv.appendChild(document.createElement('div'));for(let i=1;i<=daysInMonth;i++){let btn=document.createElement('button');btn.innerText=i;btn.className='calendar-day w-9 h-9 text-sm';let d=new Date(year,month,i);if(d<today)btn.classList.add('opacity-30');else btn.onclick=()=>{document.querySelectorAll('#res-days .calendar-day').forEach(b=>b.classList.remove('selected','bg-white','text-black'));btn.classList.add('selected','bg-white','text-black');resCtx.selectedDate=d;renderRescheduleTimes();};daysDiv.appendChild(btn);}lucide.createIcons();}function renderRescheduleTimes(){let container=document.getElementById('reschedule-time-container');if(!resCtx.selectedDate){container.innerHTML='';return;}container.innerHTML='<div class="mt-3 text-sm font-semibold">New time</div><div class="time-grid mt-2" id="res-time-grid"></div>';let grid=document.getElementById('res-time-grid');timeSlots.forEach(slot=>{let booked=isSlotBooked(resCtx.selectedDate,slot,resCtx.booking.id);let btn=document.createElement('button');btn.innerText=slot;btn.className=`time-slot-btn text-xs p-2 ${booked?'booked':''}`;if(!booked)btn.onclick=()=>{document.querySelectorAll('#res-time-grid .time-slot-btn').forEach(b=>b.classList.remove('selected'));btn.classList.add('selected');resCtx.selectedTime=slot;document.getElementById('confirm-reschedule-btn').disabled=false;};grid.appendChild(btn);});}window.reschedulePrevMonth=()=>{resCtx.currentMonth.setMonth(resCtx.currentMonth.getMonth()-1);renderRescheduleDays();};window.rescheduleNextMonth=()=>{resCtx.currentMonth.setMonth(resCtx.currentMonth.getMonth()+1);renderRescheduleDays();};window.confirmReschedule=()=>{if(!resCtx.selectedDate||!resCtx.selectedTime)return alert('Pick date & time');if(isSlotBooked(resCtx.selectedDate,resCtx.selectedTime,resCtx.booking.id)){alert('Slot taken');renderRescheduleTimes();return;}let bookings=getBookings();let idx=bookings.findIndex(b=>b.id===resCtx.booking.id);if(idx===-1)return;let bk=bookings[idx];bk.dateKey=formatLocalDate(resCtx.selectedDate);bk.dateStr=resCtx.selectedDate.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});bk.rawDate=resCtx.selectedDate.toISOString();bk.time=resCtx.selectedTime;bk.lateFee=computeLateFee(resCtx.selectedTime);bk.totalPrice=bk.basePrice+bk.lateFee;saveBookings(bookings);alert('Rescheduled!');if(!document.getElementById('admin-section').classList.contains('hidden'))loadBookings();fetchUserBookings();hideRescheduleView();};window.hideRescheduleView=()=>{document.getElementById('reschedule-view').classList.add('hidden');document.getElementById('bookings-list').classList.remove('hidden');resCtx={};document.getElementById('confirm-reschedule-btn').disabled=true;};
-        initServiceSelection();renderCalendar();updateSummary();loadBookings();let msgs=["We are open from 9 AM to 7 PM","Walk-ins welcome!","Bookings recommended weekends"];let idx=0;setInterval(()=>{let el=document.getElementById('announcement-text');if(el){el.style.opacity='0';setTimeout(()=>{el.innerText=msgs[idx%msgs.length];el.style.opacity='1';idx++;},200);}},7000);
+        
+        // ---------- Manage bookings (customer portal) ----------
+        async function fetchUserBookings(){
+            let phone = document.getElementById('booking-phone-input').value.trim();
+            if(!phone) return alert('Enter phone number');
+            const q = query(collection(window.db, "bookings"), where("phone", "==", phone), where("cancelled", "==", false));
+            const querySnapshot = await getDocs(q);
+            const bookings = [];
+            querySnapshot.forEach(doc => {
+                bookings.push({ id: doc.id, ...doc.data() });
+            });
+            const now = new Date();
+            const upcoming = bookings.filter(b => parseLocalDateTime(b.dateKey, b.time) > now);
+            if(upcoming.length === 0){ alert('No upcoming bookings'); return; }
+            displayBookings(upcoming);
+        }
+        
+        function displayBookings(bookings){
+            const container = document.getElementById('bookings-list');
+            container.innerHTML = '';
+            bookings.forEach(b => {
+                let div = document.createElement('div');
+                div.className = 'bg-[#1a1a1a] p-4 rounded-xl flex flex-wrap justify-between items-center gap-2';
+                div.innerHTML = `
+                    <div>
+                        <div class="font-medium">${b.dateStr} ${b.time}</div>
+                        <div class="text-xs text-gray-400">${b.service}</div>
+                        <div class="text-green-400 text-sm">R${b.totalPrice}</div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="startReschedule('${b.id}')" class="px-4 py-2 bg-white/10 rounded-lg text-sm">Reschedule</button>
+                        <button onclick="cancelBookingById('${b.id}'); setTimeout(fetchUserBookings,200);" class="px-4 py-2 bg-red-500/20 rounded-lg text-sm">Cancel</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+            document.getElementById('booking-phone-step').classList.add('hidden');
+            container.classList.remove('hidden');
+            lucide.createIcons();
+        }
+        
+        async function cancelBookingById(bookingId){
+            const bookingRef = doc(window.db, "bookings", bookingId);
+            const bookingSnap = await getDoc(bookingRef);
+            if (!bookingSnap.exists()) return;
+            const booking = bookingSnap.data();
+            if (booking.cancelled) return;
+            
+            const appointmentDateTime = parseLocalDateTime(booking.dateKey, booking.time);
+            const now = new Date();
+            const hoursDiff = (appointmentDateTime - now) / (1000 * 60 * 60);
+            let message = "Are you sure you want to cancel this booking?";
+            let fee = 0;
+            if (hoursDiff <= 5 && hoursDiff > 0) {
+                fee = 20;
+                message = `Cancelling within 5 hours (${Math.abs(hoursDiff).toFixed(1)}h remaining) will incur a R20 cancellation fee. Proceed?`;
+            } else if (hoursDiff <= 0) {
+                alert("Cannot cancel past appointments.");
+                return;
+            }
+            if (confirm(message)) {
+                await updateDoc(bookingRef, { cancelled: true, cancellationFee: fee });
+                alert("Booking cancelled successfully.");
+                if (!document.getElementById('admin-section').classList.contains('hidden')) loadBookings();
+                fetchUserBookings();
+            }
+        }
+        
+        // ---------- Reschedule logic (simplified) ----------
+        let resCtx = {};
+        async function startReschedule(id){
+            const bookingRef = doc(window.db, "bookings", id);
+            const bookingSnap = await getDoc(bookingRef);
+            if (!bookingSnap.exists()) return;
+            resCtx = {
+                booking: { id: bookingSnap.id, ...bookingSnap.data() },
+                id: id,
+                selectedDate: null,
+                selectedTime: null
+            };
+            document.getElementById('bookings-list').classList.add('hidden');
+            document.getElementById('reschedule-view').classList.remove('hidden');
+            renderRescheduleCalendar();
+        }
+        
+        function renderRescheduleCalendar(){
+            let container = document.getElementById('reschedule-calendar-container');
+            container.innerHTML = `
+                <div class="flex justify-between mb-3">
+                    <button onclick="window.reschedulePrevMonth()" class="p-2"><i data-lucide="chevron-left"></i></button>
+                    <span id="res-month-year" class="font-bold"></span>
+                    <button onclick="window.rescheduleNextMonth()" class="p-2"><i data-lucide="chevron-right"></i></button>
+                </div>
+                <div class="grid grid-cols-7 gap-1 text-center text-xs">${'Su Mo Tu We Th Fr Sa'.split(' ').map(d=>`<span>${d}</span>`).join('')}</div>
+                <div id="res-days" class="grid grid-cols-7 gap-1 mt-2"></div>
+            `;
+            resCtx.currentMonth = new Date();
+            resCtx.currentMonth.setHours(0,0,0,0);
+            renderRescheduleDays();
+        }
+        
+        function renderRescheduleDays(){
+            let year = resCtx.currentMonth.getFullYear(), month = resCtx.currentMonth.getMonth();
+            let firstDay = new Date(year, month, 1).getDay();
+            let daysInMonth = new Date(year, month + 1, 0).getDate();
+            let today = new Date();
+            today.setHours(0,0,0,0);
+            let daysDiv = document.getElementById('res-days');
+            daysDiv.innerHTML = '';
+            document.getElementById('res-month-year').innerText = resCtx.currentMonth.toLocaleDateString('en-US', {month:'long', year:'numeric'});
+            for(let i=0; i<firstDay; i++) daysDiv.appendChild(document.createElement('div'));
+            for(let i=1; i<=daysInMonth; i++){
+                let btn = document.createElement('button');
+                btn.innerText = i;
+                btn.className = 'calendar-day w-9 h-9 text-sm';
+                let d = new Date(year, month, i);
+                if(d < today) btn.classList.add('opacity-30');
+                else btn.onclick = () => {
+                    document.querySelectorAll('#res-days .calendar-day').forEach(b=>b.classList.remove('selected','bg-white','text-black'));
+                    btn.classList.add('selected','bg-white','text-black');
+                    resCtx.selectedDate = d;
+                    renderRescheduleTimes();
+                };
+                daysDiv.appendChild(btn);
+            }
+            lucide.createIcons();
+        }
+        
+        async function renderRescheduleTimes(){
+            let container = document.getElementById('reschedule-time-container');
+            if(!resCtx.selectedDate){ container.innerHTML = ''; return; }
+            container.innerHTML = '<div class="mt-3 text-sm font-semibold">New time</div><div class="time-grid mt-2" id="res-time-grid"></div>';
+            let grid = document.getElementById('res-time-grid');
+            for (const slot of timeSlots) {
+                let booked = await isSlotBooked(resCtx.selectedDate, slot, resCtx.id);
+                let btn = document.createElement('button');
+                btn.innerText = slot;
+                btn.className = `time-slot-btn text-xs p-2 ${booked ? 'booked' : ''}`;
+                if (!booked) {
+                    btn.onclick = () => {
+                        document.querySelectorAll('#res-time-grid .time-slot-btn').forEach(b=>b.classList.remove('selected'));
+                        btn.classList.add('selected');
+                        resCtx.selectedTime = slot;
+                        document.getElementById('confirm-reschedule-btn').disabled = false;
+                    };
+                }
+                grid.appendChild(btn);
+            }
+        }
+        
+        async function confirmReschedule(){
+            if (!resCtx.selectedDate || !resCtx.selectedTime) return alert('Pick date & time');
+            if (await isSlotBooked(resCtx.selectedDate, resCtx.selectedTime, resCtx.id)) {
+                alert('Slot taken');
+                renderRescheduleTimes();
+                return;
+            }
+            const bookingRef = doc(window.db, "bookings", resCtx.id);
+            const newDateKey = formatLocalDate(resCtx.selectedDate);
+            const newLateFee = computeLateFee(resCtx.selectedTime);
+            const bookingData = resCtx.booking;
+            const newTotal = bookingData.basePrice + newLateFee;
+            await updateDoc(bookingRef, {
+                dateKey: newDateKey,
+                rawDate: resCtx.selectedDate.toISOString(),
+                dateStr: resCtx.selectedDate.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}),
+                time: resCtx.selectedTime,
+                lateFee: newLateFee,
+                totalPrice: newTotal
+            });
+            alert('Rescheduled!');
+            if (!document.getElementById('admin-section').classList.contains('hidden')) loadBookings();
+            fetchUserBookings();
+            hideRescheduleView();
+        }
+        
+        function hideRescheduleView(){
+            document.getElementById('reschedule-view').classList.add('hidden');
+            document.getElementById('bookings-list').classList.remove('hidden');
+            resCtx = {};
+            document.getElementById('confirm-reschedule-btn').disabled = true;
+        }
+        
+        function reschedulePrevMonth(){ resCtx.currentMonth.setMonth(resCtx.currentMonth.getMonth()-1); renderRescheduleDays(); }
+        function rescheduleNextMonth(){ resCtx.currentMonth.setMonth(resCtx.currentMonth.getMonth()+1); renderRescheduleDays(); }
+        
+        // ---------- Admin toggle ----------
+        function toggleAdmin(){ document.getElementById('customer-section').classList.add('hidden'); document.getElementById('admin-section').classList.remove('hidden'); loadBookings(); }
+        function toggleCustomer(){ document.getElementById('admin-section').classList.add('hidden'); document.getElementById('customer-section').classList.remove('hidden'); }
+        async function clearBookings(){
+            if(confirm('Delete ALL bookings?')){
+                const querySnapshot = await getDocs(collection(window.db, "bookings"));
+                const batch = [];
+                querySnapshot.forEach(doc => {
+                    batch.push(deleteDoc(doc.ref));
+                });
+                await Promise.all(batch);
+                loadBookings();
+                alert('All bookings cleared.');
+            }
+        }
+        
+        // ---------- Expose globals ----------
+        window.openBooking = openBooking;
+        window.closeBooking = closeBooking;
+        window.prevMonth = prevMonth;
+        window.nextMonth = nextMonth;
+        window.goToStep = goToStep;
+        window.confirmBooking = confirmBooking;
+        window.toggleAdmin = toggleAdmin;
+        window.toggleCustomer = toggleCustomer;
+        window.clearBookings = clearBookings;
+        window.openManageBookings = () => {
+            document.getElementById('manage-bookings-modal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+            document.getElementById('booking-phone-step').classList.remove('hidden');
+            document.getElementById('bookings-list').classList.add('hidden');
+            document.getElementById('reschedule-view').classList.add('hidden');
+            document.getElementById('booking-phone-input').value = '';
+        };
+        window.closeManageBookings = () => {
+            document.getElementById('manage-bookings-modal').classList.add('hidden');
+            document.body.style.overflow = 'auto';
+        };
+        window.fetchUserBookings = fetchUserBookings;
+        window.startReschedule = startReschedule;
+        window.cancelBookingById = cancelBookingById;
+        window.reschedulePrevMonth = reschedulePrevMonth;
+        window.rescheduleNextMonth = rescheduleNextMonth;
+        window.confirmReschedule = confirmReschedule;
+        window.hideRescheduleView = hideRescheduleView;
+        
+        // ---------- Initialization ----------
+        initServiceSelection();
+        renderCalendar();
+        updateSummary();
+        loadBookings();
+        
+        let msgs = ["We are open from 9 AM to 7 PM","Walk-ins welcome!","Bookings recommended weekends"];
+        let idx = 0;
+        setInterval(()=>{
+            let el = document.getElementById('announcement-text');
+            if(el){
+                el.style.opacity='0';
+                setTimeout(()=>{
+                    el.innerText = msgs[idx%msgs.length];
+                    el.style.opacity='1';
+                    idx++;
+                },200);
+            }
+        },7000);
     </script>
 </body>
 </html>

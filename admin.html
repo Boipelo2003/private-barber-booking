@@ -2,12 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PRIVATE BARBER | Admin Access</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
+    <title>PRIVATE BARBER | Admin Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Playfair+Display:ital,wght@1,400;1,600&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
         body {
             font-family: 'Inter', sans-serif;
             background-color: #050505;
@@ -34,49 +37,98 @@
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 8px; }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #0a0a0a; }
         ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #555; }
+        
+        /* Mobile friendly touch targets */
+        button, .action-btn {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        button:active, .action-btn:active {
+            transform: scale(0.96);
+        }
+        
+        /* Table container for horizontal scroll */
+        .table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Stats cards responsive */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+        }
+        @media (min-width: 640px) {
+            .stats-grid { grid-template-columns: repeat(3, 1fr); }
+        }
+        
+        /* Make table cells easier to read on small screens */
+        .booking-table th, .booking-table td {
+            padding: 0.75rem 0.5rem;
+            white-space: nowrap;
+        }
+        @media (min-width: 640px) {
+            .booking-table th, .booking-table td {
+                padding: 1rem;
+                white-space: normal;
+            }
+        }
+        
+        /* Status badges */
+        .badge-confirmed {
+            background-color: rgba(34, 197, 94, 0.1);
+            color: #4ade80;
+            border: 1px solid rgba(74, 222, 128, 0.2);
+        }
+        .badge-cancelled {
+            background-color: rgba(239, 68, 68, 0.1);
+            color: #f87171;
+            border: 1px solid rgba(248, 113, 113, 0.2);
+        }
     </style>
 </head>
 <body class="antialiased min-h-screen flex flex-col">
 
-    <!-- LOGIN OVERLAY -->
+    <!-- LOGIN OVERLAY (mobile friendly) -->
     <div id="login-overlay" class="fixed inset-0 z-[100] bg-[#050505] flex items-center justify-center p-4">
         <div class="absolute inset-0 bg-[url('https://image.qwenlm.ai/public_source/553aff0e-e70d-4625-9778-1e3f0a132b81/1cdda2719-31f9-4a7c-9175-4844aa289a15.png')] bg-cover bg-center opacity-20"></div>
-        <div class="relative w-full max-w-md bg-[#111] border border-white/10 rounded-2xl p-8 shadow-2xl fade-in">
-            <div class="text-center mb-8">
-                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/5 border border-white/10 mb-4">
-                    <i data-lucide="shield-check" class="w-8 h-8 text-white"></i>
+        <div class="relative w-full max-w-md bg-[#111] border border-white/10 rounded-2xl p-6 sm:p-8 shadow-2xl fade-in">
+            <div class="text-center mb-6">
+                <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-white/5 border border-white/10 mb-3">
+                    <i data-lucide="shield-check" class="w-7 h-7 text-white"></i>
                 </div>
-                <h2 class="text-2xl font-bold uppercase tracking-widest">Restricted Access</h2>
-                <p class="text-gray-500 text-sm mt-2">Authorized Personnel Only</p>
+                <h2 class="text-xl sm:text-2xl font-bold uppercase tracking-widest">Restricted Access</h2>
+                <p class="text-gray-500 text-xs sm:text-sm mt-1">Authorized Personnel Only</p>
             </div>
 
             <form id="login-form" onsubmit="handleLogin(event)" class="space-y-4">
                 <div>
                     <label class="block text-xs uppercase text-gray-500 mb-1">Username</label>
                     <div class="relative">
-                        <i data-lucide="user" class="absolute left-3 top-3 w-4 h-4 text-gray-500"></i>
-                        <input type="text" id="username" class="input-field w-full rounded-lg py-2.5 pl-10 pr-4 text-white placeholder-gray-600" placeholder="admin" required>
+                        <i data-lucide="user" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500"></i>
+                        <input type="text" id="username" class="input-field w-full rounded-lg py-2.5 pl-10 pr-4 text-white placeholder-gray-600 text-base" placeholder="admin" required>
                     </div>
                 </div>
                 <div>
                     <label class="block text-xs uppercase text-gray-500 mb-1">Password</label>
                     <div class="relative">
-                        <i data-lucide="lock" class="absolute left-3 top-3 w-4 h-4 text-gray-500"></i>
-                        <input type="password" id="password" class="input-field w-full rounded-lg py-2.5 pl-10 pr-4 text-white placeholder-gray-600" placeholder="••••••" required>
+                        <i data-lucide="lock" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500"></i>
+                        <input type="password" id="password" class="input-field w-full rounded-lg py-2.5 pl-10 pr-4 text-white placeholder-gray-600 text-base" placeholder="••••••" required>
                     </div>
                 </div>
                 <div id="login-error" class="text-red-500 text-xs text-center hidden">Invalid credentials</div>
                 
-                <button type="submit" class="w-full bg-white text-black font-bold uppercase tracking-wider py-3 rounded-lg hover:bg-gray-200 transition-colors mt-4">
+                <button type="submit" class="w-full bg-white text-black font-bold uppercase tracking-wider py-3 rounded-lg hover:bg-gray-200 transition-colors mt-2 active:scale-95">
                     Enter Dashboard
                 </button>
             </form>
-            <div class="mt-6 text-center">
+            <div class="mt-5 text-center">
                 <a href="index.html" class="text-xs text-gray-600 hover:text-white transition-colors flex items-center justify-center gap-2">
                     <i data-lucide="arrow-left" class="w-3 h-3"></i> Return to Public Site
                 </a>
@@ -84,248 +136,345 @@
         </div>
     </div>
 
-    <!-- DASHBOARD CONTENT (Hidden initially) -->
+    <!-- DASHBOARD CONTENT (hidden until login) -->
     <div id="dashboard-content" class="hidden min-h-screen flex flex-col">
         
-        <!-- Navbar -->
+        <!-- Sticky Navbar -->
         <nav class="glass-panel border-b border-white/5 sticky top-0 z-40">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex items-center justify-between h-20">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-white to-gray-400 flex items-center justify-center text-black font-bold text-xl">P</div>
+                <div class="flex items-center justify-between h-16 sm:h-20">
+                    <div class="flex items-center gap-2 sm:gap-3">
+                        <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-white to-gray-400 flex items-center justify-center text-black font-bold text-sm sm:text-xl">P</div>
                         <div>
-                            <span class="font-bold text-lg tracking-widest uppercase block">Private Barber</span>
-                            <span class="text-xs text-green-500 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> Live System</span>
+                            <span class="font-bold text-sm sm:text-lg tracking-widest uppercase block">Private Barber</span>
+                            <span class="text-[10px] sm:text-xs text-green-500 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> Live System</span>
                         </div>
                     </div>
-                    <div class="flex items-center gap-4">
-                        <button onclick="logout()" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">
-                            Logout
-                        </button>
-                    </div>
+                    <button onclick="logout()" class="text-xs sm:text-sm font-medium text-gray-400 hover:text-white transition-colors px-3 py-2 rounded-full active:bg-white/10">
+                        Logout
+                    </button>
                 </div>
             </div>
         </nav>
 
         <!-- Main Content -->
-        <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full">
+        <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 w-full">
             
-            <!-- Stats Row -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-                <div class="glass-panel p-6 rounded-2xl flex items-center justify-between">
+            <!-- Stats Row - Responsive -->
+            <div class="stats-grid mb-8">
+                <div class="glass-panel p-4 sm:p-6 rounded-2xl flex items-center justify-between">
                     <div>
-                        <p class="text-gray-400 text-xs uppercase tracking-wider mb-1">Total Bookings</p>
-                        <h3 class="text-3xl font-bold" id="stat-total">0</h3>
+                        <p class="text-gray-400 text-[10px] sm:text-xs uppercase tracking-wider mb-1">Total Bookings</p>
+                        <h3 class="text-2xl sm:text-3xl font-bold" id="stat-total">0</h3>
+                        <p class="text-[10px] text-gray-500 mt-1" id="stat-active-sub">Active: 0</p>
                     </div>
-                    <div class="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-white">
-                        <i data-lucide="calendar" class="w-6 h-6"></i>
+                    <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/5 flex items-center justify-center text-white">
+                        <i data-lucide="calendar" class="w-5 h-5 sm:w-6 sm:h-6"></i>
                     </div>
                 </div>
-                <div class="glass-panel p-6 rounded-2xl flex items-center justify-between">
+                <div class="glass-panel p-4 sm:p-6 rounded-2xl flex items-center justify-between">
                     <div>
-                        <p class="text-gray-400 text-xs uppercase tracking-wider mb-1">Pending Revenue</p>
-                        <h3 class="text-3xl font-bold" id="stat-revenue">$0</h3>
+                        <p class="text-gray-400 text-[10px] sm:text-xs uppercase tracking-wider mb-1">Pending Revenue</p>
+                        <h3 class="text-2xl sm:text-3xl font-bold" id="stat-revenue">R0</h3>
+                        <p class="text-[10px] text-gray-500 mt-1">from active bookings</p>
                     </div>
-                    <div class="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-white">
-                        <i data-lucide="dollar-sign" class="w-6 h-6"></i>
+                    <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/5 flex items-center justify-center text-white">
+                        <i data-lucide="dollar-sign" class="w-5 h-5 sm:w-6 sm:h-6"></i>
                     </div>
                 </div>
-                <div class="glass-panel p-6 rounded-2xl flex items-center justify-between">
+                <div class="glass-panel p-4 sm:p-6 rounded-2xl flex items-center justify-between">
                     <div>
-                        <p class="text-gray-400 text-xs uppercase tracking-wider mb-1">System Status</p>
-                        <h3 class="text-lg font-bold text-green-400">Operational</h3>
+                        <p class="text-gray-400 text-[10px] sm:text-xs uppercase tracking-wider mb-1">System Status</p>
+                        <h3 class="text-base sm:text-lg font-bold text-green-400">Operational</h3>
+                        <p class="text-[10px] text-gray-500 mt-1">Last sync: now</p>
                     </div>
-                    <div class="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-white">
-                        <i data-lucide="activity" class="w-6 h-6"></i>
+                    <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/5 flex items-center justify-center text-white">
+                        <i data-lucide="activity" class="w-5 h-5 sm:w-6 sm:h-6"></i>
                     </div>
                 </div>
             </div>
 
             <!-- Bookings Table -->
             <div class="glass-panel rounded-2xl overflow-hidden shadow-2xl border border-white/5">
-                <div class="p-6 border-b border-white/5 flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <h2 class="text-xl font-bold uppercase tracking-wider">Appointment Log</h2>
-                    <div class="flex gap-3">
-                        <button onclick="refreshData()" class="p-2 text-gray-400 hover:text-white bg-white/5 rounded-lg transition-colors" title="Refresh">
+                <div class="p-4 sm:p-6 border-b border-white/5 flex flex-col sm:flex-row justify-between items-center gap-3">
+                    <h2 class="text-lg sm:text-xl font-bold uppercase tracking-wider">Appointment Log</h2>
+                    <div class="flex gap-2">
+                        <button onclick="refreshData()" class="p-2 text-gray-400 hover:text-white bg-white/5 rounded-lg transition-colors active:scale-95" title="Refresh">
                             <i data-lucide="refresh-cw" class="w-4 h-4"></i>
                         </button>
-                        <button onclick="clearAllData()" class="px-4 py-2 text-xs font-bold uppercase text-red-500 border border-red-500/30 rounded-lg hover:bg-red-500/10 transition-colors">
+                        <button onclick="clearAllData()" class="px-3 py-2 text-xs font-bold uppercase text-red-500 border border-red-500/30 rounded-lg hover:bg-red-500/10 transition-colors active:scale-95">
                             Clear Database
                         </button>
                     </div>
                 </div>
                 
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm">
-                        <thead class="bg-white/5 text-gray-400 uppercase text-xs tracking-wider">
+                <div class="table-wrapper">
+                    <table class="booking-table w-full text-left text-xs sm:text-sm">
+                        <thead class="bg-white/5 text-gray-400 uppercase text-[10px] sm:text-xs tracking-wider">
                             <tr>
-                                <th class="p-4 font-semibold">Client</th>
-                                <th class="p-4 font-semibold">Date & Time</th>
-                                <th class="p-4 font-semibold">Contact</th>
-                                <th class="p-4 font-semibold">Status</th>
-                                <th class="p-4 font-semibold text-right">Action</th>
+                                <th class="p-3 sm:p-4 font-semibold">Client</th>
+                                <th class="p-3 sm:p-4 font-semibold">Date & Time</th>
+                                <th class="p-3 sm:p-4 font-semibold">Contact</th>
+                                <th class="p-3 sm:p-4 font-semibold">Price</th>
+                                <th class="p-3 sm:p-4 font-semibold">Status</th>
+                                <th class="p-3 sm:p-4 font-semibold text-right">Action</th>
                             </tr>
                         </thead>
                         <tbody id="bookings-table-body" class="divide-y divide-white/5">
-                            <!-- Rows injected via JS -->
+                            <!-- dynamic rows -->
                         </tbody>
                     </table>
                 </div>
                 
                 <!-- Empty State -->
-                <div id="empty-state" class="hidden p-12 text-center">
-                    <div class="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-500">
-                        <i data-lucide="inbox" class="w-8 h-8"></i>
+                <div id="empty-state" class="hidden p-8 sm:p-12 text-center">
+                    <div class="w-14 h-14 sm:w-16 sm:h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-3 text-gray-500">
+                        <i data-lucide="inbox" class="w-7 h-7 sm:w-8 sm:h-8"></i>
                     </div>
-                    <h3 class="text-lg font-medium text-white">No Appointments</h3>
-                    <p class="text-gray-500 text-sm mt-2">Bookings made on the public site will appear here.</p>
+                    <h3 class="text-base sm:text-lg font-medium text-white">No Appointments</h3>
+                    <p class="text-gray-500 text-xs sm:text-sm mt-1">Bookings made on the public site will appear here.</p>
                 </div>
             </div>
         </main>
     </div>
 
     <script>
-        // Initialize Icons
-        lucide.createIcons();
-
-        // --- Authentication Logic ---
-        const ADMIN_USER = "admin";
-        const ADMIN_PASS = "admin123"; // Simple mock password
-
-        function checkSession() {
-            if (sessionStorage.getItem('barberAuth') === 'true') {
-                document.getElementById('login-overlay').classList.add('hidden');
-                document.getElementById('dashboard-content').classList.remove('hidden');
-                loadBookings();
-            }
-        }
-
-        function handleLogin(e) {
-            e.preventDefault();
-            const user = document.getElementById('username').value;
-            const pass = document.getElementById('password').value;
-            const errorMsg = document.getElementById('login-error');
-
-            if (user === ADMIN_USER && pass === ADMIN_PASS) {
-                sessionStorage.setItem('barberAuth', 'true');
-                checkSession();
-            } else {
-                errorMsg.classList.remove('hidden');
-                // Shake animation logic could go here
-                const form = document.getElementById('login-form');
-                form.classList.add('animate-pulse');
-                setTimeout(() => form.classList.remove('animate-pulse'), 500);
-            }
-        }
-
-        function logout() {
-            sessionStorage.removeItem('barberAuth');
-            location.reload();
-        }
-
-        // --- Dashboard Logic ---
+        // Storage key – must match the public booking system
         const STORAGE_KEY = 'premiumBarberBookings';
-
+        
+        // Admin credentials
+        const ADMIN_USER = "admin";
+        const ADMIN_PASS = "admin123";
+        
+        // Helper: parse local date+time to Date object (same as public system)
+        function parseLocalDateTime(dateKey, timeStr) {
+            const [year, month, day] = dateKey.split('-').map(Number);
+            const [timePart, modifier] = timeStr.split(' ');
+            let [hour, minute] = timePart.split(':').map(Number);
+            if (modifier === 'PM' && hour !== 12) hour += 12;
+            if (modifier === 'AM' && hour === 12) hour = 0;
+            return new Date(year, month - 1, day, hour, minute);
+        }
+        
+        // Compute late fee based on time (same rule as public)
+        function computeLateFee(timeStr) {
+            return timeStr === "07:30 PM" ? 50 : 0;
+        }
+        
+        // Get all bookings from localStorage
+        function getBookings() {
+            return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+        }
+        
+        // Save bookings
+        function saveBookings(bookings) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings));
+        }
+        
+        // Format date for display
+        function formatDisplayDate(dateKey) {
+            if (!dateKey) return 'Invalid date';
+            const [year, month, day] = dateKey.split('-').map(Number);
+            const d = new Date(year, month - 1, day);
+            return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        }
+        
+        // Update stats and table
         function loadBookings() {
-            const bookings = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+            const bookings = getBookings();
             const tbody = document.getElementById('bookings-table-body');
             const emptyState = document.getElementById('empty-state');
             
-            // Update Stats
-            document.getElementById('stat-total').innerText = bookings.length;
-            document.getElementById('stat-revenue').innerText = '$' + (bookings.length * 50).toFixed(2);
-
+            // Calculate stats
+            const total = bookings.length;
+            const activeBookings = bookings.filter(b => !b.cancelled);
+            const activeCount = activeBookings.length;
+            const totalRevenue = activeBookings.reduce((sum, b) => sum + (b.totalPrice || 0), 0);
+            
+            document.getElementById('stat-total').innerText = total;
+            document.getElementById('stat-active-sub').innerHTML = `Active: ${activeCount}`;
+            document.getElementById('stat-revenue').innerHTML = `R${totalRevenue.toFixed(2)}`;
+            
             tbody.innerHTML = '';
-
+            
             if (bookings.length === 0) {
                 emptyState.classList.remove('hidden');
                 return;
             } else {
                 emptyState.classList.add('hidden');
             }
-
-            // Sort by Date (Newest first)
-            bookings.sort((a, b) => new Date(b.rawDate) - new Date(a.rawDate));
-
-            bookings.forEach((booking, index) => {
+            
+            // Sort by date (newest first)
+            const sorted = [...bookings].sort((a, b) => new Date(b.rawDate) - new Date(a.rawDate));
+            
+            sorted.forEach(booking => {
                 const row = document.createElement('tr');
                 row.className = "hover:bg-white/5 transition-colors group";
                 
-                // Format Date for display
-                const dateObj = new Date(booking.rawDate);
-                const dateStr = dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-
+                const isCancelled = booking.cancelled === true;
+                const statusBadge = isCancelled 
+                    ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium badge-cancelled">Cancelled</span>'
+                    : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium badge-confirmed">Confirmed</span>';
+                
+                // Action button: if confirmed -> Cancel; if cancelled -> Delete
+                const actionBtn = isCancelled
+                    ? `<button onclick="deleteBookingPermanent('${booking.id}')" class="text-red-500 hover:text-red-400 transition-colors p-2 hover:bg-red-500/10 rounded-lg action-btn" title="Permanently delete"><i data-lucide="trash-2" class="w-4 h-4"></i></button>`
+                    : `<button onclick="cancelBookingById('${booking.id}')" class="text-gray-500 hover:text-red-500 transition-colors p-2 hover:bg-red-500/10 rounded-lg action-btn" title="Cancel appointment"><i data-lucide="x-circle" class="w-4 h-4"></i></button>`;
+                
                 row.innerHTML = `
-                    <td class="p-4">
-                        <div class="font-bold text-white">${booking.name}</div>
-                        <div class="text-xs text-gray-500">${booking.service}</div>
+                    <td class="p-3 sm:p-4">
+                        <div class="font-bold text-white text-sm sm:text-base">${escapeHtml(booking.name)}</div>
+                        <div class="text-[10px] sm:text-xs text-gray-500">${escapeHtml(booking.service)}</div>
                     </td>
-                    <td class="p-4">
-                        <div class="text-white font-medium">${dateStr}</div>
-                        <div class="text-xs text-gray-400">${booking.time}</div>
+                    <td class="p-3 sm:p-4">
+                        <div class="text-white text-sm sm:text-base">${booking.dateStr || formatDisplayDate(booking.dateKey)}</div>
+                        <div class="text-[10px] sm:text-xs text-gray-400">${booking.time}</div>
                     </td>
-                    <td class="p-4">
-                        <div class="text-gray-300 text-sm">${booking.phone}</div>
-                        <div class="text-gray-500 text-xs truncate max-w-[150px]">${booking.email}</div>
+                    <td class="p-3 sm:p-4">
+                        <div class="text-gray-300 text-sm sm:text-base">${escapeHtml(booking.phone)}</div>
+                        <div class="text-gray-500 text-[10px] sm:text-xs truncate max-w-[140px] sm:max-w-[200px]">${escapeHtml(booking.email || '—')}</div>
                     </td>
-                    <td class="p-4">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
-                            Confirmed
-                        </span>
+                    <td class="p-3 sm:p-4 font-medium text-green-400 whitespace-nowrap">
+                        R${(booking.totalPrice || 0).toFixed(2)}
+                        ${booking.lateFee ? `<div class="text-[9px] text-gray-500">+R${booking.lateFee} late</div>` : ''}
                     </td>
-                    <td class="p-4 text-right">
-                        <button onclick="cancelBooking(${index})" class="text-gray-500 hover:text-red-500 transition-colors p-2 hover:bg-red-500/10 rounded-lg">
-                            <i data-lucide="trash-2" class="w-4 h-4"></i>
-                        </button>
-                    </td>
+                    <td class="p-3 sm:p-4">${statusBadge}</td>
+                    <td class="p-3 sm:p-4 text-right">${actionBtn}</td>
                 `;
                 tbody.appendChild(row);
             });
             
-            // Re-initialize icons for new elements
-            lucide.createIcons();
+            // Reinitialize icons for new elements
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         }
-
-        function cancelBooking(index) {
-            if(confirm("Are you sure you want to cancel this appointment?")) {
-                let bookings = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-                // Note: Since we sorted for display, the index might not match the original array if we didn't re-sort. 
-                // However, for this simple demo, we will just reload to be safe or use a unique ID.
-                // Better approach: Find by unique identifier or reload.
-                // For simplicity in this single-file demo, let's just filter by the data in that row.
-                // Actually, let's just reload the array logic.
-                
-                // Re-fetch to ensure we delete the correct one based on current sort order
-                let currentBookings = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-                currentBookings.sort((a, b) => new Date(b.rawDate) - new Date(a.rawDate));
-                
-                const bookingToDelete = currentBookings[index];
-                
-                // Remove from original array (filter by rawDate + Time + Name to be safe-ish)
-                const updatedBookings = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-                const finalBookings = updatedBookings.filter(b => 
-                    !(b.rawDate === bookingToDelete.rawDate && b.time === bookingToDelete.time && b.name === bookingToDelete.name)
-                );
-                
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(finalBookings));
+        
+        // Cancel a confirmed booking (marks as cancelled, applies fee if within 5h)
+        function cancelBookingById(bookingId) {
+            const bookings = getBookings();
+            const booking = bookings.find(b => b.id == bookingId);
+            if (!booking) return;
+            if (booking.cancelled) {
+                alert("This booking is already cancelled.");
+                return;
+            }
+            
+            // Check time until appointment
+            const appointmentTime = parseLocalDateTime(booking.dateKey, booking.time);
+            const now = new Date();
+            const hoursDiff = (appointmentTime - now) / (1000 * 60 * 60);
+            
+            let confirmMsg = `Cancel appointment for ${booking.name} on ${booking.dateStr} at ${booking.time}?`;
+            let fee = 0;
+            if (hoursDiff <= 5 && hoursDiff > 0) {
+                fee = 20;
+                confirmMsg = `⚠️ Cancelling within ${hoursDiff.toFixed(1)} hours will incur a R20 cancellation fee. ${confirmMsg}`;
+            } else if (hoursDiff <= 0) {
+                confirmMsg = `This appointment is in the past. Cancelling will mark it as cancelled with no refund. ${confirmMsg}`;
+            }
+            
+            if (confirm(confirmMsg)) {
+                booking.cancelled = true;
+                if (fee > 0) booking.cancellationFee = fee;
+                else if (hoursDiff <= 0) booking.cancellationFee = 0;
+                // Keep totalPrice as is, but we could optionally subtract? For simplicity, we keep original total.
+                saveBookings(bookings);
                 loadBookings();
+                alert("Booking has been cancelled.");
             }
         }
-
+        
+        // Permanently delete a cancelled booking
+        function deleteBookingPermanent(bookingId) {
+            if (confirm("⚠️ This will permanently remove the booking from the system. This action cannot be undone. Continue?")) {
+                let bookings = getBookings();
+                const filtered = bookings.filter(b => b.id != bookingId);
+                if (filtered.length === bookings.length) {
+                    alert("Booking not found.");
+                    return;
+                }
+                saveBookings(filtered);
+                loadBookings();
+                alert("Booking permanently deleted.");
+            }
+        }
+        
+        // Clear entire database (all bookings)
         function clearAllData() {
-            if(confirm("WARNING: This will delete ALL booking history. This cannot be undone.")) {
+            if (confirm("🚨 WARNING: This will delete ALL booking records (including cancelled). This action is irreversible. Are you absolutely sure?")) {
                 localStorage.removeItem(STORAGE_KEY);
                 loadBookings();
+                alert("All bookings have been cleared.");
             }
         }
-
+        
         function refreshData() {
             loadBookings();
         }
-
-        // Initialize
-        checkSession();
-
+        
+        // Helper to escape HTML
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+        
+        // --- Authentication ---
+        function checkSession() {
+            if (sessionStorage.getItem('barberAuth') === 'true') {
+                document.getElementById('login-overlay').classList.add('hidden');
+                document.getElementById('dashboard-content').classList.remove('hidden');
+                loadBookings();
+                // Auto-refresh every 30 seconds (optional)
+                if (window.autoRefreshInterval) clearInterval(window.autoRefreshInterval);
+                window.autoRefreshInterval = setInterval(() => {
+                    if (document.getElementById('dashboard-content') && !document.getElementById('dashboard-content').classList.contains('hidden')) {
+                        loadBookings();
+                    }
+                }, 30000);
+            }
+        }
+        
+        function handleLogin(e) {
+            e.preventDefault();
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+            const errorMsg = document.getElementById('login-error');
+            
+            if (user === ADMIN_USER && pass === ADMIN_PASS) {
+                sessionStorage.setItem('barberAuth', 'true');
+                checkSession();
+            } else {
+                errorMsg.classList.remove('hidden');
+                const form = document.getElementById('login-form');
+                form.classList.add('animate-pulse');
+                setTimeout(() => form.classList.remove('animate-pulse'), 500);
+            }
+        }
+        
+        function logout() {
+            if (window.autoRefreshInterval) clearInterval(window.autoRefreshInterval);
+            sessionStorage.removeItem('barberAuth');
+            location.reload();
+        }
+        
+        // Expose functions to global scope
+        window.handleLogin = handleLogin;
+        window.logout = logout;
+        window.loadBookings = loadBookings;
+        window.cancelBookingById = cancelBookingById;
+        window.deleteBookingPermanent = deleteBookingPermanent;
+        window.clearAllData = clearAllData;
+        window.refreshData = refreshData;
+        
+        // Initialize icons and session check
+        document.addEventListener('DOMContentLoaded', () => {
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+            checkSession();
+        });
     </script>
 </body>
 </html>

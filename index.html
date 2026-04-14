@@ -391,29 +391,41 @@
 </div>
         </section>
 
-        <!-- Admin Section -->
-        <section id="adminSection" class="max-w-6xl mx-auto hidden">
-            <!-- Admin Login -->
-            <div id="adminLogin" class="max-w-md mx-auto mt-10">
-                <div class="glass rounded-2xl p-8">
-                    <div class="text-center mb-6">
-                        <div class="w-16 h-16 rounded-full glass-gold flex items-center justify-center mx-auto mb-4">
-                            <i data-lucide="shield" class="w-8 h-8 text-gold-400"></i>
-                        </div>
-                        <h3 class="text-2xl font-bold">Admin Dashboard</h3>
-                        <p class="text-dark-300 text-sm mt-2">Enter admin credentials to continue</p>
-                    </div>
-                    <div class="flex flex-col gap-4">
-                        <div>
-                            <label class="text-sm text-dark-200 mb-1 block">Password</label>
-                            <input type="password" id="adminPassword" placeholder="Enter admin password" class="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-dark-400 focus:border-gold-400 focus:ring-1 focus:ring-gold-400/20 transition-all" onkeypress="if(event.key==='Enter')adminLogin()">
-                        </div>
-                        <button onclick="adminLogin()" class="btn-gold w-full py-3 rounded-xl font-semibold text-dark-900">
-                            Login
-                        </button>
-                    </div>
+<!-- Admin Section -->
+<section id="adminSection" class="max-w-6xl mx-auto hidden">
+    <!-- Admin Login -->
+    <div id="adminLogin" class="max-w-md mx-auto mt-10">
+        <div class="glass rounded-2xl p-8">
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 rounded-full glass-gold flex items-center justify-center mx-auto mb-4">
+                    <i data-lucide="shield" class="w-8 h-8 text-gold-400"></i>
                 </div>
+                <h3 class="text-2xl font-bold">Admin Dashboard</h3>
+                <p class="text-dark-300 text-sm mt-2">Enter admin credentials to continue</p>
             </div>
+            <div class="flex flex-col gap-4">
+                <!-- NEW: Username Field -->
+                <div>
+                    <label class="text-sm text-dark-200 mb-1 block">Username</label>
+                    <input type="text" id="adminUsername" placeholder="Enter username" class="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-dark-400 focus:border-gold-400 focus:ring-1 focus:ring-gold-400/20 transition-all">
+                </div>
+                <!-- Password Field -->
+                <div>
+                    <label class="text-sm text-dark-200 mb-1 block">Password</label>
+                    <input type="password" id="adminPassword" placeholder="Enter admin password" class="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-dark-400 focus:border-gold-400 focus:ring-1 focus:ring-gold-400/20 transition-all" onkeypress="if(event.key==='Enter')adminLogin()">
+                </div>
+                <button onclick="adminLogin()" class="btn-gold w-full py-3 rounded-xl font-semibold text-dark-900">
+                    Login
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard (keep the rest of your existing dashboard code here unchanged) -->
+    <div id="adminDashboard" class="hidden">
+        <!-- ... your existing dashboard content ... -->
+    </div>
+</section>
 
             <!-- Admin Dashboard -->
             <div id="adminDashboard" class="hidden">
@@ -1530,30 +1542,31 @@ const EMAILJS_TEMPLATE_ID = "template_4fg78jn";
         showNotification('Error rescheduling booking', 'error');
     }
 }
-        // ============================================
-        // ADMIN
-        // ============================================
-        function adminLogin() {
-            const password = document.getElementById('adminPassword').value;
-            
-            if (password === adminState.adminPassword) {
-                adminState.isLoggedIn = true;
-                document.getElementById('adminLogin').classList.add('hidden');
-                document.getElementById('adminDashboard').classList.remove('hidden');
-                document.getElementById('adminNavLink').classList.remove('hidden');
-                loadAdminBookings();
-                showNotification('Welcome back, Admin!', 'success');
-            } else {
-                showNotification('Invalid password', 'error');
-            }
-        }
+     // ============================================
+// ADMIN
+// ============================================
+function adminLogin() {
+    const username = document.getElementById('adminUsername').value.trim();
+    const password = document.getElementById('adminPassword').value;
+    
+    if (username === adminState.adminUsername && password === adminState.adminPassword) {
+        adminState.isLoggedIn = true;
+        document.getElementById('adminLogin').classList.add('hidden');
+        document.getElementById('adminDashboard').classList.remove('hidden');
+        loadAdminBookings();
+        showNotification('Welcome back, Admin!', 'success');
+    } else {
+        showNotification('Invalid username or password', 'error');
+    }
+}
 
-        function adminLogout() {
-            adminState.isLoggedIn = false;
-            document.getElementById('adminLogin').classList.remove('hidden');
-            document.getElementById('adminDashboard').classList.add('hidden');
-            document.getElementById('adminPassword').value = '';
-        }
+  function adminLogout() {
+    adminState.isLoggedIn = false;
+    document.getElementById('adminLogin').classList.remove('hidden');
+    document.getElementById('adminDashboard').classList.add('hidden');
+    document.getElementById('adminUsername').value = '';
+    document.getElementById('adminPassword').value = '';
+}
 
         async function loadAdminBookings() {
             try {

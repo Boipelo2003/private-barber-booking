@@ -2,630 +2,1449 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>PRIVATE BARBER | Admin Dashboard + Analytics</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BarberPro - Admin Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Playfair+Display:ital,wght@1,400;1,600&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Chart.js for analytics -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <style>
-        * {
-            -webkit-tap-highlight-color: transparent;
-        }
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #050505;
-            color: #ffffff;
-        }
-        .serif-font { font-family: 'Playfair Display', serif; }
-        .glass-panel {
-            background: rgba(20, 20, 20, 0.7);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-        .input-field {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            transition: all 0.3s;
-        }
-        .input-field:focus {
-            background: rgba(255, 255, 255, 0.1);
-            border-color: #ffffff;
-            outline: none;
-        }
-        .fade-in { animation: fadeIn 0.5s ease-in-out; }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #0a0a0a; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #555; }
-        
-        button, .action-btn {
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        button:active, .action-btn:active {
-            transform: scale(0.96);
-        }
-        
-        .table-wrapper {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-        }
-        
-        .stats-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 1rem;
-        }
-        @media (min-width: 640px) {
-            .stats-grid { grid-template-columns: repeat(3, 1fr); }
-        }
-        
-        .booking-table th, .booking-table td {
-            padding: 0.75rem 0.5rem;
-            white-space: nowrap;
-        }
-        @media (min-width: 640px) {
-            .booking-table th, .booking-table td {
-                padding: 1rem;
-                white-space: normal;
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        gold: {
+                            100: '#FDF5E6',
+                            200: '#F5E6C8',
+                            300: '#E8D5A3',
+                            400: '#D4AF37',
+                            500: '#C5A028',
+                            600: '#A88620',
+                            700: '#8B6F18',
+                        },
+                        dark: {
+                            50: '#F5F5F5',
+                            100: '#E5E5E5',
+                            200: '#CCCCCC',
+                            300: '#999999',
+                            400: '#666666',
+                            500: '#333333',
+                            600: '#1F1F1F',
+                            700: '#1A1A1A',
+                            800: '#111111',
+                            900: '#0A0A0A',
+                            950: '#050505',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    }
+                }
             }
         }
-        
-        .badge-confirmed {
-            background-color: rgba(34, 197, 94, 0.1);
-            color: #4ade80;
-            border: 1px solid rgba(74, 222, 128, 0.2);
+    </script>
+    <link href="https://cdn.jsdelivr.net/npm/fontsource-inter@5.0.16/index.css" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: linear-gradient(135deg, #050505 0%, #111111 50%, #0A0A0A 100%);
+            color: #F5F5F5;
+            min-height: 100vh;
         }
-        .badge-cancelled {
-            background-color: rgba(239, 68, 68, 0.1);
-            color: #f87171;
-            border: 1px solid rgba(248, 113, 113, 0.2);
+        .glass {
+            background: rgba(26, 26, 26, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(212, 175, 55, 0.15);
         }
-        /* Analytics cards */
-        .chart-card {
-            background: rgba(20,20,20,0.6);
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 1rem;
-            padding: 1rem;
+        .glass-light {
+            background: rgba(31, 31, 31, 0.4);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
         }
-        .view-toggle-btn {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.1);
-            transition: all 0.2s;
+        .glass-gold {
+            background: rgba(212, 175, 55, 0.08);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(212, 175, 55, 0.3);
         }
-        .view-toggle-btn.active {
-            background: white;
-            color: black;
-            border-color: white;
+        .gold-glow { box-shadow: 0 0 20px rgba(212, 175, 55, 0.15); }
+        .gold-glow-hover:hover { box-shadow: 0 0 30px rgba(212, 175, 55, 0.3); }
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        .slide-up { animation: slideUp 0.5s ease-out; }
+        .slide-in-right { animation: slideInRight 0.4s ease-out; }
+        .slide-in-left { animation: slideInLeft 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideInRight { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes slideInLeft { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .spinner { animation: spin 1s linear infinite; }
+        .btn-gold {
+            background: linear-gradient(135deg, #D4AF37 0%, #C5A028 50%, #A88620 100%);
+            transition: all 0.3s ease;
+        }
+        .btn-gold:hover {
+            background: linear-gradient(135deg, #E5C44A 0%, #D4AF37 50%, #C5A028 100%);
+            transform: translateY(-1px);
+        }
+        .btn-gold:active { transform: translateY(0); }
+        .btn-outline-gold {
+            border: 1px solid #D4AF37;
+            color: #D4AF37;
+            transition: all 0.3s ease;
+        }
+        .btn-outline-gold:hover { background: rgba(212, 175, 55, 0.1); }
+        .table-row-hover:hover { background: rgba(212, 175, 55, 0.05); }
+        .tab-active {
+            border-bottom: 2px solid #D4AF37;
+            color: #D4AF37;
+        }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #111; }
+        ::-webkit-scrollbar-thumb { background: #D4AF37; border-radius: 3px; }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #D4AF37;
+            box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2);
+        }
+        .notification { animation: slideDown 0.3s ease-out; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        .modal-overlay {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 300px;
+        }
+        @media (max-width: 768px) {
+            .chart-container { height: 200px; }
         }
     </style>
-    <!-- Firebase SDK -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.2/firebase-app.js";
-        import { getFirestore, collection, addDoc, getDocs, query, where, updateDoc, doc, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.2/firebase-firestore.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyB05r9ei92egPbcnbFKQNK0mso25DHcBss",
-            authDomain: "private-barber-booking-67cde.firebaseapp.com",
-            projectId: "private-barber-booking-67cde",
-            storageBucket: "private-barber-booking-67cde.firebasestorage.app",
-            messagingSenderId: "889141435520",
-            appId: "1:889141435520:web:bf645a2b8584b853225a65",
-            measurementId: "G-KNCJ003KNP"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-
-        window.db = db;
-        window.collection = collection;
-        window.addDoc = addDoc;
-        window.getDocs = getDocs;
-        window.query = query;
-        window.where = where;
-        window.updateDoc = updateDoc;
-        window.doc = doc;
-        window.deleteDoc = deleteDoc;
-        window.getDoc = getDoc;
-    </script>
 </head>
-<body class="antialiased min-h-screen flex flex-col">
+<body>
+    <!-- Notifications Container -->
+    <div id="notificationsContainer" class="fixed top-4 right-4 z-[100] flex flex-col gap-2"></div>
 
-    <!-- LOGIN OVERLAY -->
-    <div id="login-overlay" class="fixed inset-0 z-[100] bg-[#050505] flex items-center justify-center p-4">
-        <div class="absolute inset-0 bg-[url('https://image.qwenlm.ai/public_source/553aff0e-e70d-4625-9778-1e3f0a132b81/1cdda2719-31f9-4a7c-9175-4844aa289a15.png')] bg-cover bg-center opacity-20"></div>
-        <div class="relative w-full max-w-md bg-[#111] border border-white/10 rounded-2xl p-6 sm:p-8 shadow-2xl fade-in">
-            <div class="text-center mb-6">
-                <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-white/5 border border-white/10 mb-3">
-                    <i data-lucide="shield-check" class="w-7 h-7 text-white"></i>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="min-h-screen flex items-center justify-center p-4">
+        <div class="glass rounded-3xl p-8 w-full max-w-md slide-up">
+            <div class="text-center mb-8">
+                <div class="w-20 h-20 rounded-2xl glass-gold flex items-center justify-center mx-auto mb-6 gold-glow">
+                    <i data-lucide="shield" class="w-10 h-10 text-gold-400"></i>
                 </div>
-                <h2 class="text-xl sm:text-2xl font-bold uppercase tracking-widest">Restricted Access</h2>
-                <p class="text-gray-500 text-xs sm:text-sm mt-1">Authorized Personnel Only</p>
+                <h1 class="text-3xl font-bold mb-2">Admin <span class="text-gold-400">Dashboard</span></h1>
+                <p class="text-dark-300">Enter credentials to access your dashboard</p>
             </div>
-            <form id="login-form" onsubmit="handleLogin(event)" class="space-y-4">
+            <div class="flex flex-col gap-4">
                 <div>
-                    <label class="block text-xs uppercase text-gray-500 mb-1">Username</label>
-                    <div class="relative">
-                        <i data-lucide="user" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500"></i>
-                        <input type="text" id="username" class="input-field w-full rounded-lg py-2.5 pl-10 pr-4 text-white placeholder-gray-600 text-base" placeholder="admin" required>
-                    </div>
+                    <label class="text-sm text-dark-200 mb-1 block">Username</label>
+                    <input type="text" id="adminUsername" placeholder="admin" class="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-dark-400 focus:border-gold-400 transition-all" value="admin">
                 </div>
                 <div>
-                    <label class="block text-xs uppercase text-gray-500 mb-1">Password</label>
-                    <div class="relative">
-                        <i data-lucide="lock" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500"></i>
-                        <input type="password" id="password" class="input-field w-full rounded-lg py-2.5 pl-10 pr-4 text-white placeholder-gray-600 text-base" placeholder="••••••" required>
-                    </div>
+                    <label class="text-sm text-dark-200 mb-1 block">Password</label>
+                    <input type="password" id="adminPassword" placeholder="Enter password" class="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-dark-400 focus:border-gold-400 transition-all" onkeypress="if(event.key==='Enter')handleLogin()">
                 </div>
-                <div id="login-error" class="text-red-500 text-xs text-center hidden">Invalid credentials</div>
-                <button type="submit" class="w-full bg-white text-black font-bold uppercase tracking-wider py-3 rounded-lg hover:bg-gray-200 transition-colors mt-2 active:scale-95">
-                    Enter Dashboard
+                <button onclick="handleLogin()" class="btn-gold w-full py-3 rounded-xl font-semibold text-dark-900 text-lg mt-2">
+                    Sign In
                 </button>
-            </form>
-            <div class="mt-5 text-center">
-                <a href="index.html" class="text-xs text-gray-600 hover:text-white transition-colors flex items-center justify-center gap-2">
-                    <i data-lucide="arrow-left" class="w-3 h-3"></i> Return to Public Site
-                </a>
             </div>
         </div>
     </div>
 
-    <!-- DASHBOARD CONTENT (hidden until login) -->
-    <div id="dashboard-content" class="hidden min-h-screen flex flex-col">
-        
-        <!-- Sticky Navbar with Analytics toggle -->
-        <nav class="glass-panel border-b border-white/5 sticky top-0 z-40">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex items-center justify-between h-16 sm:h-20">
-                    <div class="flex items-center gap-2 sm:gap-3">
-                        <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-white to-gray-400 flex items-center justify-center text-black font-bold text-sm sm:text-xl">P</div>
-                        <div>
-                            <span class="font-bold text-sm sm:text-lg tracking-widest uppercase block">Private Barber</span>
-                            <span class="text-[10px] sm:text-xs text-green-500 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> Live System</span>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <button id="toggleViewBtn" onclick="toggleView()" class="text-xs sm:text-sm font-medium text-gray-400 hover:text-white transition-colors px-3 py-2 rounded-full active:bg-white/10">
-                            📊 Analytics
-                        </button>
-                        <button onclick="logout()" class="text-xs sm:text-sm font-medium text-gray-400 hover:text-white transition-colors px-3 py-2 rounded-full active:bg-white/10">
-                            Logout
-                        </button>
-                    </div>
+<!-- Main Dashboard -->
+<div id="dashboardScreen" class="hidden">
+    <!-- Header -->
+    <header class="fixed top-0 left-0 right-0 z-50 glass">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-gold-400 flex items-center justify-center">
+                    <i data-lucide="scissors" class="w-5 h-5 text-dark-900"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold">Barber<span class="text-gold-400">Pro</span> Admin</h1>
                 </div>
             </div>
-        </nav>
+            <div class="flex items-center gap-3">
+                <span class="text-sm text-dark-300 hidden sm:block">Last updated: <span id="lastUpdated" class="text-dark-200">Just now</span></span>
+                <button onclick="refreshData()" class="btn-outline-gold px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-sm">
+                    <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline">Refresh</span>
+                </button>
+                <a href="index.html" class="text-dark-300 hover:text-white text-sm flex items-center gap-1 transition-colors">
+                    <i data-lucide="home" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline">Home</span>
+                </a>
+                <button onclick="handleLogout()" class="text-dark-300 hover:text-white text-sm flex items-center gap-1 transition-colors">
+                    <i data-lucide="log-out" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline">Logout</span>
+                </button>
+            </div>
+        </div>
+    </header>
 
         <!-- Main Content -->
-        <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 w-full">
-            
-            <!-- Stats Row - always visible -->
-            <div class="stats-grid mb-8">
-                <div class="glass-panel p-4 sm:p-6 rounded-2xl flex items-center justify-between">
-                    <div>
-                        <p class="text-gray-400 text-[10px] sm:text-xs uppercase tracking-wider mb-1">Total Bookings</p>
-                        <h3 class="text-2xl sm:text-3xl font-bold" id="stat-total">0</h3>
-                        <p class="text-[10px] text-gray-500 mt-1" id="stat-active-sub">Active: 0</p>
-                    </div>
-                    <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/5 flex items-center justify-center text-white">
-                        <i data-lucide="calendar" class="w-5 h-5 sm:w-6 sm:h-6"></i>
-                    </div>
+        <main class="pt-20 pb-8 px-4">
+            <div class="max-w-7xl mx-auto">
+                <!-- Navigation Tabs -->
+                <div class="flex items-center gap-6 mb-8 border-b border-dark-500 overflow-x-auto">
+                    <button onclick="switchTab('overview')" class="tab-btn tab-active pb-3 text-sm font-semibold whitespace-nowrap" data-tab="overview">
+                        <i data-lucide="layout-dashboard" class="w-4 h-4 inline mr-1"></i>
+                        Overview
+                    </button>
+                    <button onclick="switchTab('bookings')" class="tab-btn text-dark-300 hover:text-white pb-3 text-sm font-semibold whitespace-nowrap transition-colors" data-tab="bookings">
+                        <i data-lucide="calendar" class="w-4 h-4 inline mr-1"></i>
+                        All Bookings
+                    </button>
+                    <button onclick="switchTab('calendar')" class="tab-btn text-dark-300 hover:text-white pb-3 text-sm font-semibold whitespace-nowrap transition-colors" data-tab="calendar">
+                        <i data-lucide="calendar-range" class="w-4 h-4 inline mr-1"></i>
+                        Calendar View
+                    </button>
+                    <button onclick="switchTab('analytics')" class="tab-btn text-dark-300 hover:text-white pb-3 text-sm font-semibold whitespace-nowrap transition-colors" data-tab="analytics">
+                        <i data-lucide="bar-chart-3" class="w-4 h-4 inline mr-1"></i>
+                        Analytics
+                    </button>
+                    <button onclick="switchTab('settings')" class="tab-btn text-dark-300 hover:text-white pb-3 text-sm font-semibold whitespace-nowrap transition-colors" data-tab="settings">
+                        <i data-lucide="settings" class="w-4 h-4 inline mr-1"></i>
+                        Settings
+                    </button>
                 </div>
-                <div class="glass-panel p-4 sm:p-6 rounded-2xl flex items-center justify-between">
-                    <div>
-                        <p class="text-gray-400 text-[10px] sm:text-xs uppercase tracking-wider mb-1">Pending Revenue</p>
-                        <h3 class="text-2xl sm:text-3xl font-bold" id="stat-revenue">R0</h3>
-                        <p class="text-[10px] text-gray-500 mt-1">from active bookings</p>
-                    </div>
-                    <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/5 flex items-center justify-center text-white">
-                        <i data-lucide="dollar-sign" class="w-5 h-5 sm:w-6 sm:h-6"></i>
-                    </div>
-                </div>
-                <div class="glass-panel p-4 sm:p-6 rounded-2xl flex items-center justify-between">
-                    <div>
-                        <p class="text-gray-400 text-[10px] sm:text-xs uppercase tracking-wider mb-1">System Status</p>
-                        <h3 class="text-base sm:text-lg font-bold text-green-400">Operational</h3>
-                        <p class="text-[10px] text-gray-500 mt-1">Last sync: now</p>
-                    </div>
-                    <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/5 flex items-center justify-center text-white">
-                        <i data-lucide="activity" class="w-5 h-5 sm:w-6 sm:h-6"></i>
-                    </div>
-                </div>
-            </div>
 
-            <!-- VIEW 1: Appointments Table -->
-            <div id="appointments-view" class="glass-panel rounded-2xl overflow-hidden shadow-2xl border border-white/5">
-                <div class="p-4 sm:p-6 border-b border-white/5 flex flex-col sm:flex-row justify-between items-center gap-3">
-                    <h2 class="text-lg sm:text-xl font-bold uppercase tracking-wider">Appointment Log</h2>
-                    <div class="flex gap-2">
-                        <button onclick="refreshData()" class="p-2 text-gray-400 hover:text-white bg-white/5 rounded-lg transition-colors active:scale-95" title="Refresh">
-                            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-                        </button>
-                        <button onclick="clearAllData()" class="px-3 py-2 text-xs font-bold uppercase text-red-500 border border-red-500/30 rounded-lg hover:bg-red-500/10 transition-colors active:scale-95">
-                            Clear Database
-                        </button>
+                <!-- Overview Tab -->
+                <div id="overviewTab" class="tab-content fade-in">
+                    <!-- Stats Cards -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                        <div class="glass rounded-2xl p-5 gold-glow-hover slide-up" style="animation-delay: 0.1s">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                                    <i data-lucide="calendar-check" class="w-5 h-5 text-blue-400"></i>
+                                </div>
+                                <span class="text-xs text-dark-300">Total</span>
+                            </div>
+                            <p class="text-3xl font-bold" id="statTotalBookings">0</p>
+                            <p class="text-xs text-dark-300 mt-1">All bookings</p>
+                        </div>
+                        <div class="glass rounded-2xl p-5 gold-glow-hover slide-up" style="animation-delay: 0.2s">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
+                                    <i data-lucide="clock" class="w-5 h-5 text-green-400"></i>
+                                </div>
+                                <span class="text-xs text-dark-300">Upcoming</span>
+                            </div>
+                            <p class="text-3xl font-bold text-green-400" id="statUpcoming">0</p>
+                            <p class="text-xs text-dark-300 mt-1">Active bookings</p>
+                        </div>
+                        <div class="glass rounded-2xl p-5 gold-glow-hover slide-up" style="animation-delay: 0.3s">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="w-10 h-10 rounded-lg bg-gold-400/10 flex items-center justify-center">
+                                    <i data-lucide="banknote" class="w-5 h-5 text-gold-400"></i>
+                                </div>
+                                <span class="text-xs text-dark-300">Revenue</span>
+                            </div>
+                            <p class="text-3xl font-bold text-gold-400" id="statRevenue">R0</p>
+                            <p class="text-xs text-dark-300 mt-1">This month</p>
+                        </div>
+                        <div class="glass rounded-2xl p-5 gold-glow-hover slide-up" style="animation-delay: 0.4s">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center">
+                                    <i data-lucide="x-circle" class="w-5 h-5 text-red-400"></i>
+                                </div>
+                                <span class="text-xs text-dark-300">Cancelled</span>
+                            </div>
+                            <p class="text-3xl font-bold text-red-400" id="statCancelled">0</p>
+                            <p class="text-xs text-dark-300 mt-1">This month</p>
+                        </div>
                     </div>
-                </div>
-                <div class="table-wrapper">
-                    <table class="booking-table w-full text-left text-xs sm:text-sm">
-                        <thead class="bg-white/5 text-gray-400 uppercase text-[10px] sm:text-xs tracking-wider">
-                            废水
-                                <th class="p-3 sm:p-4 font-semibold">Client</th>
-                                <th class="p-3 sm:p-4 font-semibold">Date & Time</th>
-                                <th class="p-3 sm:p-4 font-semibold">Contact</th>
-                                <th class="p-3 sm:p-4 font-semibold">Price</th>
-                                <th class="p-3 sm:p-4 font-semibold">Status</th>
-                                <th class="p-3 sm:p-4 font-semibold text-right">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="bookings-table-body" class="divide-y divide-white/5"></tbody>
-                    </table>
-                </div>
-                <div id="empty-state" class="hidden p-8 sm:p-12 text-center">
-                    <div class="w-14 h-14 sm:w-16 sm:h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-3 text-gray-500">
-                        <i data-lucide="inbox" class="w-7 h-7 sm:w-8 sm:h-8"></i>
-                    </div>
-                    <h3 class="text-base sm:text-lg font-medium text-white">No Appointments</h3>
-                    <p class="text-gray-500 text-xs sm:text-sm mt-1">Bookings made on the public site will appear here.</p>
-                </div>
-            </div>
 
-            <!-- VIEW 2: Analytics Dashboard (hidden initially) -->
-            <div id="analytics-view" class="hidden space-y-6">
-                <div class="text-center text-sm text-gray-400 mb-2">
-                    <span class="bg-white/5 px-3 py-1 rounded-full">📈 Business Intelligence</span>
-                </div>
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div class="chart-card">
-                        <h3 class="text-sm font-bold uppercase tracking-wider mb-3 text-gray-400">Bookings (Last 14 Days)</h3>
-                        <canvas id="bookingsTrendChart" height="200"></canvas>
-                    </div>
-                    <div class="chart-card">
-                        <h3 class="text-sm font-bold uppercase tracking-wider mb-3 text-gray-400">Revenue Trend (Last 14 Days)</h3>
-                        <canvas id="revenueTrendChart" height="200"></canvas>
-                    </div>
-                </div>
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div class="chart-card">
-                        <h3 class="text-sm font-bold uppercase tracking-wider mb-3 text-gray-400">Service Popularity</h3>
-                        <canvas id="serviceChart" height="200"></canvas>
-                    </div>
-                    <div class="chart-card">
-                        <h3 class="text-sm font-bold uppercase tracking-wider mb-3 text-gray-400">Time Slot Popularity</h3>
-                        <canvas id="timeSlotChart" height="200"></canvas>
-                    </div>
-                </div>
-                <div class="chart-card">
-                    <h3 class="text-sm font-bold uppercase tracking-wider mb-3 text-gray-400">Customer Retention</h3>
-                    <div class="flex flex-col sm:flex-row justify-around items-center gap-4">
-                        <div class="text-center">
-                            <p class="text-3xl font-bold text-green-400" id="repeat-customers">0</p>
-                            <p class="text-xs text-gray-500">Repeat customers</p>
+                    <!-- Today's Schedule -->
+                    <div class="glass rounded-2xl p-6 mb-8">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold flex items-center gap-2">
+                                <i data-lucide="sun" class="w-5 h-5 text-gold-400"></i>
+                                Today's Schedule
+                            </h3>
+                            <span class="text-sm text-dark-300" id="todayDate"></span>
                         </div>
-                        <div class="text-center">
-                            <p class="text-3xl font-bold text-blue-400" id="total-customers">0</p>
-                            <p class="text-xs text-gray-500">Unique customers</p>
-                        </div>
-                        <div class="text-center">
-                            <p class="text-3xl font-bold text-yellow-400" id="retention-rate">0%</p>
-                            <p class="text-xs text-gray-500">Retention rate</p>
+                        <div id="todaySchedule" class="flex flex-col gap-3">
+                            <!-- Today's bookings will be inserted here -->
                         </div>
                     </div>
-                    <canvas id="retentionChart" height="100" class="mt-4"></canvas>
+
+                    <!-- Recent Bookings & Quick Actions -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="md:col-span-2 glass rounded-2xl p-6">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                                <i data-lucide="list" class="w-5 h-5 text-gold-400"></i>
+                                Recent Bookings
+                            </h3>
+                            <div id="recentBookingsList" class="flex flex-col gap-3">
+                                <!-- Recent bookings -->
+                            </div>
+                        </div>
+                        <div class="glass rounded-2xl p-6">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                                <i data-lucide="zap" class="w-5 h-5 text-gold-400"></i>
+                                Quick Actions
+                            </h3>
+                            <div class="flex flex-col gap-3">
+                                <button onclick="clearAllBookings()" class="bg-red-500/10 border border-red-500/20 text-red-400 py-3 rounded-xl text-sm font-semibold hover:bg-red-500/20 transition-colors flex items-center justify-center gap-2">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    Clear All Bookings
+                                </button>
+                                <button onclick="switchTab('analytics')" class="btn-outline-gold py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2">
+                                    <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                                    View Analytics
+                                </button>
+                                <button onclick="switchTab('settings')" class="glass-light py-3 rounded-xl text-sm font-semibold text-dark-200 hover:text-white transition-colors flex items-center justify-center gap-2">
+                                    <i data-lucide="settings" class="w-4 h-4"></i>
+                                    Settings
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bookings Tab -->
+                <div id="bookingsTab" class="tab-content hidden fade-in">
+                    <!-- Filters & Search -->
+                    <div class="glass rounded-2xl p-4 mb-6">
+                        <div class="flex flex-col md:flex-row gap-3">
+                            <div class="flex-1 relative">
+                                <i data-lucide="search" class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-dark-400"></i>
+                                <input type="text" id="searchBookings" placeholder="Search by name, phone, or ID..." class="w-full bg-dark-700 border border-dark-500 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-dark-400 focus:border-gold-400 transition-all" oninput="filterBookings()">
+                            </div>
+                            <select id="filterStatus" class="bg-dark-700 border border-dark-500 rounded-xl px-4 py-2.5 text-sm text-white focus:border-gold-400 transition-all" onchange="filterBookings()">
+                                <option value="all">All Status</option>
+                                <option value="confirmed">Confirmed</option>
+                                <option value="cancelled">Cancelled</option>
+                            </select>
+                            <select id="filterService" class="bg-dark-700 border border-dark-500 rounded-xl px-4 py-2.5 text-sm text-white focus:border-gold-400 transition-all" onchange="filterBookings()">
+                                <option value="all">All Services</option>
+                                <option value="dye">Haircut with Dye</option>
+                                <option value="nodye">Haircut without Dye</option>
+                            </select>
+                            <input type="date" id="filterDate" class="bg-dark-700 border border-dark-500 rounded-xl px-4 py-2.5 text-sm text-white focus:border-gold-400 transition-all" onchange="filterBookings()">
+                        </div>
+                    </div>
+
+                    <!-- Bookings Table -->
+                    <div class="glass rounded-2xl overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead>
+                                    <tr class="border-b border-dark-500 text-left">
+                                        <th class="px-4 py-3 text-sm font-semibold text-dark-200">Client</th>
+                                        <th class="px-4 py-3 text-sm font-semibold text-dark-200 hidden md:table-cell">Date & Time</th>
+                                        <th class="px-4 py-3 text-sm font-semibold text-dark-200 hidden sm:table-cell">Service</th>
+                                        <th class="px-4 py-3 text-sm font-semibold text-dark-200">Total</th>
+                                        <th class="px-4 py-3 text-sm font-semibold text-dark-200">Status</th>
+                                        <th class="px-4 py-3 text-sm font-semibold text-dark-200">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="bookingsTableBody">
+                                    <!-- Bookings rows will be inserted here -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="noBookingsMessage" class="hidden px-4 py-8 text-center text-dark-400">
+                            <div class="flex flex-col items-center gap-2">
+                                <i data-lucide="calendar-x" class="w-8 h-8"></i>
+                                <p>No bookings found</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Calendar View Tab -->
+                <div id="calendarTab" class="tab-content hidden fade-in">
+                    <div class="glass rounded-2xl p-6">
+                        <div class="flex items-center justify-between mb-6">
+                            <button onclick="changeCalendarMonth(-1)" class="w-10 h-10 rounded-lg hover:bg-dark-600 flex items-center justify-center transition-colors">
+                                <i data-lucide="chevron-left" class="w-5 h-5"></i>
+                            </button>
+                            <h3 class="text-xl font-semibold" id="calendarMonthYear"></h3>
+                            <button onclick="changeCalendarMonth(1)" class="w-10 h-10 rounded-lg hover:bg-dark-600 flex items-center justify-center transition-colors">
+                                <i data-lucide="chevron-right" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-7 gap-1 mb-2">
+                            <span class="text-center text-xs text-dark-300 py-2">Sun</span>
+                            <span class="text-center text-xs text-dark-300 py-2">Mon</span>
+                            <span class="text-center text-xs text-dark-300 py-2">Tue</span>
+                            <span class="text-center text-xs text-dark-300 py-2">Wed</span>
+                            <span class="text-center text-xs text-dark-300 py-2">Thu</span>
+                            <span class="text-center text-xs text-dark-300 py-2">Fri</span>
+                            <span class="text-center text-xs text-dark-300 py-2">Sat</span>
+                        </div>
+                        <div id="adminCalendarGrid" class="grid grid-cols-7 gap-1">
+                            <!-- Calendar days -->
+                        </div>
+                    </div>
+                    <!-- Day Detail Modal -->
+                    <div id="dayDetailModal" class="fixed inset-0 z-[60] hidden">
+                        <div class="modal-overlay absolute inset-0" onclick="closeDayDetail()"></div>
+                        <div class="relative z-10 flex items-center justify-center min-h-full p-4">
+                            <div class="glass rounded-2xl w-full max-w-lg slide-up">
+                                <div class="flex items-center justify-between p-4 border-b border-dark-500">
+                                    <h3 class="text-lg font-semibold" id="dayDetailTitle">Day Details</h3>
+                                    <button onclick="closeDayDetail()" class="w-8 h-8 rounded-lg hover:bg-dark-600 flex items-center justify-center transition-colors">
+                                        <i data-lucide="x" class="w-5 h-5"></i>
+                                    </button>
+                                </div>
+                                <div id="dayDetailContent" class="p-4 max-h-96 overflow-y-auto">
+                                    <!-- Day bookings -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Analytics Tab -->
+                <div id="analyticsTab" class="tab-content hidden fade-in">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div class="glass rounded-2xl p-6">
+                            <h3 class="text-lg font-semibold mb-4">Bookings Overview</h3>
+                            <div class="chart-container">
+                                <canvas id="bookingsChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="glass rounded-2xl p-6">
+                            <h3 class="text-lg font-semibold mb-4">Revenue Breakdown</h3>
+                            <div class="chart-container">
+                                <canvas id="revenueChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="glass rounded-2xl p-6">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                                <i data-lucide="pie-chart" class="w-5 h-5 text-gold-400"></i>
+                                Service Distribution
+                            </h3>
+                            <div class="flex flex-col gap-3" id="serviceDistribution">
+                                <!-- Service stats -->
+                            </div>
+                        </div>
+                        <div class="glass rounded-2xl p-6">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                                <i data-lucide="clock" class="w-5 h-5 text-gold-400"></i>
+                                Peak Hours
+                            </h3>
+                            <div class="flex flex-col gap-2" id="peakHours">
+                                <!-- Peak hours -->
+                            </div>
+                        </div>
+                        <div class="glass rounded-2xl p-6">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                                <i data-lucide="trending-up" class="w-5 h-5 text-gold-400"></i>
+                                Summary
+                            </h3>
+                            <div class="flex flex-col gap-3 text-sm" id="summaryStats">
+                                <!-- Summary stats -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings Tab -->
+                <div id="settingsTab" class="tab-content hidden fade-in">
+                    <div class="max-w-2xl mx-auto">
+                        <div class="glass rounded-2xl p-6 mb-6">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                                <i data-lucide="user" class="w-5 h-5 text-gold-400"></i>
+                                Account Settings
+                            </h3>
+                            <div class="flex flex-col gap-4">
+                                <div>
+                                    <label class="text-sm text-dark-200 mb-1 block">Admin Password</label>
+                                    <input type="password" id="newPassword" placeholder="New password" class="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-dark-400 focus:border-gold-400 transition-all">
+                                </div>
+                                <div>
+                                    <label class="text-sm text-dark-200 mb-1 block">Confirm Password</label>
+                                    <input type="password" id="confirmPassword" placeholder="Confirm new password" class="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-dark-400 focus:border-gold-400 transition-all">
+                                </div>
+                                <button onclick="updatePassword()" class="btn-gold w-full py-3 rounded-xl font-semibold text-dark-900">
+                                    Update Password
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="glass rounded-2xl p-6 mb-6">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                                <i data-lucide="database" class="w-5 h-5 text-gold-400"></i>
+                                Data Management
+                            </h3>
+                            <div class="flex flex-col gap-3">
+                                <button onclick="exportBookings()" class="btn-outline-gold py-3 rounded-xl font-semibold flex items-center justify-center gap-2">
+                                    <i data-lucide="download" class="w-4 h-4"></i>
+                                    Export Bookings (JSON)
+                                </button>
+                                <button onclick="clearAllBookings()" class="bg-red-500/10 border border-red-500/20 text-red-400 py-3 rounded-xl font-semibold hover:bg-red-500/20 transition-colors flex items-center justify-center gap-2">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    Clear All Bookings
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="glass rounded-2xl p-6">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                                <i data-lucide="info" class="w-5 h-5 text-gold-400"></i>
+                                System Information
+                            </h3>
+                            <div class="flex flex-col gap-2 text-sm text-dark-300">
+                                <div class="flex justify-between">
+                                    <span>Database</span>
+                                    <span id="dbType" class="text-dark-200">Local Storage</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Last Sync</span>
+                                    <span id="lastSync" class="text-dark-200">Just now</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Version</span>
+                                    <span class="text-dark-200">1.0.0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>
     </div>
 
+    <!-- Booking Details Modal -->
+    <div id="bookingDetailsModal" class="fixed inset-0 z-[60] hidden">
+        <div class="modal-overlay absolute inset-0" onclick="closeBookingDetails()"></div>
+        <div class="relative z-10 flex items-center justify-center min-h-full p-4">
+            <div class="glass rounded-2xl w-full max-w-lg slide-up">
+                <div class="flex items-center justify-between p-4 border-b border-dark-500">
+                    <h3 class="text-lg font-semibold">Booking Details</h3>
+                    <button onclick="closeBookingDetails()" class="w-8 h-8 rounded-lg hover:bg-dark-600 flex items-center justify-center transition-colors">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                <div id="bookingDetailsContent" class="p-6">
+                    <!-- Booking details -->
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // ---------- Global variables ----------
-        const ADMIN_USER = "admin";
-        const ADMIN_PASS = "admin123";
-        
-        let bookingsChart, revenueChart, serviceChart, timeSlotChart, retentionChart;
-        let currentView = 'appointments'; // 'appointments' or 'analytics'
+        // ============================================
+        // STATE
+        // ============================================
+let adminState = {
+    isLoggedIn: false,
+    adminPassword: "voka123" // ← removed the trailing quote
+};
 
-        // ---------- Helper functions ----------
-        function parseLocalDateTime(dateKey, timeStr) {
-            const [year, month, day] = dateKey.split('-').map(Number);
-            const [timePart, modifier] = timeStr.split(' ');
-            let [hour, minute] = timePart.split(':').map(Number);
-            if (modifier === 'PM' && hour !== 12) hour += 12;
-            if (modifier === 'AM' && hour === 12) hour = 0;
-            return new Date(year, month - 1, day, hour, minute);
-        }
+        let allBookings = [];
+        let calendarState = {
+            currentMonth: new Date().getMonth(),
+            currentYear: new Date().getFullYear()
+        };
 
-        function escapeHtml(str) {
-            if (!str) return '';
-            return str.replace(/[&<>]/g, function(m) {
-                if (m === '&') return '&amp;';
-                if (m === '<') return '&lt;';
-                if (m === '>') return '&gt;';
-                return m;
-            });
-        }
+        let charts = {};
 
-        // ---------- Firestore CRUD ----------
-        async function getAllBookings() {
-            const querySnapshot = await getDocs(collection(window.db, "bookings"));
-            const bookings = [];
-            querySnapshot.forEach(doc => {
-                bookings.push({ id: doc.id, ...doc.data() });
-            });
-            return bookings;
-        }
-
-        async function loadAppointments() {
-            const bookings = await getAllBookings();
-            const tbody = document.getElementById('bookings-table-body');
-            const emptyState = document.getElementById('empty-state');
-            
-            const total = bookings.length;
-            const activeBookings = bookings.filter(b => !b.cancelled);
-            const activeCount = activeBookings.length;
-            const totalRevenue = activeBookings.reduce((sum, b) => sum + (b.totalPrice || 0), 0);
-            
-            document.getElementById('stat-total').innerText = total;
-            document.getElementById('stat-active-sub').innerHTML = `Active: ${activeCount}`;
-            document.getElementById('stat-revenue').innerHTML = `R${totalRevenue.toFixed(2)}`;
-            
-            tbody.innerHTML = '';
-            if (bookings.length === 0) {
-                emptyState.classList.remove('hidden');
-                return;
-            } else {
-                emptyState.classList.add('hidden');
-            }
-            
-            const sorted = [...bookings].sort((a, b) => new Date(b.rawDate) - new Date(a.rawDate));
-            sorted.forEach(booking => {
-                const row = document.createElement('tr');
-                const isCancelled = booking.cancelled === true;
-                const statusBadge = isCancelled 
-                    ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium badge-cancelled">Cancelled</span>'
-                    : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium badge-confirmed">Confirmed</span>';
-                const actionBtn = isCancelled
-                    ? `<button onclick="deleteBookingPermanent('${booking.id}')" class="text-red-500 hover:text-red-400 transition-colors p-2 hover:bg-red-500/10 rounded-lg action-btn" title="Permanently delete"><i data-lucide="trash-2" class="w-4 h-4"></i></button>`
-                    : `<button onclick="cancelBookingById('${booking.id}')" class="text-gray-500 hover:text-red-500 transition-colors p-2 hover:bg-red-500/10 rounded-lg action-btn" title="Cancel appointment"><i data-lucide="x-circle" class="w-4 h-4"></i></button>`;
-                row.innerHTML = `
-                    <td class="p-3 sm:p-4"><div class="font-bold text-white text-sm sm:text-base">${escapeHtml(booking.name)}</div><div class="text-[10px] sm:text-xs text-gray-500">${escapeHtml(booking.service)}</div></td>
-                    <td class="p-3 sm:p-4"><div class="text-white text-sm sm:text-base">${booking.dateStr || ''}</div><div class="text-[10px] sm:text-xs text-gray-400">${booking.time}</div></td>
-                    <td class="p-3 sm:p-4"><div class="text-gray-300 text-sm sm:text-base">${escapeHtml(booking.phone)}</div><div class="text-gray-500 text-[10px] sm:text-xs truncate max-w-[140px] sm:max-w-[200px]">${escapeHtml(booking.email || '—')}</div></td>
-                    <td class="p-3 sm:p-4 font-medium text-green-400 whitespace-nowrap">R${(booking.totalPrice || 0).toFixed(2)}${booking.lateFee ? `<div class="text-[9px] text-gray-500">+R${booking.lateFee} late</div>` : ''}</td>
-                    <td class="p-3 sm:p-4">${statusBadge}</td>
-                    <td class="p-3 sm:p-4 text-right">${actionBtn}</td>
-                `;
-                tbody.appendChild(row);
-            });
-            lucide.createIcons();
-        }
-
-        async function cancelBookingById(bookingId) {
-            const bookingRef = doc(window.db, "bookings", bookingId);
-            const bookingSnap = await getDoc(bookingRef);
-            if (!bookingSnap.exists()) return;
-            const booking = bookingSnap.data();
-            if (booking.cancelled) {
-                alert("This booking is already cancelled.");
-                return;
-            }
-            
-            const appointmentTime = parseLocalDateTime(booking.dateKey, booking.time);
-            const now = new Date();
-            const hoursDiff = (appointmentTime - now) / (1000 * 60 * 60);
-            
-            let confirmMsg = `Cancel appointment for ${booking.name} on ${booking.dateStr} at ${booking.time}?`;
-            let fee = 0;
-            if (hoursDiff <= 5 && hoursDiff > 0) {
-                fee = 20;
-                confirmMsg = `⚠️ Cancelling within ${hoursDiff.toFixed(1)} hours will incur a R20 cancellation fee. ${confirmMsg}`;
-            } else if (hoursDiff <= 0) {
-                confirmMsg = `This appointment is in the past. Cancelling will mark it as cancelled with no refund. ${confirmMsg}`;
-            }
-            
-            if (confirm(confirmMsg)) {
-                await updateDoc(bookingRef, { cancelled: true, cancellationFee: fee });
-                await loadAppointments();
-                if (currentView === 'analytics') await computeAnalytics();
-                alert("Booking has been cancelled.");
-            }
-        }
-        
-        async function deleteBookingPermanent(bookingId) {
-            if (confirm("⚠️ This will permanently remove the booking. Continue?")) {
-                await deleteDoc(doc(window.db, "bookings", bookingId));
-                await loadAppointments();
-                if (currentView === 'analytics') await computeAnalytics();
-                alert("Booking permanently deleted.");
-            }
-        }
-        
-        async function clearAllData() {
-            if (confirm("🚨 WARNING: This will delete ALL booking records (including cancelled). This action is irreversible. Are you absolutely sure?")) {
-                const querySnapshot = await getDocs(collection(window.db, "bookings"));
-                const batch = [];
-                querySnapshot.forEach(doc => {
-                    batch.push(deleteDoc(doc.ref));
-                });
-                await Promise.all(batch);
-                await loadAppointments();
-                if (currentView === 'analytics') await computeAnalytics();
-                alert("All bookings cleared.");
-            }
-        }
-        
-        async function refreshData() {
-            await loadAppointments();
-            if (currentView === 'analytics') await computeAnalytics();
-        }
-        
-        // ---------- Analytics ----------
-        async function computeAnalytics() {
-            const bookings = await getAllBookings();
-            const confirmedBookings = bookings.filter(b => !b.cancelled);
-            
-            // Bookings trend (last 14 days)
-            const today = new Date();
-            const last14Days = [];
-            for (let i = 13; i >= 0; i--) {
-                const d = new Date(today);
-                d.setDate(today.getDate() - i);
-                last14Days.push(d.toISOString().slice(0,10));
-            }
-            const bookingsByDay = {};
-            const revenueByDay = {};
-            last14Days.forEach(day => { bookingsByDay[day] = 0; revenueByDay[day] = 0; });
-            confirmedBookings.forEach(b => {
-                const day = b.dateKey;
-                if (bookingsByDay[day] !== undefined) {
-                    bookingsByDay[day]++;
-                    revenueByDay[day] += b.totalPrice;
-                }
-            });
-            const bookingCounts = last14Days.map(day => bookingsByDay[day]);
-            const revenueCounts = last14Days.map(day => revenueByDay[day]);
-            
-            // Service popularity
-            const serviceCounts = {};
-            confirmedBookings.forEach(b => { serviceCounts[b.service] = (serviceCounts[b.service] || 0) + 1; });
-            const serviceLabels = Object.keys(serviceCounts);
-            const serviceData = Object.values(serviceCounts);
-            
-            // Time slot popularity
-            const timeCounts = {};
-            const allSlots = ["09:00 AM","10:00 AM","11:00 AM","01:00 PM","02:00 PM","03:30 PM","04:30 PM","05:30 PM","07:30 PM"];
-            allSlots.forEach(slot => timeCounts[slot] = 0);
-            confirmedBookings.forEach(b => { timeCounts[b.time] = (timeCounts[b.time] || 0) + 1; });
-            const timeData = allSlots.map(slot => timeCounts[slot]);
-            
-            // Customer retention
-            const customerMap = new Map();
-            confirmedBookings.forEach(b => {
-                const key = b.phone + (b.email || '');
-                customerMap.set(key, (customerMap.get(key) || 0) + 1);
-            });
-            const totalCustomers = customerMap.size;
-            const repeatCustomers = Array.from(customerMap.values()).filter(c => c > 1).length;
-            const retentionRate = totalCustomers ? Math.round((repeatCustomers / totalCustomers) * 100) : 0;
-            
-            document.getElementById('repeat-customers').innerText = repeatCustomers;
-            document.getElementById('total-customers').innerText = totalCustomers;
-            document.getElementById('retention-rate').innerText = `${retentionRate}%`;
-            
-            // Destroy old charts
-            if (bookingsChart) bookingsChart.destroy();
-            if (revenueChart) revenueChart.destroy();
-            if (serviceChart) serviceChart.destroy();
-            if (timeSlotChart) timeSlotChart.destroy();
-            if (retentionChart) retentionChart.destroy();
-            
-            // Create new charts
-            const ctxBookings = document.getElementById('bookingsTrendChart').getContext('2d');
-            bookingsChart = new Chart(ctxBookings, {
-                type: 'line',
-                data: { labels: last14Days.map(d => d.slice(5)), datasets: [{ label: 'Bookings', data: bookingCounts, borderColor: '#4ade80', backgroundColor: 'rgba(74,222,128,0.1)', fill: true, tension: 0.3 }] },
-                options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { labels: { color: '#fff' } } }, scales: { y: { ticks: { color: '#fff' }, grid: { color: 'rgba(255,255,255,0.1)' } }, x: { ticks: { color: '#fff' }, grid: { display: false } } } }
-            });
-            const ctxRevenue = document.getElementById('revenueTrendChart').getContext('2d');
-            revenueChart = new Chart(ctxRevenue, {
-                type: 'line',
-                data: { labels: last14Days.map(d => d.slice(5)), datasets: [{ label: 'Revenue (R)', data: revenueCounts, borderColor: '#fbbf24', backgroundColor: 'rgba(251,191,36,0.1)', fill: true, tension: 0.3 }] },
-                options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { labels: { color: '#fff' } } }, scales: { y: { ticks: { color: '#fff' }, grid: { color: 'rgba(255,255,255,0.1)' } }, x: { ticks: { color: '#fff' }, grid: { display: false } } } }
-            });
-            const ctxService = document.getElementById('serviceChart').getContext('2d');
-            serviceChart = new Chart(ctxService, {
-                type: 'bar',
-                data: { labels: serviceLabels, datasets: [{ label: 'Number of bookings', data: serviceData, backgroundColor: '#3b82f6', borderRadius: 8 }] },
-                options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { labels: { color: '#fff' } } }, scales: { y: { ticks: { color: '#fff' }, grid: { color: 'rgba(255,255,255,0.1)' } }, x: { ticks: { color: '#fff' }, grid: { display: false } } } }
-            });
-            const ctxTime = document.getElementById('timeSlotChart').getContext('2d');
-            timeSlotChart = new Chart(ctxTime, {
-                type: 'bar',
-                data: { labels: allSlots.map(s => s.replace(' AM','').replace(' PM','')), datasets: [{ label: 'Bookings', data: timeData, backgroundColor: '#ec489a', borderRadius: 8 }] },
-                options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { labels: { color: '#fff' } } }, scales: { y: { ticks: { color: '#fff' }, grid: { color: 'rgba(255,255,255,0.1)' } }, x: { ticks: { color: '#fff', maxRotation: 45, minRotation: 45 }, grid: { display: false } } } }
-            });
-            const ctxRetention = document.getElementById('retentionChart').getContext('2d');
-            retentionChart = new Chart(ctxRetention, {
-                type: 'doughnut',
-                data: { labels: ['Repeat customers', 'One-time customers'], datasets: [{ data: [repeatCustomers, totalCustomers - repeatCustomers], backgroundColor: ['#4ade80', '#6b7280'], borderWidth: 0 }] },
-                options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { labels: { color: '#fff' } } } }
-            });
-        }
-        
-        // ---------- Toggle between views ----------
-        async function toggleView() {
-            const appointmentsDiv = document.getElementById('appointments-view');
-            const analyticsDiv = document.getElementById('analytics-view');
-            const toggleBtn = document.getElementById('toggleViewBtn');
-            if (currentView === 'appointments') {
-                appointmentsDiv.classList.add('hidden');
-                analyticsDiv.classList.remove('hidden');
-                toggleBtn.innerHTML = '📅 Appointments';
-                currentView = 'analytics';
-                await computeAnalytics();
-            } else {
-                appointmentsDiv.classList.remove('hidden');
-                analyticsDiv.classList.add('hidden');
-                toggleBtn.innerHTML = '📊 Analytics';
-                currentView = 'appointments';
-                await loadAppointments();
-            }
-            lucide.createIcons();
-        }
-        
-        // ---------- Authentication ----------
-  async function checkSession() {
-    if (sessionStorage.getItem('barberAuth') === 'true') {
-        document.getElementById('login-overlay').classList.add('hidden');
-        document.getElementById('dashboard-content').classList.remove('hidden');
-        await loadAppointments();                    // ← added await
-        if (window.autoRefreshInterval) clearInterval(window.autoRefreshInterval);
-        window.autoRefreshInterval = setInterval(async () => {
-            if (document.getElementById('dashboard-content') && !document.getElementById('dashboard-content').classList.contains('hidden')) {
-                await loadAppointments();
-                if (currentView === 'analytics') await computeAnalytics();
-            }
-        }, 30000);
-    }
-}
-        function handleLogin(e) {
-            e.preventDefault();
-            const user = document.getElementById('username').value;
-            const pass = document.getElementById('password').value;
-            if (user === ADMIN_USER && pass === ADMIN_PASS) {
-                sessionStorage.setItem('barberAuth', 'true');
-                checkSession();
-            } else {
-                document.getElementById('login-error').classList.remove('hidden');
-            }
-        }
-        
-        function logout() {
-            if (window.autoRefreshInterval) clearInterval(window.autoRefreshInterval);
-            sessionStorage.removeItem('barberAuth');
-            location.reload();
-        }
-        
-        // Expose global functions
-        window.handleLogin = handleLogin;
-        window.logout = logout;
-        window.cancelBookingById = cancelBookingById;
-        window.deleteBookingPermanent = deleteBookingPermanent;
-        window.clearAllData = clearAllData;
-        window.refreshData = refreshData;
-        window.toggleView = toggleView;
-        
-        // Initialization
+        // ============================================
+        // INITIALIZATION
+        // ============================================
         document.addEventListener('DOMContentLoaded', () => {
             lucide.createIcons();
-            checkSession();
+            
+            // Load from storage
+            loadBookings();
+            
+            // Check session
+            const session = sessionStorage.getItem('adminLoggedIn');
+            if (session === 'true') {
+                showDashboard();
+            }
         });
+
+        // ============================================
+        // AUTH
+        // ============================================
+        function handleLogin() {
+            const username = document.getElementById('adminUsername').value.trim();
+            const password = document.getElementById('adminPassword').value;
+            
+            if (username === adminState.username && password === adminState.password) {
+                adminState.isLoggedIn = true;
+                sessionStorage.setItem('adminLoggedIn', 'true');
+                showDashboard();
+                showNotification('Welcome back!', 'success');
+            } else {
+                showNotification('Invalid credentials', 'error');
+            }
+        }
+
+        function handleLogout() {
+            adminState.isLoggedIn = false;
+            sessionStorage.removeItem('adminLoggedIn');
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('dashboardScreen').classList.add('hidden');
+            document.getElementById('adminUsername').value = 'admin';
+            document.getElementById('adminPassword').value = '';
+        }
+
+        function showDashboard() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('dashboardScreen').classList.remove('hidden');
+            loadAllData();
+            lucide.createIcons();
+        }
+
+        // ============================================
+        // DATA MANAGEMENT
+        // ============================================
+        function getBookingsFromStorage() {
+            const stored = localStorage.getItem('barberBookings');
+            return stored ? JSON.parse(stored) : [];
+        }
+
+        function saveBookingsToStorage(bookings) {
+            localStorage.setItem('barberBookings', JSON.stringify(bookings));
+        }
+
+        function loadBookings() {
+            allBookings = getBookingsFromStorage();
+        }
+
+        function saveBookings() {
+            saveBookingsToStorage(allBookings);
+        }
+
+        function loadAllData() {
+            loadBookings();
+            updateStats();
+            renderTodaySchedule();
+            renderRecentBookings();
+            renderBookingsTable();
+            renderAdminCalendar();
+            renderAnalytics();
+            document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+        }
+
+        async function refreshData() {
+            loadBookings();
+            loadAllData();
+            showNotification('Data refreshed', 'success');
+        }
+
+        // ============================================
+        // NOTIFICATIONS
+        // ============================================
+        function showNotification(message, type = 'success') {
+            const container = document.getElementById('notificationsContainer');
+            const notif = document.createElement('div');
+            const bgColor = type === 'success' ? 'bg-green-500/20 border-green-500/30 text-green-400' :
+                          type === 'error' ? 'bg-red-500/20 border-red-500/30 text-red-400' :
+                          'bg-blue-500/20 border-blue-500/30 text-blue-400';
+            
+            notif.className = `notification ${bgColor} border px-4 py-3 rounded-xl flex items-center gap-2 min-w-[280px]`;
+            notif.innerHTML = `
+                <i data-lucide="${type === 'success' ? 'check-circle' : type === 'error' ? 'x-circle' : 'info'}" class="w-5 h-5"></i>
+                <span class="text-sm">${message}</span>
+            `;
+            container.appendChild(notif);
+            lucide.createIcons({ nodes: [notif] });
+
+            setTimeout(() => {
+                notif.style.opacity = '0';
+                notif.style.transform = 'translateY(-20px)';
+                notif.style.transition = 'all 0.3s ease';
+                setTimeout(() => notif.remove(), 300);
+            }, 3000);
+        }
+
+        // ============================================
+        // TAB NAVIGATION
+        // ============================================
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('tab-active');
+                btn.classList.add('text-dark-300');
+            });
+            
+            // Show selected tab
+            document.getElementById(`${tabName}Tab`).classList.remove('hidden');
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('tab-active');
+            document.querySelector(`[data-tab="${tabName}"]`).classList.remove('text-dark-300');
+            
+            // Refresh data when switching tabs
+            if (tabName === 'analytics') renderAnalytics();
+            if (tabName === 'calendar') renderAdminCalendar();
+            
+            lucide.createIcons();
+        }
+
+        // ============================================
+        // STATS
+        // ============================================
+        function updateStats() {
+            const now = new Date();
+            const currentMonth = now.getMonth();
+            const currentYear = now.getFullYear();
+            
+            const total = allBookings.length;
+            const upcoming = allBookings.filter(b => b.status === 'confirmed' && new Date(b.date + 'T' + b.time) > now).length;
+            const cancelled = allBookings.filter(b => b.status === 'cancelled').length;
+            
+            // Calculate monthly revenue
+            const monthlyRevenue = allBookings
+                .filter(b => {
+                    const bDate = new Date(b.createdAt);
+                    return bDate.getMonth() === currentMonth && bDate.getFullYear() === currentYear && b.status === 'confirmed';
+                })
+                .reduce((sum, b) => sum + (b.total || 0), 0);
+            
+            document.getElementById('statTotalBookings').textContent = total;
+            document.getElementById('statUpcoming').textContent = upcoming;
+            document.getElementById('statRevenue').textContent = `R${monthlyRevenue}`;
+            document.getElementById('statCancelled').textContent = cancelled;
+            
+            // Today's date
+            const today = new Date();
+            document.getElementById('todayDate').textContent = today.toLocaleDateString('en-ZA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        }
+
+        // ============================================
+        // TODAY'S SCHEDULE
+        // ============================================
+        function renderTodaySchedule() {
+            const today = new Date().toISOString().split('T')[0];
+            const container = document.getElementById('todaySchedule');
+            
+            const todayBookings = allBookings
+                .filter(b => b.date === today && b.status === 'confirmed')
+                .sort((a, b) => a.time.localeCompare(b.time));
+            
+            if (todayBookings.length === 0) {
+                container.innerHTML = `
+                    <div class="flex flex-col items-center gap-2 py-8 text-dark-400">
+                        <i data-lucide="coffee" class="w-8 h-8"></i>
+                        <p class="text-sm">No appointments today</p>
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
+            
+            container.innerHTML = '';
+            todayBookings.forEach(booking => {
+                const isPast = new Date(booking.date + 'T' + booking.time) < new Date();
+                const div = document.createElement('div');
+                div.className = `flex items-center gap-4 p-3 rounded-xl ${isPast ? 'bg-dark-600/50 opacity-60' : 'glass-light'} slide-in-right`;
+                
+                div.innerHTML = `
+                    <div class="w-12 h-12 rounded-lg bg-gold-400/10 flex items-center justify-center flex-shrink-0">
+                        <i data-lucide="user" class="w-5 h-5 text-gold-400"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-semibold text-sm truncate">${booking.name}</p>
+                        <p class="text-xs text-dark-300">${booking.serviceName}</p>
+                    </div>
+                    <div class="text-right flex-shrink-0">
+                        <p class="text-sm font-semibold">${formatTimeDisplay(booking.time)}</p>
+                        <p class="text-xs text-gold-400">R${booking.total}</p>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+            
+            lucide.createIcons();
+        }
+
+        // ============================================
+        // RECENT BOOKINGS
+        // ============================================
+        function renderRecentBookings() {
+            const container = document.getElementById('recentBookingsList');
+            const recent = [...allBookings].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
+            
+            if (recent.length === 0) {
+                container.innerHTML = `
+                    <div class="flex flex-col items-center gap-2 py-8 text-dark-400">
+                        <i data-lucide="calendar-x" class="w-8 h-8"></i>
+                        <p class="text-sm">No bookings yet</p>
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
+            
+            container.innerHTML = '';
+            recent.forEach(booking => {
+                const div = document.createElement('div');
+                div.className = 'flex items-center gap-3 p-3 rounded-xl glass-light table-row-hover cursor-pointer';
+                div.onclick = () => openBookingDetails(booking.id);
+                
+                const statusClass = booking.status === 'cancelled' ? 'text-red-400' : 'text-green-400';
+                const statusBg = booking.status === 'cancelled' ? 'bg-red-500/10' : 'bg-green-500/10';
+                
+                div.innerHTML = `
+                    <div class="w-10 h-10 rounded-lg ${statusBg} flex items-center justify-center flex-shrink-0">
+                        <i data-lucide="user" class="w-4 h-4 ${statusClass}"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-semibold text-sm truncate">${booking.name}</p>
+                        <p class="text-xs text-dark-300">${formatDateDisplay(booking.date)} • ${booking.serviceName}</p>
+                    </div>
+                    <span class="text-xs px-2 py-1 rounded-full ${statusBg} ${statusClass} flex-shrink-0">${booking.status}</span>
+                `;
+                container.appendChild(div);
+            });
+            
+            lucide.createIcons();
+        }
+
+        // ============================================
+        // BOOKINGS TABLE
+        // ============================================
+        function renderBookingsTable(filteredBookings = null) {
+            const tbody = document.getElementById('bookingsTableBody');
+            const noMsg = document.getElementById('noBookingsMessage');
+            const bookings = filteredBookings || allBookings;
+            
+            tbody.innerHTML = '';
+            
+            if (bookings.length === 0) {
+                tbody.classList.add('hidden');
+                noMsg.classList.remove('hidden');
+                lucide.createIcons();
+                return;
+            }
+            
+            tbody.classList.remove('hidden');
+            noMsg.classList.add('hidden');
+            
+            // Sort by creation date (newest first)
+            const sorted = [...bookings].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            
+            sorted.forEach(booking => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-dark-600 table-row-hover cursor-pointer';
+                tr.onclick = () => openBookingDetails(booking.id);
+                
+                const statusClass = booking.status === 'cancelled' ? 'text-red-400' : 'text-green-400';
+                const statusBg = booking.status === 'cancelled' ? 'bg-red-500/10' : 'bg-green-500/10';
+                
+                tr.innerHTML = `
+                    <td class="px-4 py-3">
+                        <div>
+                            <p class="font-medium text-sm">${booking.name}</p>
+                            <p class="text-xs text-dark-400">${booking.phone}</p>
+                        </div>
+                    </td>
+                    <td class="px-4 py-3 text-sm hidden md:table-cell">
+                        <p>${formatDateDisplay(booking.date)}</p>
+                        <p class="text-dark-400">${formatTimeDisplay(booking.time)}</p>
+                    </td>
+                    <td class="px-4 py-3 text-sm hidden sm:table-cell">${booking.serviceName}</td>
+                    <td class="px-4 py-3 text-sm font-medium text-gold-400">R${booking.total}</td>
+                    <td class="px-4 py-3">
+                        <span class="text-xs px-2 py-1 rounded-full ${statusBg} ${statusClass}">${booking.status}</span>
+                    </td>
+                    <td class="px-4 py-3">
+                        <div class="flex items-center gap-2" onclick="event.stopPropagation()">
+                            ${booking.status === 'confirmed' ? `
+                                <button onclick="cancelBooking('${booking.id}')" class="text-red-400 hover:text-red-300 transition-colors" title="Cancel">
+                                    <i data-lucide="x-circle" class="w-4 h-4"></i>
+                                </button>
+                            ` : ''}
+                            <button onclick="openBookingDetails('${booking.id}')" class="text-blue-400 hover:text-blue-300 transition-colors" title="View">
+                                <i data-lucide="eye" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                
+                tbody.appendChild(tr);
+            });
+            
+            lucide.createIcons();
+        }
+
+        // ============================================
+        // FILTER BOOKINGS
+        // ============================================
+        function filterBookings() {
+            const search = document.getElementById('searchBookings').value.toLowerCase();
+            const status = document.getElementById('filterStatus').value;
+            const service = document.getElementById('filterService').value;
+            const date = document.getElementById('filterDate').value;
+            
+            let filtered = [...allBookings];
+            
+            if (search) {
+                filtered = filtered.filter(b => 
+                    b.name.toLowerCase().includes(search) ||
+                    b.phone.toLowerCase().includes(search) ||
+                    b.id.toLowerCase().includes(search)
+                );
+            }
+            
+            if (status !== 'all') {
+                filtered = filtered.filter(b => b.status === status);
+            }
+            
+            if (service !== 'all') {
+                filtered = filtered.filter(b => b.service === service);
+            }
+            
+            if (date) {
+                filtered = filtered.filter(b => b.date === date);
+            }
+            
+            renderBookingsTable(filtered);
+        }
+
+        // ============================================
+        // BOOKING DETAILS
+        // ============================================
+        function openBookingDetails(bookingId) {
+            const booking = allBookings.find(b => b.id === bookingId);
+            if (!booking) return;
+            
+            const content = document.getElementById('bookingDetailsContent');
+            const statusClass = booking.status === 'cancelled' ? 'text-red-400' : 'text-green-400';
+            const statusBg = booking.status === 'cancelled' ? 'bg-red-500/10' : 'bg-green-500/10';
+            
+            content.innerHTML = `
+                <div class="flex flex-col gap-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs text-dark-400 font-mono">${booking.id}</span>
+                        <span class="text-xs px-2 py-1 rounded-full ${statusBg} ${statusClass}">${booking.status}</span>
+                    </div>
+                    
+                    <div class="glass-light rounded-xl p-4">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="w-12 h-12 rounded-full bg-gold-400/10 flex items-center justify-center">
+                                <span class="text-gold-400 font-bold text-lg">${booking.name.charAt(0).toUpperCase()}</span>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-lg">${booking.name}</h4>
+                                <p class="text-sm text-dark-300">${booking.phone}</p>
+                                ${booking.email ? `<p class="text-sm text-dark-400">${booking.email}</p>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="glass-light rounded-xl p-3">
+                            <p class="text-xs text-dark-300 mb-1">Date</p>
+                            <p class="text-sm font-semibold">${formatDateDisplay(booking.date)}</p>
+                        </div>
+                        <div class="glass-light rounded-xl p-3">
+                            <p class="text-xs text-dark-300 mb-1">Time</p>
+                            <p class="text-sm font-semibold">${formatTimeDisplay(booking.time)}</p>
+                        </div>
+                        <div class="glass-light rounded-xl p-3">
+                            <p class="text-xs text-dark-300 mb-1">Service</p>
+                            <p class="text-sm font-semibold">${booking.serviceName}</p>
+                        </div>
+                        <div class="glass-light rounded-xl p-3">
+                            <p class="text-xs text-dark-300 mb-1">Total</p>
+                            <p class="text-sm font-bold text-gold-400">R${booking.total}</p>
+                        </div>
+                    </div>
+                    
+                    ${booking.lateFee > 0 ? `
+                        <div class="flex items-center gap-2 text-xs text-red-400">
+                            <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+                            Late fee included: R${booking.lateFee}
+                        </div>
+                    ` : ''}
+                    
+                    <div class="text-xs text-dark-400">
+                        <p>Created: ${new Date(booking.createdAt).toLocaleString()}</p>
+                        ${booking.cancelledAt ? `<p>Cancelled: ${new Date(booking.cancelledAt).toLocaleString()}</p>` : ''}
+                    </div>
+                    
+                    <div class="flex gap-3 mt-2">
+                        ${booking.status === 'confirmed' ? `
+                            <button onclick="cancelBooking('${booking.id}'); closeBookingDetails();" class="flex-1 bg-red-500/10 border border-red-500/20 text-red-400 py-3 rounded-xl text-sm font-semibold hover:bg-red-500/20 transition-colors">
+                                Cancel Booking
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('bookingDetailsModal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+            lucide.createIcons();
+        }
+
+        function closeBookingDetails() {
+            document.getElementById('bookingDetailsModal').classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+
+        // ============================================
+        // CANCEL BOOKING
+        // ============================================
+        function cancelBooking(bookingId) {
+            if (!confirm('Are you sure you want to cancel this booking?')) return;
+            
+            const index = allBookings.findIndex(b => b.id === bookingId);
+            if (index !== -1) {
+                allBookings[index].status = 'cancelled';
+                allBookings[index].cancelledAt = new Date().toISOString();
+                saveBookings();
+                loadAllData();
+                showNotification('Booking cancelled', 'success');
+            }
+        }
+
+        // ============================================
+        // CLEAR ALL BOOKINGS
+        // ============================================
+        function clearAllBookings() {
+            if (!confirm('Are you sure you want to delete ALL bookings? This cannot be undone.')) return;
+            if (!confirm('FINAL WARNING: This will permanently delete all bookings. Continue?')) return;
+            
+            allBookings = [];
+            saveBookings();
+            loadAllData();
+            showNotification('All bookings cleared', 'success');
+        }
+
+        // ============================================
+        // CALENDAR VIEW
+        // ============================================
+        function renderAdminCalendar() {
+            const year = calendarState.currentYear;
+            const month = calendarState.currentMonth;
+            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                               'July', 'August', 'September', 'October', 'November', 'December'];
+            
+            document.getElementById('calendarMonthYear').textContent = `${monthNames[month]} ${year}`;
+            
+            const grid = document.getElementById('adminCalendarGrid');
+            grid.innerHTML = '';
+            
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const today = new Date().toISOString().split('T')[0];
+            
+            // Empty cells
+            for (let i = 0; i < firstDay; i++) {
+                const empty = document.createElement('div');
+                empty.className = 'p-2';
+                grid.appendChild(empty);
+            }
+            
+            // Days
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const isToday = dateString === today;
+                
+                const dayBookings = allBookings.filter(b => b.date === dateString && b.status === 'confirmed');
+                
+                const cell = document.createElement('div');
+                cell.className = `p-2 rounded-lg cursor-pointer transition-all hover:bg-dark-600 ${isToday ? 'border border-gold-400' : ''}`;
+                
+                let bookingsHTML = '';
+                if (dayBookings.length > 0) {
+                    const maxShow = Math.min(dayBookings.length, 3);
+                    for (let i = 0; i < maxShow; i++) {
+                        bookingsHTML += `<div class="text-[10px] text-gold-400 truncate">${formatTimeDisplay(dayBookings[i].time)} - ${dayBookings[i].name.split(' ')[0]}</div>`;
+                    }
+                    if (dayBookings.length > 3) {
+                        bookingsHTML += `<div class="text-[10px] text-dark-400">+${dayBookings.length - 3} more</div>`;
+                    }
+                }
+                
+                cell.innerHTML = `
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-sm font-semibold ${isToday ? 'text-gold-400' : ''}">${day}</span>
+                        ${dayBookings.length > 0 ? `<span class="text-xs bg-gold-400/20 text-gold-400 px-1.5 py-0.5 rounded-full">${dayBookings.length}</span>` : ''}
+                    </div>
+                    <div class="flex flex-col gap-0.5">${bookingsHTML}</div>
+                `;
+                
+                cell.onclick = () => showDayDetail(dateString);
+                grid.appendChild(cell);
+            }
+        }
+
+        function changeCalendarMonth(delta) {
+            calendarState.currentMonth += delta;
+            if (calendarState.currentMonth > 11) {
+                calendarState.currentMonth = 0;
+                calendarState.currentYear++;
+            } else if (calendarState.currentMonth < 0) {
+                calendarState.currentMonth = 11;
+                calendarState.currentYear--;
+            }
+            renderAdminCalendar();
+        }
+
+        function showDayDetail(dateString) {
+            const dayBookings = allBookings.filter(b => b.date === dateString);
+            
+            document.getElementById('dayDetailTitle').textContent = formatDateDisplay(dateString);
+            
+            const content = document.getElementById('dayDetailContent');
+            
+            if (dayBookings.length === 0) {
+                content.innerHTML = `
+                    <div class="flex flex-col items-center gap-2 py-8 text-dark-400">
+                        <i data-lucide="calendar-x" class="w-8 h-8"></i>
+                        <p class="text-sm">No bookings for this day</p>
+                    </div>
+                `;
+            } else {
+                content.innerHTML = '';
+                dayBookings.sort((a, b) => a.time.localeCompare(b.time));
+                
+                dayBookings.forEach(booking => {
+                    const div = document.createElement('div');
+                    div.className = `flex items-center gap-3 p-3 rounded-xl mb-2 ${booking.status === 'cancelled' ? 'opacity-50' : 'glass-light'}`;
+                    
+                    const statusClass = booking.status === 'cancelled' ? 'text-red-400' : 'text-green-400';
+                    
+                    div.innerHTML = `
+                        <div class="w-10 h-10 rounded-lg bg-gold-400/10 flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="user" class="w-4 h-4 text-gold-400"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="font-semibold text-sm truncate">${booking.name}</p>
+                            <p class="text-xs text-dark-300">${booking.serviceName}</p>
+                        </div>
+                        <div class="text-right flex-shrink-0">
+                            <p class="text-sm font-semibold">${formatTimeDisplay(booking.time)}</p>
+                            <p class="text-xs ${statusClass}">${booking.status}</p>
+                        </div>
+                    `;
+                    div.onclick = () => {
+                        closeDayDetail();
+                        openBookingDetails(booking.id);
+                    };
+                    content.appendChild(div);
+                });
+            }
+            
+            document.getElementById('dayDetailModal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+            lucide.createIcons();
+        }
+
+        function closeDayDetail() {
+            document.getElementById('dayDetailModal').classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+
+        // ============================================
+        // ANALYTICS
+        // ============================================
+        function renderAnalytics() {
+            renderBookingsChart();
+            renderRevenueChart();
+            renderServiceDistribution();
+            renderPeakHours();
+            renderSummaryStats();
+        }
+
+        function renderBookingsChart() {
+            const ctx = document.getElementById('bookingsChart').getContext('2d');
+            
+            if (charts.bookings) charts.bookings.destroy();
+            
+            // Get last 7 days
+            const labels = [];
+            const data = [];
+            
+            for (let i = 6; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                const dateString = date.toISOString().split('T')[0];
+                labels.push(date.toLocaleDateString('en-ZA', { weekday: 'short' }));
+                
+                const count = allBookings.filter(b => b.date === dateString).length;
+                data.push(count);
+            }
+            
+            charts.bookings = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Bookings',
+                        data: data,
+                        backgroundColor: 'rgba(212, 175, 55, 0.3)',
+                        borderColor: '#D4AF37',
+                        borderWidth: 2,
+                        borderRadius: 8,
+                        barPercentage: 0.6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: '#999' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#999' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderRevenueChart() {
+            const ctx = document.getElementById('revenueChart').getContext('2d');
+            
+            if (charts.revenue) charts.revenue.destroy();
+            
+            const labels = [];
+            const confirmedData = [];
+            const cancelledData = [];
+            
+            for (let i = 6; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                const dateString = date.toISOString().split('T')[0];
+                labels.push(date.toLocaleDateString('en-ZA', { weekday: 'short' }));
+                
+                const dayBookings = allBookings.filter(b => b.date === dateString);
+                confirmedData.push(dayBookings.filter(b => b.status === 'confirmed').reduce((sum, b) => sum + (b.total || 0), 0));
+                cancelledData.push(dayBookings.filter(b => b.status === 'cancelled').reduce((sum, b) => sum + (b.total || 0), 0));
+            }
+            
+            charts.revenue = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Confirmed Revenue',
+                            data: confirmedData,
+                            borderColor: '#D4AF37',
+                            backgroundColor: 'rgba(212, 175, 55, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4,
+                            pointBackgroundColor: '#D4AF37'
+                        },
+                        {
+                            label: 'Cancelled Revenue',
+                            data: cancelledData,
+                            borderColor: '#EF4444',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4,
+                            pointBackgroundColor: '#EF4444'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#999' }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { 
+                                color: '#999',
+                                callback: function(value) { return 'R' + value; }
+                            }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#999' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderServiceDistribution() {
+            const container = document.getElementById('serviceDistribution');
+            
+            const dyeCount = allBookings.filter(b => b.service === 'dye').length;
+            const nodyeCount = allBookings.filter(b => b.service === 'nodye').length;
+            const total = allBookings.length || 1;
+            
+            container.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <div class="flex-1">
+                        <div class="flex justify-between text-sm mb-1">
+                            <span class="text-dark-200">Haircut with Dye</span>
+                            <span class="text-gold-400 font-semibold">${dyeCount} (${Math.round(dyeCount/total*100)}%)</span>
+                        </div>
+                        <div class="w-full h-2 bg-dark-600 rounded-full overflow-hidden">
+                            <div class="h-full bg-gold-400 rounded-full" style="width: ${dyeCount/total*100}%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="flex-1">
+                        <div class="flex justify-between text-sm mb-1">
+                            <span class="text-dark-200">Haircut without Dye</span>
+                            <span class="text-gold-400 font-semibold">${nodyeCount} (${Math.round(nodyeCount/total*100)}%)</span>
+                        </div>
+                        <div class="w-full h-2 bg-dark-600 rounded-full overflow-hidden">
+                            <div class="h-full bg-blue-400 rounded-full" style="width: ${nodyeCount/total*100}%"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderPeakHours() {
+            const container = document.getElementById('peakHours');
+            
+            // Count bookings by hour
+            const hourCounts = {};
+            allBookings.forEach(b => {
+                if (b.status === 'confirmed') {
+                    const hour = parseInt(b.time.split(':')[0]);
+                    hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+                }
+            });
+            
+            // Sort by count
+            const sorted = Object.entries(hourCounts).sort((a, b) => b[1] - a[1]);
+            
+            if (sorted.length === 0) {
+                container.innerHTML = '<p class="text-sm text-dark-400 text-center py-4">No data yet</p>';
+                return;
+            }
+            
+            container.innerHTML = '';
+            sorted.slice(0, 5).forEach(([hour, count], index) => {
+                const timeDisplay = formatTimeDisplay(`${hour}:00`).split(' ')[0];
+                const div = document.createElement('div');
+                div.className = 'flex items-center gap-3';
+                div.innerHTML = `
+                    <span class="text-xs text-dark-300 w-8">${index + 1}</span>
+                    <span class="text-sm font-semibold w-16">${timeDisplay}</span>
+                    <div class="flex-1 h-2 bg-dark-600 rounded-full overflow-hidden">
+                        <div class="h-full bg-green-400 rounded-full" style="width: ${count/sorted[0][1]*100}%"></div>
+                    </div>
+                    <span class="text-xs text-dark-300 w-8 text-right">${count}</span>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function renderSummaryStats() {
+            const container = document.getElementById('summaryStats');
+            
+            const totalBookings = allBookings.length;
+            const confirmedBookings = allBookings.filter(b => b.status === 'confirmed').length;
+            const cancelledBookings = allBookings.filter(b => b.status === 'cancelled').length;
+            const totalRevenue = allBookings.filter(b => b.status === 'confirmed').reduce((sum, b) => sum + (b.total || 0), 0);
+            const avgBookingValue = confirmedBookings > 0 ? (totalRevenue / confirmedBookings).toFixed(0) : 0;
+            const lateFees = allBookings.reduce((sum, b) => sum + (b.lateFee || 0), 0);
+            const cancellationFees = allBookings.reduce((sum, b) => sum + (b.cancellationFee || 0), 0);
+            
+            container.innerHTML = `
+                <div class="flex justify-between py-2 border-b border-dark-600">
+                    <span class="text-dark-300">Total Bookings</span>
+                    <span class="font-semibold">${totalBookings}</span>
+                </div>
+                <div class="flex justify-between py-2 border-b border-dark-600">
+                    <span class="text-dark-300">Confirmation Rate</span>
+                    <span class="font-semibold text-green-400">${totalBookings > 0 ? Math.round(confirmedBookings/totalBookings*100) : 0}%</span>
+                </div>
+                <div class="flex justify-between py-2 border-b border-dark-600">
+                    <span class="text-dark-300">Avg. Booking Value</span>
+                    <span class="font-semibold text-gold-400">R${avgBookingValue}</span>
+                </div>
+                <div class="flex justify-between py-2 border-b border-dark-600">
+                    <span class="text-dark-300">Late Fees Collected</span>
+                    <span class="font-semibold text-yellow-400">R${lateFees}</span>
+                </div>
+                <div class="flex justify-between py-2 border-b border-dark-600">
+                    <span class="text-dark-300">Cancellation Fees</span>
+                    <span class="font-semibold text-yellow-400">R${cancellationFees}</span>
+                </div>
+                <div class="flex justify-between py-2">
+                    <span class="text-dark-300">Total Revenue</span>
+                    <span class="font-bold text-gold-400">R${totalRevenue}</span>
+                </div>
+            `;
+        }
+
+        // ============================================
+        // SETTINGS
+        // ============================================
+        function updatePassword() {
+            const newPass = document.getElementById('newPassword').value;
+            const confirmPass = document.getElementById('confirmPassword').value;
+            
+            if (!newPass) {
+                showNotification('Please enter a new password', 'error');
+                return;
+            }
+            if (newPass !== confirmPass) {
+                showNotification('Passwords do not match', 'error');
+                return;
+            }
+            if (newPass.length < 6) {
+                showNotification('Password must be at least 6 characters', 'error');
+                return;
+            }
+            
+            adminState.password = newPass;
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
+            showNotification('Password updated successfully', 'success');
+        }
+
+        function exportBookings() {
+            const dataStr = JSON.stringify(allBookings, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `bookings_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showNotification('Bookings exported', 'success');
+        }
+
+        // ============================================
+        // UTILITIES
+        // ============================================
+        function formatDateDisplay(dateString) {
+            const date = new Date(dateString + 'T00:00:00');
+            const options = { weekday: 'short', month: 'short', day: 'numeric' };
+            return date.toLocaleDateString('en-ZA', options);
+        }
+
+        function formatTimeDisplay(time) {
+            const [hour, minute] = time.split(':').map(Number);
+            const h12h = hour > 12 ? hour - 12 : hour;
+            const ampm = hour >= 12 ? 'PM' : 'AM';
+            return `${h12h}:${String(minute).padStart(2, '0')} ${ampm}`;
+        }
     </script>
 </body>
 </html>

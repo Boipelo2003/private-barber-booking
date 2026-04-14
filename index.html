@@ -861,14 +861,14 @@ const EMAILJS_TEMPLATE_ID = "template_4fg78jn";
             if (isFirebaseInitialized) {
                 return await db.collection('bookings').add(booking);
             }
-            await addBookingToStorage(booking);
+            await addBookingFirestore(booking);
         }
 
         async function updateBookingFirestore(bookingId, updates) {
             if (isFirebaseInitialized) {
                 return await db.collection('bookings').doc(bookingId).update(updates);
             }
-            await updateBookingInStorage(bookingId, updates);
+            await updateBookingFirestore(bookingId, updates);
         }
 
         async function deleteBookingFirestore(bookingId) {
@@ -1466,7 +1466,7 @@ const EMAILJS_TEMPLATE_ID = "template_4fg78jn";
     }
     
     try {
-        await updateBookingInStorage(bookingId, {
+        await updateBookingFirestore(bookingId, {
             status: 'cancelled',
             cancelledAt: new Date().toISOString(),
             cancellationFee: lateFee
@@ -1515,7 +1515,7 @@ const EMAILJS_TEMPLATE_ID = "template_4fg78jn";
     }
     
     try {
-        await updateBookingInStorage(rescheduleState.bookingId, {
+        await updateBookingFirestore(rescheduleState.bookingId, {
             date: newDate,
             time: newTime,
             rescheduledAt: new Date().toISOString()
@@ -1643,7 +1643,7 @@ const EMAILJS_TEMPLATE_ID = "template_4fg78jn";
             if (!confirm('Are you sure you want to cancel this booking?')) return;
             
             try {
-                await updateBookingInStorage(bookingId, {
+                await updateBookingFirestore(bookingId, {
                     status: 'cancelled',
                     cancelledAt: new Date().toISOString()
                 });
@@ -1682,3 +1682,4 @@ const EMAILJS_TEMPLATE_ID = "template_4fg78jn";
     </script>
 </body>
 </html>
+

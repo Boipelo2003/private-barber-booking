@@ -1,1698 +1,2123 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BarberPro - Premium Booking</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-    <script src="https://cdn.emailjs.com/dist/email.min.js"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        gold: {
-                            100: '#FDF5E6',
-                            200: '#F5E6C8',
-                            300: '#E8D5A3',
-                            400: '#D4AF37',
-                            500: '#C5A028',
-                            600: '#A88620',
-                            700: '#8B6F18',
-                        },
-                        dark: {
-                            50: '#F5F5F5',
-                            100: '#E5E5E5',
-                            200: '#CCCCCC',
-                            300: '#999999',
-                            400: '#666666',
-                            500: '#333333',
-                            600: '#1F1F1F',
-                            700: '#1A1A1A',
-                            800: '#111111',
-                            900: '#0A0A0A',
-                            950: '#050505',
-                        }
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'system-ui', 'sans-serif'],
-                    }
-                }
-            }
-        }
-    </script>
-    <link href="https://cdn.jsdelivr.net/npm/fontsource-inter@5.0.16/index.css" rel="stylesheet">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            font-family: 'Inter', system-ui, sans-serif;
-            background: linear-gradient(135deg, #050505 0%, #111111 50%, #0A0A0A 100%);
-            color: #F5F5F5;
-            min-height: 100vh;
-        }
-        .glass {
-            background: rgba(26, 26, 26, 0.6);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(212, 175, 55, 0.15);
-        }
-        .glass-light {
-            background: rgba(31, 31, 31, 0.4);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-        .glass-gold {
-            background: rgba(212, 175, 55, 0.08);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
-            border: 1px solid rgba(212, 175, 55, 0.3);
-        }
-        .gold-glow {
-            box-shadow: 0 0 20px rgba(212, 175, 55, 0.15);
-        }
-        .gold-glow-hover:hover {
-            box-shadow: 0 0 30px rgba(212, 175, 55, 0.3);
-        }
-        .modal-overlay {
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(10px);
-        }
-        .step-indicator {
-            transition: all 0.3s ease;
-        }
-        .step-indicator.active {
-            background: #D4AF37;
-            color: #0A0A0A;
-        }
-        .step-indicator.completed {
-            background: #D4AF37;
-            color: #0A0A0A;
-        }
-        .time-slot {
-            transition: all 0.2s ease;
-        }
-        .time-slot:hover:not(.disabled) {
-            background: rgba(212, 175, 55, 0.2);
-            border-color: #D4AF37;
-        }
-        .time-slot.selected {
-            background: #D4AF37;
-            color: #0A0A0A;
-            border-color: #D4AF37;
-        }
-        .time-slot.disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-            text-decoration: line-through;
-        }
-        .service-card {
-            transition: all 0.3s ease;
-        }
-        .service-card:hover {
-            border-color: #D4AF37;
-        }
-        .service-card.selected {
-            border-color: #D4AF37;
-            background: rgba(212, 175, 55, 0.15);
-        }
-        .calendar-day {
-            transition: all 0.2s ease;
-        }
-        .calendar-day:hover:not(.disabled):not(.empty) {
-            background: rgba(212, 175, 55, 0.2);
-        }
-        .calendar-day.selected {
-            background: #D4AF37;
-            color: #0A0A0A;
-        }
-        .calendar-day.disabled {
-            opacity: 0.3;
-            cursor: not-allowed;
-        }
-        .calendar-day.empty {
-            cursor: default;
-        }
-        .calendar-day.today {
-            border: 1px solid #D4AF37;
-        }
-        .fade-in {
-            animation: fadeIn 0.4s ease-out;
-        }
-        .slide-up {
-            animation: slideUp 0.5s ease-out;
-        }
-        .slide-in-right {
-            animation: slideInRight 0.4s ease-out;
-        }
-        .slide-in-left {
-            animation: slideInLeft 0.4s ease-out;
-        }
-        .pulse-gold {
-            animation: pulseGold 2s infinite;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes slideInRight {
-            from { opacity: 0; transform: translateX(30px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-        @keyframes slideInLeft {
-            from { opacity: 0; transform: translateX(-30px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-        @keyframes pulseGold {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.4); }
-            50% { box-shadow: 0 0 0 10px rgba(212, 175, 55, 0); }
-        }
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-        .spinner {
-            animation: spin 1s linear infinite;
-        }
-        .notification {
-            animation: slideDown 0.3s ease-out;
-        }
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .table-row-hover:hover {
-            background: rgba(212, 175, 55, 0.05);
-        }
-        ::-webkit-scrollbar {
-            width: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #111;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #D4AF37;
-            border-radius: 3px;
-        }
-        input:focus, select:focus {
-            outline: none;
-            border-color: #D4AF37;
-            box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2);
-        }
-        .btn-gold {
-            background: linear-gradient(135deg, #D4AF37 0%, #C5A028 50%, #A88620 100%);
-            transition: all 0.3s ease;
-        }
-        .btn-gold:hover {
-            background: linear-gradient(135deg, #E5C44A 0%, #D4AF37 50%, #C5A028 100%);
-            transform: translateY(-1px);
-        }
-        .btn-gold:active {
-            transform: translateY(0);
-        }
-        .btn-outline-gold {
-            border: 1px solid #D4AF37;
-            color: #D4AF37;
-            transition: all 0.3s ease;
-        }
-        .btn-outline-gold:hover {
-            background: rgba(212, 175, 55, 0.1);
-        }
-        .booking-status-confirmed {
-            color: #22C55E;
-        }
-        .booking-status-cancelled {
-            color: #EF4444;
-            text-decoration: line-through;
-        }
-        .late-fee-badge {
-            background: rgba(239, 68, 68, 0.2);
-            color: #EF4444;
-            border: 1px solid rgba(239, 68, 68, 0.3);
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PRIVATE BARBER 💈</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Jost:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --black: #0b0b0b;
+  --black2: #111111;
+  --black3: #181818;
+  --black4: #222222;
+  --gold: #ffffff;
+  --gold2: #f0f0f0;
+  --gold3: #aaaaaa;
+  --gold-dim: rgba(255,255,255,0.07);
+  --gold-glow: rgba(255,255,255,0.2);
+  --white: #f5f0e8;
+  --white2: #c8c0b0;
+  --white3: #8a8070;
+  --danger: #c0392b;
+  --danger-dim: rgba(192,57,43,0.12);
+  --success: #27ae60;
+  --success-dim: rgba(39,174,96,0.12);
+  --radius: 12px;
+  --radius2: 8px;
+  --trans: all 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;font-size:16px}
+body{
+  background:var(--black);
+  color:var(--white);
+  font-family:'Jost',sans-serif;
+  font-weight:300;
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+/* ─── SCROLLBAR ─── */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:var(--black2)}
+::-webkit-scrollbar-thumb{background:var(--gold3);border-radius:2px}
+
+/* ─── TEXTURE OVERLAY ─── */
+body::before{
+  content:'';
+  position:fixed;
+  inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  pointer-events:none;
+  z-index:9999;
+  opacity:0.6;
+}
+
+/* ─── NAV ─── */
+#nav{
+  position:fixed;
+  top:0;left:0;right:0;
+  z-index:100;
+  padding:0 5%;
+  height:72px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  background:rgba(11,11,11,0.92);
+  backdrop-filter:blur(20px);
+  border-bottom:1px solid rgba(255,255,255,0.1);
+  transition:var(--trans);
+}
+#nav.scrolled{
+  height:60px;
+  background:rgba(11,11,11,0.98);
+}
+.nav-logo{
+  font-family:'Cormorant Garamond',serif;
+  font-size:1.45rem;
+  font-weight:600;
+  color:var(--gold);
+  letter-spacing:0.12em;
+  text-transform:uppercase;
+  display:flex;align-items:center;gap:8px;
+  cursor:pointer;
+}
+.nav-logo span{font-size:1.2rem}
+.nav-links{
+  display:flex;align-items:center;gap:6px;
+}
+.nav-btn{
+  background:none;border:none;
+  color:var(--white2);
+  font-family:'Jost',sans-serif;
+  font-size:0.78rem;
+  font-weight:400;
+  letter-spacing:0.1em;
+  text-transform:uppercase;
+  padding:8px 14px;
+  border-radius:var(--radius2);
+  cursor:pointer;
+  transition:var(--trans);
+}
+.nav-btn:hover{color:var(--gold);background:var(--gold-dim)}
+.nav-btn.active{color:var(--gold);background:var(--gold-dim)}
+.nav-btn.gold{
+  background:var(--gold);
+  color:var(--black);
+  font-weight:600;
+}
+.nav-btn.gold:hover{background:var(--gold2);box-shadow:0 0 20px var(--gold-glow)}
+
+/* ─── HERO ─── */
+#hero{
+  min-height:100vh;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  text-align:center;
+  padding:100px 5% 80px;
+  position:relative;
+  overflow:hidden;
+}
+.hero-bg{
+  position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 30%, rgba(255,255,255,0.03) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 80% at 80% 80%, rgba(255,255,255,0.02) 0%, transparent 60%);
+}
+.hero-line{
+  width:1px;height:80px;
+  background:linear-gradient(to bottom, transparent, var(--gold), transparent);
+  margin:0 auto 40px;
+  animation:fadeIn 1s 0.3s both;
+}
+.hero-eyebrow{
+  font-size:0.7rem;
+  letter-spacing:0.35em;
+  text-transform:uppercase;
+  color:var(--gold);
+  font-weight:400;
+  margin-bottom:20px;
+  animation:slideUp 0.8s 0.4s both;
+}
+.hero-title{
+  font-family:'Cormorant Garamond',serif;
+  font-size:clamp(3.5rem,9vw,7rem);
+  font-weight:600;
+  line-height:0.92;
+  color:var(--white);
+  margin-bottom:12px;
+  animation:slideUp 0.8s 0.5s both;
+}
+.hero-title em{
+  font-style:italic;
+  color:var(--gold);
+}
+.hero-sub{
+  font-size:0.85rem;
+  letter-spacing:0.2em;
+  text-transform:uppercase;
+  color:var(--white3);
+  margin-bottom:48px;
+  animation:slideUp 0.8s 0.6s both;
+}
+.hero-cta{
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:center;
+  animation:slideUp 0.8s 0.7s both;
+}
+.btn-gold{
+  background:var(--gold);
+  color:var(--black);
+  border:none;
+  font-family:'Jost',sans-serif;
+  font-size:0.78rem;
+  font-weight:600;
+  letter-spacing:0.15em;
+  text-transform:uppercase;
+  padding:14px 32px;
+  border-radius:var(--radius2);
+  cursor:pointer;
+  transition:var(--trans);
+  display:flex;align-items:center;gap:8px;
+}
+.btn-gold:hover{
+  background:var(--gold2);
+  box-shadow:0 8px 30px var(--gold-glow);
+  transform:translateY(-2px);
+}
+.btn-outline{
+  background:none;
+  color:var(--white2);
+  border:1px solid rgba(255,255,255,0.18);
+  font-family:'Jost',sans-serif;
+  font-size:0.78rem;
+  font-weight:400;
+  letter-spacing:0.15em;
+  text-transform:uppercase;
+  padding:14px 32px;
+  border-radius:var(--radius2);
+  cursor:pointer;
+  transition:var(--trans);
+}
+.btn-outline:hover{
+  border-color:var(--gold);
+  color:var(--gold);
+  background:var(--gold-dim);
+}
+.hero-badges{
+  display:flex;align-items:center;gap:32px;
+  margin-top:72px;
+  animation:fadeIn 1s 0.9s both;
+}
+.badge{
+  text-align:center;
+}
+.badge-num{
+  font-family:'Cormorant Garamond',serif;
+  font-size:2.2rem;
+  font-weight:600;
+  color:var(--gold);
+  line-height:1;
+}
+.badge-label{
+  font-size:0.65rem;
+  letter-spacing:0.2em;
+  text-transform:uppercase;
+  color:var(--white3);
+  margin-top:4px;
+}
+.badge-divider{
+  width:1px;height:40px;
+  background:rgba(255,255,255,0.12);
+}
+
+/* ─── SECTIONS ─── */
+.section{
+  padding:100px 5%;
+  max-width:1200px;
+  margin:0 auto;
+}
+.section-label{
+  font-size:0.68rem;
+  letter-spacing:0.35em;
+  text-transform:uppercase;
+  color:var(--gold);
+  margin-bottom:12px;
+}
+.section-title{
+  font-family:'Cormorant Garamond',serif;
+  font-size:clamp(2rem,4vw,3rem);
+  font-weight:600;
+  color:var(--white);
+  margin-bottom:48px;
+  line-height:1.1;
+}
+
+/* ─── SERVICES ─── */
+.services-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+  gap:20px;
+}
+.service-card{
+  background:var(--black2);
+  border:1px solid rgba(255,255,255,0.07);
+  border-radius:var(--radius);
+  padding:36px 32px;
+  transition:var(--trans);
+  cursor:pointer;
+  position:relative;
+  overflow:hidden;
+}
+.service-card::before{
+  content:'';
+  position:absolute;
+  top:0;left:0;right:0;
+  height:2px;
+  background:linear-gradient(to right, transparent, var(--gold), transparent);
+  opacity:0;
+  transition:var(--trans);
+}
+.service-card:hover{
+  border-color:rgba(255,255,255,0.2);
+  transform:translateY(-4px);
+  box-shadow:0 20px 60px rgba(0,0,0,0.4);
+}
+.service-card:hover::before{opacity:1}
+.service-icon{
+  font-size:2rem;margin-bottom:20px;
+}
+.service-name{
+  font-family:'Cormorant Garamond',serif;
+  font-size:1.5rem;
+  font-weight:600;
+  color:var(--white);
+  margin-bottom:8px;
+}
+.service-desc{
+  font-size:0.82rem;
+  color:var(--white3);
+  line-height:1.6;
+  margin-bottom:24px;
+}
+.service-price{
+  font-family:'Cormorant Garamond',serif;
+  font-size:2rem;
+  font-weight:600;
+  color:var(--gold);
+}
+.service-price span{
+  font-family:'Jost',sans-serif;
+  font-size:0.75rem;
+  color:var(--white3);
+  font-weight:300;
+}
+
+/* ─── PAGES ─── */
+.page{display:none}
+.page.active{display:block}
+#page-home{padding-top:0}
+
+/* ─── BOOKING FLOW ─── */
+#page-booking{
+  padding-top:110px;
+  padding-bottom:80px;
+  max-width:680px;
+  margin:0 auto;
+  padding-left:5%;
+  padding-right:5%;
+}
+.booking-header{
+  text-align:center;
+  margin-bottom:48px;
+}
+.step-indicator{
+  display:flex;align-items:center;justify-content:center;
+  gap:0;
+  margin-bottom:40px;
+}
+.step-dot{
+  width:32px;height:32px;
+  border-radius:50%;
+  border:1.5px solid rgba(255,255,255,0.15);
+  background:var(--black2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:0.7rem;
+  font-weight:500;
+  color:var(--white3);
+  transition:var(--trans);
+  position:relative;
+  z-index:1;
+  flex-shrink:0;
+}
+.step-dot.active{
+  border-color:var(--gold);
+  background:var(--gold);
+  color:var(--black);
+  box-shadow:0 0 16px var(--gold-glow);
+}
+.step-dot.done{
+  border-color:var(--gold);
+  background:var(--gold-dim);
+  color:var(--gold);
+}
+.step-line{
+  flex:1;height:1px;
+  background:rgba(255,255,255,0.1);
+  max-width:60px;
+}
+.step-line.done{background:var(--gold3)}
+
+.step-panel{display:none}
+.step-panel.active{display:block;animation:slideUp 0.4s both}
+
+.step-title{
+  font-family:'Cormorant Garamond',serif;
+  font-size:1.8rem;
+  font-weight:600;
+  color:var(--white);
+  margin-bottom:6px;
+}
+.step-subtitle{
+  font-size:0.8rem;
+  color:var(--white3);
+  letter-spacing:0.08em;
+  margin-bottom:32px;
+}
+
+/* Date picker */
+.calendar{
+  background:var(--black2);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:var(--radius);
+  padding:24px;
+  margin-bottom:24px;
+}
+.cal-header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:20px;
+}
+.cal-month{
+  font-family:'Cormorant Garamond',serif;
+  font-size:1.2rem;
+  font-weight:600;
+  color:var(--white);
+}
+.cal-nav{
+  background:none;border:1px solid rgba(255,255,255,0.12);
+  color:var(--gold);
+  width:32px;height:32px;
+  border-radius:var(--radius2);
+  cursor:pointer;
+  font-size:1rem;
+  display:flex;align-items:center;justify-content:center;
+  transition:var(--trans);
+}
+.cal-nav:hover{background:var(--gold-dim);border-color:var(--gold)}
+.cal-grid{
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  gap:4px;
+}
+.cal-day-label{
+  text-align:center;
+  font-size:0.62rem;
+  letter-spacing:0.1em;
+  color:var(--white3);
+  padding:6px 0;
+  text-transform:uppercase;
+}
+.cal-day{
+  aspect-ratio:1;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:var(--radius2);
+  font-size:0.82rem;
+  cursor:pointer;
+  transition:var(--trans);
+  position:relative;
+}
+.cal-day:hover:not(.disabled):not(.empty){
+  background:var(--gold-dim);
+  color:var(--gold);
+}
+.cal-day.selected{
+  background:var(--gold);
+  color:var(--black);
+  font-weight:600;
+  box-shadow:0 0 12px var(--gold-glow);
+}
+.cal-day.disabled{
+  opacity:0.25;
+  cursor:not-allowed;
+}
+.cal-day.today{
+  border:1px solid rgba(255,255,255,0.25);
+}
+.cal-day.empty{cursor:default}
+
+/* Time slots */
+.time-grid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:8px;
+  margin-bottom:24px;
+}
+@media(max-width:400px){.time-grid{grid-template-columns:repeat(3,1fr)}}
+.time-slot{
+  background:var(--black2);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:var(--radius2);
+  padding:10px 6px;
+  text-align:center;
+  cursor:pointer;
+  transition:var(--trans);
+  font-size:0.78rem;
+  font-weight:400;
+  color:var(--white2);
+  position:relative;
+}
+.time-slot:hover:not(.booked){
+  border-color:var(--gold);
+  color:var(--gold);
+  background:var(--gold-dim);
+}
+.time-slot.selected{
+  background:var(--gold);
+  color:var(--black);
+  border-color:var(--gold);
+  font-weight:600;
+  box-shadow:0 0 12px var(--gold-glow);
+}
+.time-slot.booked{
+  opacity:0.3;
+  cursor:not-allowed;
+  text-decoration:line-through;
+}
+.time-slot .late-badge{
+  display:block;
+  font-size:0.55rem;
+  color:var(--gold3);
+  margin-top:2px;
+  letter-spacing:0.05em;
+}
+.time-slot.selected .late-badge{color:rgba(0,0,0,0.6)}
+
+/* Services step */
+.service-options{display:flex;flex-direction:column;gap:12px;margin-bottom:24px}
+.service-option{
+  background:var(--black2);
+  border:1.5px solid rgba(255,255,255,0.1);
+  border-radius:var(--radius);
+  padding:20px 24px;
+  cursor:pointer;
+  transition:var(--trans);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.service-option:hover{
+  border-color:rgba(255,255,255,0.25);
+  background:var(--black3);
+}
+.service-option.selected{
+  border-color:var(--gold);
+  background:var(--gold-dim);
+  box-shadow:0 0 20px rgba(255,255,255,0.05);
+}
+.service-option-left{display:flex;flex-direction:column;gap:4px}
+.service-option-name{
+  font-family:'Cormorant Garamond',serif;
+  font-size:1.15rem;
+  font-weight:600;
+  color:var(--white);
+}
+.service-option-note{
+  font-size:0.75rem;
+  color:var(--white3);
+}
+.service-option-price{
+  font-family:'Cormorant Garamond',serif;
+  font-size:1.6rem;
+  font-weight:600;
+  color:var(--gold);
+}
+
+/* Details form */
+.form-group{margin-bottom:20px}
+.form-label{
+  display:block;
+  font-size:0.7rem;
+  letter-spacing:0.15em;
+  text-transform:uppercase;
+  color:var(--white3);
+  margin-bottom:8px;
+}
+.form-input{
+  width:100%;
+  background:var(--black2);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:var(--radius2);
+  padding:14px 16px;
+  color:var(--white);
+  font-family:'Jost',sans-serif;
+  font-size:0.9rem;
+  font-weight:300;
+  transition:var(--trans);
+  outline:none;
+}
+.form-input:focus{
+  border-color:var(--gold);
+  background:var(--black3);
+  box-shadow:0 0 0 3px rgba(255,255,255,0.05);
+}
+.form-input::placeholder{color:var(--white3)}
+
+.summary-box{
+  background:var(--black2);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:var(--radius);
+  padding:20px 24px;
+  margin-bottom:20px;
+}
+.summary-row{
+  display:flex;justify-content:space-between;
+  align-items:center;
+  padding:8px 0;
+  font-size:0.85rem;
+  color:var(--white2);
+  border-bottom:1px solid rgba(255,255,255,0.05);
+}
+.summary-row:last-child{border-bottom:none}
+.summary-row.total{
+  font-weight:600;
+  color:var(--gold);
+  font-family:'Cormorant Garamond',serif;
+  font-size:1.1rem;
+  padding-top:12px;
+}
+.summary-row.total span:last-child{font-size:1.3rem}
+
+.warning-box{
+  background:rgba(192,57,43,0.08);
+  border:1px solid rgba(192,57,43,0.3);
+  border-radius:var(--radius2);
+  padding:12px 16px;
+  font-size:0.78rem;
+  color:#e07060;
+  display:flex;align-items:flex-start;gap:8px;
+  margin-bottom:20px;
+  line-height:1.5;
+}
+
+/* Confirmation */
+.confirm-card{
+  background:var(--black2);
+  border:1px solid rgba(255,255,255,0.15);
+  border-radius:var(--radius);
+  padding:40px 36px;
+  text-align:center;
+  position:relative;
+  overflow:hidden;
+}
+.confirm-card::before{
+  content:'';
+  position:absolute;
+  top:0;left:0;right:0;
+  height:2px;
+  background:linear-gradient(to right, transparent, var(--gold), transparent);
+}
+.confirm-icon{
+  font-size:3.5rem;
+  margin-bottom:16px;
+  animation:bounceIn 0.6s 0.2s both;
+}
+.confirm-title{
+  font-family:'Cormorant Garamond',serif;
+  font-size:2rem;
+  font-weight:600;
+  color:var(--gold);
+  margin-bottom:8px;
+}
+.confirm-sub{
+  font-size:0.8rem;
+  color:var(--white3);
+  margin-bottom:28px;
+}
+.booking-id{
+  background:var(--black);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:var(--radius2);
+  padding:12px 20px;
+  font-size:0.78rem;
+  color:var(--white3);
+  display:inline-block;
+  margin-bottom:28px;
+  letter-spacing:0.1em;
+}
+.booking-id strong{color:var(--gold);letter-spacing:0.15em}
+.confirm-details{
+  text-align:left;
+  margin-bottom:24px;
+}
+
+/* Step nav buttons */
+.step-nav{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:12px;
+  margin-top:8px;
+}
+.btn-back{
+  background:none;
+  border:1px solid rgba(255,255,255,0.12);
+  color:var(--white3);
+  font-family:'Jost',sans-serif;
+  font-size:0.78rem;
+  font-weight:400;
+  letter-spacing:0.1em;
+  text-transform:uppercase;
+  padding:13px 24px;
+  border-radius:var(--radius2);
+  cursor:pointer;
+  transition:var(--trans);
+  display:flex;align-items:center;gap:6px;
+}
+.btn-back:hover{border-color:var(--gold);color:var(--gold)}
+.btn-next{
+  flex:1;
+  background:var(--gold);
+  color:var(--black);
+  border:none;
+  font-family:'Jost',sans-serif;
+  font-size:0.78rem;
+  font-weight:600;
+  letter-spacing:0.15em;
+  text-transform:uppercase;
+  padding:14px 24px;
+  border-radius:var(--radius2);
+  cursor:pointer;
+  transition:var(--trans);
+}
+.btn-next:hover{
+  background:var(--gold2);
+  box-shadow:0 8px 25px var(--gold-glow);
+}
+.btn-next:disabled{
+  background:var(--black4);
+  color:var(--white3);
+  cursor:not-allowed;
+  box-shadow:none;
+}
+
+/* ─── MY BOOKINGS ─── */
+#page-bookings{
+  padding-top:110px;
+  padding-bottom:80px;
+  max-width:720px;
+  margin:0 auto;
+  padding-left:5%;
+  padding-right:5%;
+}
+.email-lookup{
+  background:var(--black2);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:var(--radius);
+  padding:32px;
+  margin-bottom:32px;
+  text-align:center;
+}
+.email-lookup-title{
+  font-family:'Cormorant Garamond',serif;
+  font-size:1.4rem;
+  font-weight:600;
+  color:var(--white);
+  margin-bottom:6px;
+}
+.email-lookup-sub{font-size:0.8rem;color:var(--white3);margin-bottom:20px}
+.email-lookup-row{
+  display:flex;gap:10px;
+}
+.booking-card{
+  background:var(--black2);
+  border:1px solid rgba(255,255,255,0.07);
+  border-radius:var(--radius);
+  padding:24px;
+  margin-bottom:16px;
+  transition:var(--trans);
+  animation:slideUp 0.4s both;
+}
+.booking-card:hover{border-color:rgba(255,255,255,0.15)}
+.bc-header{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  margin-bottom:16px;
+}
+.bc-id{
+  font-size:0.65rem;
+  letter-spacing:0.15em;
+  color:var(--white3);
+  margin-bottom:4px;
+}
+.bc-name{
+  font-family:'Cormorant Garamond',serif;
+  font-size:1.2rem;
+  font-weight:600;
+  color:var(--white);
+}
+.status-badge{
+  font-size:0.65rem;
+  letter-spacing:0.1em;
+  text-transform:uppercase;
+  padding:4px 10px;
+  border-radius:20px;
+  font-weight:500;
+}
+.status-badge.confirmed{
+  background:var(--success-dim);
+  color:#4ecb80;
+  border:1px solid rgba(39,174,96,0.3);
+}
+.status-badge.pending{
+  background:var(--gold-dim);
+  color:var(--gold);
+  border:1px solid rgba(255,255,255,0.18);
+}
+.status-badge.cancelled{
+  background:var(--danger-dim);
+  color:#e07060;
+  border:1px solid rgba(192,57,43,0.3);
+}
+.bc-details{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-bottom:16px;
+}
+.bc-detail{
+  font-size:0.8rem;
+  color:var(--white3);
+  display:flex;align-items:center;gap:6px;
+}
+.bc-detail strong{color:var(--white2);font-weight:400}
+.bc-price{
+  font-family:'Cormorant Garamond',serif;
+  font-size:1.3rem;
+  color:var(--gold);
+  font-weight:600;
+  margin-bottom:16px;
+}
+.bc-actions{
+  display:flex;gap:8px;flex-wrap:wrap;
+}
+.btn-sm{
+  font-family:'Jost',sans-serif;
+  font-size:0.72rem;
+  font-weight:500;
+  letter-spacing:0.08em;
+  text-transform:uppercase;
+  padding:9px 16px;
+  border-radius:var(--radius2);
+  cursor:pointer;
+  transition:var(--trans);
+  border:1px solid;
+}
+.btn-sm-cancel{
+  background:var(--danger-dim);
+  border-color:rgba(192,57,43,0.3);
+  color:#e07060;
+}
+.btn-sm-cancel:hover{
+  background:rgba(192,57,43,0.2);
+  border-color:#c0392b;
+}
+.btn-sm-reschedule{
+  background:var(--gold-dim);
+  border-color:rgba(255,255,255,0.18);
+  color:var(--gold);
+}
+.btn-sm-reschedule:hover{
+  background:rgba(255,255,255,0.12);
+  border-color:var(--gold);
+}
+
+/* ─── ADMIN ─── */
+#page-admin{
+  padding-top:110px;
+  padding-bottom:80px;
+  max-width:900px;
+  margin:0 auto;
+  padding-left:5%;
+  padding-right:5%;
+}
+.admin-login{
+  max-width:400px;
+  margin:0 auto;
+  background:var(--black2);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:var(--radius);
+  padding:40px 36px;
+  text-align:center;
+}
+.admin-stats{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:16px;
+  margin-bottom:32px;
+}
+.stat-card{
+  background:var(--black2);
+  border:1px solid rgba(255,255,255,0.07);
+  border-radius:var(--radius);
+  padding:20px 24px;
+}
+.stat-num{
+  font-family:'Cormorant Garamond',serif;
+  font-size:2.2rem;
+  font-weight:600;
+  color:var(--gold);
+  line-height:1;
+}
+.stat-label{
+  font-size:0.7rem;
+  letter-spacing:0.12em;
+  text-transform:uppercase;
+  color:var(--white3);
+  margin-top:4px;
+}
+.admin-section-title{
+  font-family:'Cormorant Garamond',serif;
+  font-size:1.3rem;
+  font-weight:600;
+  color:var(--white);
+  margin-bottom:16px;
+  padding-bottom:8px;
+  border-bottom:1px solid rgba(255,255,255,0.07);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.admin-booking-card{
+  background:var(--black2);
+  border:1px solid rgba(255,255,255,0.07);
+  border-radius:var(--radius);
+  padding:20px 24px;
+  margin-bottom:12px;
+  transition:var(--trans);
+  animation:slideUp 0.3s both;
+}
+.admin-booking-card:hover{border-color:rgba(255,255,255,0.12)}
+.abc-top{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  margin-bottom:12px;
+  flex-wrap:wrap;gap:8px;
+}
+.abc-name{
+  font-family:'Cormorant Garamond',serif;
+  font-size:1.1rem;
+  font-weight:600;
+  color:var(--white);
+}
+.abc-phone{font-size:0.78rem;color:var(--white3);margin-top:2px}
+.abc-info{
+  display:flex;gap:16px;flex-wrap:wrap;
+  margin-bottom:12px;
+  font-size:0.8rem;
+  color:var(--white2);
+}
+.abc-info span{display:flex;align-items:center;gap:5px;color:var(--white3)}
+.abc-info span strong{color:var(--white2)}
+.abc-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn-wa{
+  font-family:'Jost',sans-serif;
+  font-size:0.72rem;
+  font-weight:500;
+  letter-spacing:0.06em;
+  text-transform:uppercase;
+  padding:8px 14px;
+  border-radius:var(--radius2);
+  cursor:pointer;
+  transition:var(--trans);
+  border:1px solid;
+  text-decoration:none;
+  display:inline-flex;align-items:center;gap:6px;
+}
+.btn-wa-confirm{
+  background:var(--success-dim);
+  border-color:rgba(39,174,96,0.3);
+  color:#4ecb80;
+}
+.btn-wa-confirm:hover{background:rgba(39,174,96,0.2);border-color:#27ae60}
+.btn-wa-cancel{
+  background:var(--danger-dim);
+  border-color:rgba(192,57,43,0.3);
+  color:#e07060;
+}
+.btn-wa-cancel:hover{background:rgba(192,57,43,0.2);border-color:#c0392b}
+.btn-wa-reschedule{
+  background:var(--gold-dim);
+  border-color:rgba(255,255,255,0.18);
+  color:var(--gold);
+}
+.btn-wa-reschedule:hover{background:rgba(255,255,255,0.12);border-color:var(--gold)}
+.admin-quick-actions{
+  display:flex;gap:12px;flex-wrap:wrap;
+  margin-bottom:32px;
+}
+
+/* ─── MODAL ─── */
+.modal-overlay{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,0.85);
+  backdrop-filter:blur(8px);
+  z-index:200;
+  display:flex;align-items:center;justify-content:center;
+  padding:20px;
+  opacity:0;pointer-events:none;
+  transition:opacity 0.3s;
+}
+.modal-overlay.open{opacity:1;pointer-events:all}
+.modal{
+  background:var(--black2);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:var(--radius);
+  padding:32px;
+  width:100%;max-width:480px;
+  transform:scale(0.92) translateY(20px);
+  transition:transform 0.3s cubic-bezier(0.4,0,0.2,1);
+  position:relative;
+}
+.modal-overlay.open .modal{transform:scale(1) translateY(0)}
+.modal-close{
+  position:absolute;
+  top:16px;right:16px;
+  background:none;
+  border:none;
+  color:var(--white3);
+  font-size:1.2rem;
+  cursor:pointer;
+  width:32px;height:32px;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:50%;
+  transition:var(--trans);
+}
+.modal-close:hover{background:rgba(255,255,255,0.05);color:var(--white)}
+.modal-title{
+  font-family:'Cormorant Garamond',serif;
+  font-size:1.5rem;
+  font-weight:600;
+  color:var(--white);
+  margin-bottom:8px;
+}
+.modal-sub{font-size:0.8rem;color:var(--white3);margin-bottom:24px}
+
+/* ─── TOAST ─── */
+#toast-container{
+  position:fixed;
+  top:86px;right:20px;
+  z-index:300;
+  display:flex;flex-direction:column;gap:8px;
+}
+.toast{
+  background:var(--black3);
+  border-left:3px solid var(--gold);
+  border-radius:var(--radius2);
+  padding:14px 18px;
+  font-size:0.82rem;
+  color:var(--white2);
+  min-width:260px;max-width:340px;
+  box-shadow:0 8px 32px rgba(0,0,0,0.5);
+  animation:toastIn 0.3s both;
+  display:flex;align-items:flex-start;gap:10px;
+}
+.toast.success{border-color:var(--success)}
+.toast.error{border-color:var(--danger)}
+.toast.warning{border-color:#e6a817}
+.toast-icon{font-size:1rem;flex-shrink:0;margin-top:1px}
+@keyframes toastIn{
+  from{transform:translateX(120%);opacity:0}
+  to{transform:translateX(0);opacity:1}
+}
+@keyframes toastOut{
+  from{transform:translateX(0);opacity:1}
+  to{transform:translateX(120%);opacity:0}
+}
+
+/* ─── MISC ─── */
+.gold-divider{
+  height:1px;
+  background:linear-gradient(to right, transparent, rgba(255,255,255,0.18), transparent);
+  margin:0 auto;
+  max-width:1200px;
+}
+.empty-state{
+  text-align:center;
+  padding:48px 20px;
+  color:var(--white3);
+  font-size:0.85rem;
+}
+.empty-state .icon{font-size:2.5rem;margin-bottom:12px}
+.filter-row{
+  display:flex;gap:8px;flex-wrap:wrap;
+  margin-bottom:20px;
+}
+.filter-btn{
+  background:var(--black2);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:20px;
+  padding:6px 14px;
+  font-family:'Jost',sans-serif;
+  font-size:0.72rem;
+  letter-spacing:0.08em;
+  text-transform:uppercase;
+  color:var(--white3);
+  cursor:pointer;
+  transition:var(--trans);
+}
+.filter-btn:hover,.filter-btn.active{
+  border-color:var(--gold);
+  color:var(--gold);
+  background:var(--gold-dim);
+}
+.logout-btn{
+  background:none;
+  border:1px solid rgba(255,255,255,0.1);
+  color:var(--white3);
+  font-family:'Jost',sans-serif;
+  font-size:0.72rem;
+  font-weight:400;
+  letter-spacing:0.1em;
+  text-transform:uppercase;
+  padding:6px 14px;
+  border-radius:var(--radius2);
+  cursor:pointer;
+  transition:var(--trans);
+}
+.logout-btn:hover{border-color:var(--danger);color:#e07060}
+
+/* ─── FOOTER ─── */
+footer{
+  border-top:1px solid rgba(255,255,255,0.05);
+  padding:48px 5%;
+  text-align:center;
+  color:var(--white3);
+  font-size:0.75rem;
+  letter-spacing:0.1em;
+}
+footer .footer-logo{
+  font-family:'Cormorant Garamond',serif;
+  font-size:1.2rem;
+  color:var(--gold);
+  letter-spacing:0.2em;
+  margin-bottom:12px;
+}
+
+/* ─── ANIMATIONS ─── */
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes bounceIn{
+  0%{opacity:0;transform:scale(0.3)}
+  60%{transform:scale(1.1)}
+  80%{transform:scale(0.95)}
+  100%{opacity:1;transform:scale(1)}
+}
+
+/* ─── RESPONSIVE ─── */
+@media(max-width:600px){
+  .nav-links .nav-btn:not(.gold){display:none}
+  .hero-badges{gap:20px}
+  .badge-num{font-size:1.6rem}
+  .time-grid{grid-template-columns:repeat(3,1fr)}
+  .bc-details{grid-template-columns:1fr}
+  .admin-booking-card .abc-actions{flex-direction:column;align-items:flex-start}
+  .email-lookup-row{flex-direction:column}
+}
+@media(max-width:400px){
+  #nav{padding:0 4%}
+  .nav-logo{font-size:1.1rem}
+}
+
+/* ─── SHIMMER ─── */
+.shimmer{
+  background:linear-gradient(90deg,var(--black2) 25%,var(--black3) 50%,var(--black2) 75%);
+  background-size:200% 100%;
+  animation:shimmer 1.5s infinite;
+  border-radius:var(--radius2);
+  height:16px;
+}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* ─── SECTION ANIMATE ─── */
+.reveal{
+  opacity:0;
+  transform:translateY(24px);
+  transition:opacity 0.7s cubic-bezier(0.4,0,0.2,1),transform 0.7s cubic-bezier(0.4,0,0.2,1);
+}
+.reveal.visible{opacity:1;transform:none}
+</style>
 </head>
 <body>
-    <!-- Notifications Container -->
-    <div id="notificationsContainer" class="fixed top-4 right-4 z-[100] flex flex-col gap-2"></div>
 
- <!-- Header -->
-<header class="fixed top-0 left-0 right-0 z-50 glass">
-    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-full bg-gold-400 flex items-center justify-center">
-                <i data-lucide="scissors" class="w-5 h-5 text-dark-900"></i>
-            </div>
-            <div>
-                <h1 class="text-xl font-bold text-white">Barber<span class="text-gold-400">Pro</span></h1>
-                <p class="text-xs text-dark-300">Premium Cuts</p>
-            </div>
-        </div>
-        <nav class="flex items-center gap-2">
-            <button onclick="showSection('home')" class="px-4 py-2 rounded-lg text-sm hover:text-gold-400 transition-colors nav-link" data-nav="home">Home</button>
-            <button onclick="showSection('my-bookings')" class="px-4 py-2 rounded-lg text-sm hover:text-gold-400 transition-colors nav-link" data-nav="my-bookings">My Bookings</button>
-            <a href="admin.html" class="px-4 py-2 rounded-lg text-sm hover:text-gold-400 transition-colors">Admin Panel</a>
-        </nav>
+<!-- NAV -->
+<nav id="nav">
+  <div class="nav-logo" onclick="showPage('home')">
+    <img src="data:image/jpeg;base64,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" alt="Private Barber Logo" style="height:42px;width:42px;object-fit:contain;border-radius:50%;border:1px solid rgba(255,255,255,0.2);">
+    <span style="font-size:0;opacity:0;width:0;overflow:hidden">Private Barber</span>
+  </div>
+  <div class="nav-links">
+    <button class="nav-btn" onclick="showPage('home')">Home</button>
+    <button class="nav-btn" onclick="showPage('bookings')">My Bookings</button>
+    <button class="nav-btn" onclick="showPage('admin')">Admin</button>
+    <button class="nav-btn gold" onclick="showPage('booking')">Book Now</button>
+  </div>
+</nav>
+
+<!-- TOAST CONTAINER -->
+<div id="toast-container"></div>
+
+<!-- ══════════════════════════════════════
+     HOME
+══════════════════════════════════════ -->
+<div id="page-home" class="page active">
+  <!-- HERO -->
+  <section id="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-line"></div>
+    <img src="data:image/jpeg;base64,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" alt="Private Barber Logo" style="width:140px;height:140px;object-fit:contain;border-radius:50%;border:2px solid rgba(255,255,255,0.15);margin-bottom:28px;animation:fadeIn 1s 0.4s both;background:#fff;">
+    <div class="hero-eyebrow">Est. 2019 · Johannesburg 🇿🇦</div>
+    <h1 class="hero-title">The Art of<br>the <em>Perfect</em><br>Cut</h1>
+    <p class="hero-sub">Premium grooming. Unmatched precision.</p>
+    <div class="hero-cta">
+      <button class="btn-gold" onclick="showPage('booking')">
+        ✂️ Book Appointment
+      </button>
+      <button class="btn-outline" onclick="showPage('bookings')">My Bookings</button>
+      <a class="btn-outline" href="https://www.instagram.com/private_barber_sa" target="_blank" style="display:flex;align-items:center;gap:8px;text-decoration:none;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+        Instagram
+      </a>
     </div>
-</header>
-
-    <!-- Main Content -->
-    <main class="pt-24 pb-16 px-4">
-        <!-- Home Section -->
-        <section id="homeSection" class="max-w-6xl mx-auto">
-            <!-- Hero -->
-            <div class="relative min-h-[70vh] flex items-center justify-center">
-                <div class="absolute inset-0 bg-gradient-to-b from-dark-900/50 via-dark-900/80 to-dark-950"></div>
-                <div class="absolute inset-0 opacity-20" style="background-image: radial-gradient(circle at 20% 50%, rgba(212, 175, 55, 0.15) 0%, transparent 50%), radial-gradient(circle at 80% 50%, rgba(212, 175, 55, 0.1) 0%, transparent 50%);"></div>
-                
-                <div class="relative z-10 text-center px-4 max-w-3xl">
-                    <div class="mb-6 slide-up">
-                        <span class="inline-block px-4 py-1 rounded-full glass-gold text-gold-400 text-sm mb-6">
-                            <i data-lucide="star" class="w-3 h-3 inline mr-1"></i>
-                            Premium Appointment Only
-                        </span>
-                    </div>
-                    <h2 class="text-5xl md:text-7xl font-bold mb-6 slide-up" style="animation-delay: 0.1s">
-                        Master Your <br><span class="text-gold-400">Style</span>
-                    </h2>
-                    <p class="text-lg md:text-xl text-dark-200 mb-10 slide-up" style="animation-delay: 0.2s">
-                        Book your premium barber experience in seconds. No waiting, just precision cuts.
-                    </p>
-                    <div class="flex flex-col sm:flex-row gap-4 justify-center slide-up" style="animation-delay: 0.3s">
-                        <button onclick="openBookingModal()" class="btn-gold px-8 py-4 rounded-xl text-dark-900 font-semibold text-lg gold-glow-hover flex items-center justify-center gap-2">
-                            <i data-lucide="calendar" class="w-5 h-5"></i>
-                            Book Slot
-                        </button>
-                        <button onclick="showSection('my-bookings')" class="btn-outline-gold px-8 py-4 rounded-xl text-lg font-semibold flex items-center justify-center gap-2">
-                            <i data-lucide="list-checks" class="w-5 h-5"></i>
-                            My Bookings
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-       <!-- Business Info -->
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16">
-    <!-- Location Card -->
-    <div class="glass rounded-2xl p-6 gold-glow-hover slide-up" style="animation-delay: 0.4s">
-        <div class="w-12 h-12 rounded-xl glass-gold flex items-center justify-center mb-4">
-            <i data-lucide="map-pin" class="w-6 h-6 text-gold-400"></i>
-        </div>
-        <h3 class="text-lg font-semibold mb-2">Location</h3>
-        <p class="text-dark-300">
-            <a href="https://maps.google.com/?q=924+Mosidi+Street,+Ikageng,+Potchefstroom,+2539" 
-               target="_blank" 
-               rel="noopener noreferrer"
-               class="hover:text-gold-400 transition-colors">
-                924 Mosidi Street, Ikageng<br>Potchefstroom, 2539
-            </a>
-        </p>
+    <div class="hero-badges">
+      <div class="badge"><div class="badge-num">500+</div><div class="badge-label">Clients Served</div></div>
+      <div class="badge-divider"></div>
+      <div class="badge"><div class="badge-num">6+</div><div class="badge-label">Years Experience</div></div>
+      <div class="badge-divider"></div>
+      <div class="badge"><div class="badge-num">4.9★</div><div class="badge-label">Avg Rating</div></div>
     </div>
+  </section>
 
-    <!-- Hours Card -->
-    <div class="glass rounded-2xl p-6 gold-glow-hover slide-up" style="animation-delay: 0.5s">
-        <div class="w-12 h-12 rounded-xl glass-gold flex items-center justify-center mb-4">
-            <i data-lucide="clock" class="w-6 h-6 text-gold-400"></i>
-        </div>
-        <h3 class="text-lg font-semibold mb-2">Hours</h3>
-        <p class="text-dark-300">Mon - Sat: 9:00 AM - 8:00 PM<br>Sunday: Closed</p>
-    </div>
+  <div class="gold-divider"></div>
 
-    <!-- Announcement Card -->
-    <div class="glass rounded-2xl p-6 gold-glow-hover slide-up" style="animation-delay: 0.6s">
-        <div class="w-12 h-12 rounded-xl glass-gold flex items-center justify-center mb-4">
-            <i data-lucide="megaphone" class="w-6 h-6 text-gold-400"></i>
-        </div>
-        <h3 class="text-lg font-semibold mb-2">Announcement</h3>
-        <p class="text-dark-300">New service available: <br><span class="text-gold-400">Beard Trim + Cut Combo!</span></p>
+  <!-- SERVICES -->
+  <div class="section">
+    <div class="reveal">
+      <div class="section-label">Our Services</div>
+      <h2 class="section-title">What We Offer</h2>
     </div>
+    <div class="services-grid">
+      <div class="service-card reveal" onclick="startBookingWithService('dye')">
+        <div class="service-icon">✂️</div>
+        <div class="service-name">Haircut with Dye</div>
+        <div class="service-desc">Premium cut with professional dye treatment. Full colour, toning, or highlights included.</div>
+        <div class="service-price">R100 <span>/ session</span></div>
+      </div>
+      <div class="service-card reveal" onclick="startBookingWithService('nodye')">
+        <div class="service-icon">💇</div>
+        <div class="service-name">Haircut without Dye</div>
+        <div class="service-desc">Clean, precise cut tailored to your style. Wash and style included.</div>
+        <div class="service-price">R80 <span>/ session</span></div>
+      </div>
+      <div class="service-card reveal" onclick="showPage('booking')">
+        <div class="service-icon">📅</div>
+        <div class="service-name">Custom Booking</div>
+        <div class="service-desc">Pick your date, time, and service. Slots from 09:00 to 20:00 available daily.</div>
+        <div class="service-price" style="font-size:1.2rem;color:var(--white3)">From R80</div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-logo">💈 PRIVATE BARBER</div>
+    <div>© 2025 Private Barber · All Rights Reserved · Johannesburg, SA</div>
+    <div style="margin-top:12px">
+      <a href="https://www.instagram.com/private_barber_sa" target="_blank" style="color:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:6px;opacity:0.7;transition:opacity 0.2s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.7">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+        @private_barber_sa
+      </a>
+    </div>
+  </footer>
 </div>
 
-            <!-- Services Preview -->
-            <div class="mt-16">
-                <h3 class="text-3xl font-bold text-center mb-2">Our <span class="text-gold-400">Services</span></h3>
-                <p class="text-dark-300 text-center mb-8">Premium grooming experiences tailored for you</p>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-                    <div class="glass rounded-2xl p-8 text-center gold-glow-hover">
-                        <div class="text-5xl font-bold text-gold-400 mb-2">R100</div>
-                        <h4 class="text-xl font-semibold mb-2">Haircut with Dye</h4>
-                        <p class="text-dark-300 text-sm">Complete haircut service with premium color treatment</p>
-                    </div>
-                    <div class="glass rounded-2xl p-8 text-center gold-glow-hover">
-                        <div class="text-5xl font-bold text-gold-400 mb-2">R80</div>
-                        <h4 class="text-xl font-semibold mb-2">Haircut without Dye</h4>
-                        <p class="text-dark-300 text-sm">Classic precision cut with styling</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- My Bookings Section -->
-        <section id="myBookingsSection" class="max-w-4xl mx-auto hidden">
-            <div class="text-center mb-8">
-                <h2 class="text-3xl font-bold">My <span class="text-gold-400">Bookings</span></h2>
-                <p class="text-dark-300 mt-2">Enter your phone number to view your appointments</p>
-            </div>
-
-          <!-- Email Search -->
-<div id="emailSearchForm" class="glass rounded-2xl p-8 max-w-md mx-auto">
-    <div class="flex flex-col gap-4">
-        <label class="text-sm text-dark-200">Email Address</label>
-        <div class="flex gap-3">
-            <input type="email" id="searchEmail" placeholder="your@email.com" class="flex-1 bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-dark-400 focus:border-gold-400 focus:ring-1 focus:ring-gold-400/20 transition-all">
-            <button onclick="searchBookings()" class="btn-gold px-6 py-3 rounded-xl font-semibold text-dark-900 flex items-center gap-2">
-                <i data-lucide="search" class="w-4 h-4"></i>
-                Search
-            </button>
-        </div>
+<!-- ══════════════════════════════════════
+     BOOKING
+══════════════════════════════════════ -->
+<div id="page-booking" class="page">
+  <div id="page-booking-inner">
+    <div class="booking-header">
+      <div class="section-label" style="margin-bottom:6px">New Appointment</div>
+      <h2 class="step-title" id="bookingMainTitle">Book Your Session</h2>
     </div>
+    <!-- STEP INDICATOR -->
+    <div class="step-indicator">
+      <div class="step-dot active" id="sdot-1">1</div>
+      <div class="step-line" id="sline-1"></div>
+      <div class="step-dot" id="sdot-2">2</div>
+      <div class="step-line" id="sline-2"></div>
+      <div class="step-dot" id="sdot-3">3</div>
+      <div class="step-line" id="sline-3"></div>
+      <div class="step-dot" id="sdot-4">4</div>
+      <div class="step-line" id="sline-4"></div>
+      <div class="step-dot" id="sdot-5">5</div>
+    </div>
+
+    <!-- STEP 1: DATE -->
+    <div class="step-panel active" id="step-1">
+      <div class="step-title">Choose a Date</div>
+      <div class="step-subtitle">Select your preferred appointment date</div>
+      <div class="calendar" id="calendar"></div>
+      <div id="selected-date-display" style="font-size:0.82rem;color:var(--gold);text-align:center;margin-bottom:20px;min-height:20px"></div>
+      <div class="step-nav">
+        <button class="btn-next" id="next-1" onclick="goStep(2)" disabled>Continue →</button>
+      </div>
+    </div>
+
+    <!-- STEP 2: TIME -->
+    <div class="step-panel" id="step-2">
+      <div class="step-title">Pick a Time</div>
+      <div class="step-subtitle">Available slots for your selected date</div>
+      <div class="time-grid" id="time-grid"></div>
+      <div class="step-nav">
+        <button class="btn-back" onclick="goStep(1)">← Back</button>
+        <button class="btn-next" id="next-2" onclick="goStep(3)" disabled>Continue →</button>
+      </div>
+    </div>
+
+    <!-- STEP 3: SERVICE -->
+    <div class="step-panel" id="step-3">
+      <div class="step-title">Select Service</div>
+      <div class="step-subtitle">Choose the service you'd like</div>
+      <div class="service-options" id="service-options">
+        <div class="service-option" id="svc-dye" onclick="selectService('dye')">
+          <div class="service-option-left">
+            <div class="service-option-name">✂️ Haircut with Dye</div>
+            <div class="service-option-note">Cut + professional colour treatment</div>
+          </div>
+          <div class="service-option-price">R100</div>
+        </div>
+        <div class="service-option" id="svc-nodye" onclick="selectService('nodye')">
+          <div class="service-option-left">
+            <div class="service-option-name">💇 Haircut without Dye</div>
+            <div class="service-option-note">Clean precision cut + wash & style</div>
+          </div>
+          <div class="service-option-price">R80</div>
+        </div>
+      </div>
+      <div class="step-nav">
+        <button class="btn-back" onclick="goStep(2)">← Back</button>
+        <button class="btn-next" id="next-3" onclick="goStep(4)" disabled>Continue →</button>
+      </div>
+    </div>
+
+    <!-- STEP 4: DETAILS -->
+    <div class="step-panel" id="step-4">
+      <div class="step-title">Your Details</div>
+      <div class="step-subtitle">Complete your booking</div>
+
+      <div class="form-group">
+        <label class="form-label">Full Name</label>
+        <input type="text" class="form-input" id="inp-name" placeholder="e.g. Thabo Mokoena" oninput="updateSummary()">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Phone Number</label>
+        <input type="tel" class="form-input" id="inp-phone" placeholder="e.g. 0812345678" oninput="updateSummary()">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email Address</label>
+        <input type="email" class="form-input" id="inp-email" placeholder="e.g. thabo@email.com" oninput="updateSummary()">
+      </div>
+
+      <!-- LIVE SUMMARY -->
+      <div class="summary-box" id="summary-box">
+        <div class="summary-row">
+          <span>📅 Date</span><span id="sum-date">—</span>
+        </div>
+        <div class="summary-row">
+          <span>🕐 Time</span><span id="sum-time">—</span>
+        </div>
+        <div class="summary-row">
+          <span>✂️ Service</span><span id="sum-service">—</span>
+        </div>
+        <div class="summary-row">
+          <span>💰 Service Price</span><span id="sum-price">—</span>
+        </div>
+        <div class="summary-row" id="sum-late-row" style="display:none">
+          <span>🌙 Late Fee</span><span id="sum-late">+R20</span>
+        </div>
+        <div class="summary-row total">
+          <span>Total</span><span id="sum-total">—</span>
+        </div>
+      </div>
+
+      <div class="warning-box">
+        ⚠️ <span>Cancellation within 5 hours of your appointment incurs a <strong style="color:#e07060">R20 cancellation fee</strong>.</span>
+      </div>
+
+      <div class="step-nav">
+        <button class="btn-back" onclick="goStep(3)">← Back</button>
+        <button class="btn-next" id="next-4" onclick="confirmBooking()">Confirm Booking ✓</button>
+      </div>
+    </div>
+
+    <!-- STEP 5: CONFIRMATION -->
+    <div class="step-panel" id="step-5">
+      <div class="confirm-card">
+        <div class="confirm-icon">✅</div>
+        <div class="confirm-title">Booking Confirmed!</div>
+        <div class="confirm-sub">Your appointment has been successfully booked</div>
+        <div class="booking-id">Booking ID: <strong id="confirm-id"></strong></div>
+        <div class="summary-box confirm-details" id="confirm-summary"></div>
+        <button class="btn-gold" style="width:100%;justify-content:center;margin-bottom:12px" onclick="showPage('bookings')">View My Bookings</button>
+        <button class="btn-outline" style="width:100%" onclick="resetBooking();showPage('home')">Back to Home</button>
+      </div>
+    </div>
+  </div>
 </div>
 
-            <!-- Bookings List -->
-<div id="myBookingsList" class="mt-8 hidden">
-    <div class="flex items-center justify-between mb-6">
-        <h3 class="text-xl font-semibold">Your Appointments</h3>
-        <button onclick="changeEmailAddress()" class="text-sm text-gold-400 hover:underline">Change email</button>
-    </div>
-    <div id="bookingsContainer" class="flex flex-col gap-4">
-        <!-- Bookings will be inserted here -->
-    </div>
-</div>
-        </section>
+<!-- ══════════════════════════════════════
+     MY BOOKINGS
+══════════════════════════════════════ -->
+<div id="page-bookings" class="page">
+  <div>
+    <div class="section-label">My Appointments</div>
+    <h2 class="step-title" style="margin-bottom:8px">My Bookings</h2>
+    <p class="step-subtitle" style="margin-bottom:28px">Enter your email to view your appointments</p>
 
-<!-- Admin Section -->
-<section id="adminSection" class="max-w-6xl mx-auto hidden">
-    <!-- Admin Login -->
-    <div id="adminLogin" class="max-w-md mx-auto mt-10">
-        <div class="glass rounded-2xl p-8">
-            <div class="text-center mb-6">
-                <div class="w-16 h-16 rounded-full glass-gold flex items-center justify-center mx-auto mb-4">
-                    <i data-lucide="shield" class="w-8 h-8 text-gold-400"></i>
-                </div>
-                <h3 class="text-2xl font-bold">Admin Dashboard</h3>
-                <p class="text-dark-300 text-sm mt-2">Enter admin credentials to continue</p>
-            </div>
-            <div class="flex flex-col gap-4">
-                <!-- NEW: Username Field -->
-                <div>
-                    <label class="text-sm text-dark-200 mb-1 block">Username</label>
-                    <input type="text" id="adminUsername" placeholder="Enter username" class="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-dark-400 focus:border-gold-400 focus:ring-1 focus:ring-gold-400/20 transition-all">
-                </div>
-                <!-- Password Field -->
-                <div>
-                    <label class="text-sm text-dark-200 mb-1 block">Password</label>
-                    <input type="password" id="adminPassword" placeholder="Enter admin password" class="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-dark-400 focus:border-gold-400 focus:ring-1 focus:ring-gold-400/20 transition-all" onkeypress="if(event.key==='Enter')adminLogin()">
-                </div>
-                <button onclick="adminLogin()" class="btn-gold w-full py-3 rounded-xl font-semibold text-dark-900">
-                    Login
-                </button>
-            </div>
-        </div>
+    <div class="email-lookup">
+      <div class="email-lookup-title">Find Your Bookings</div>
+      <div class="email-lookup-sub">Enter the email you used when booking</div>
+      <div class="email-lookup-row">
+        <input type="email" class="form-input" id="lookup-email" placeholder="your@email.com" onkeydown="if(event.key==='Enter')lookupBookings()">
+        <button class="btn-gold" onclick="lookupBookings()">Search</button>
+      </div>
     </div>
 
-    <!-- Admin Dashboard (keep the rest of your existing dashboard code here unchanged) -->
-    <div id="adminDashboard" class="hidden">
-        <!-- ... your existing dashboard content ... -->
-    </div>
-</section>
-
-            <!-- Admin Dashboard -->
-            <div id="adminDashboard" class="hidden">
-                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
-                    <div>
-                        <h2 class="text-3xl font-bold">Admin <span class="text-gold-400">Dashboard</span></h2>
-                        <p class="text-dark-300 text-sm mt-1">Manage all bookings</p>
-                    </div>
-                    <div class="flex gap-3">
-                        <button onclick="refreshAdminBookings()" class="btn-outline-gold px-4 py-2 rounded-lg flex items-center gap-2 text-sm">
-                            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-                            Refresh
-                        </button>
-                        <button onclick="confirmClearAll()" class="bg-red-500/20 border border-red-500/30 text-red-400 px-4 py-2 rounded-lg flex items-center gap-2 text-sm hover:bg-red-500/30 transition-colors">
-                            <i data-lucide="trash-2" class="w-4 h-4"></i>
-                            Clear All
-                        </button>
-                        <button onclick="adminLogout()" class="text-dark-300 hover:text-white text-sm px-4 py-2 transition-colors">
-                            Logout
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Stats -->
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                    <div class="glass rounded-xl p-4">
-                        <p class="text-dark-300 text-sm">Total Bookings</p>
-                        <p class="text-2xl font-bold text-gold-400" id="statTotal">0</p>
-                    </div>
-                    <div class="glass rounded-xl p-4">
-                        <p class="text-dark-300 text-sm">Upcoming</p>
-                        <p class="text-2xl font-bold text-green-400" id="statUpcoming">0</p>
-                    </div>
-                    <div class="glass rounded-xl p-4">
-                        <p class="text-dark-300 text-sm">Cancelled</p>
-                        <p class="text-2xl font-bold text-red-400" id="statCancelled">0</p>
-                    </div>
-                    <div class="glass rounded-xl p-4">
-                        <p class="text-dark-300 text-sm">Today</p>
-                        <p class="text-2xl font-bold text-blue-400" id="statToday">0</p>
-                    </div>
-                </div>
-
-                <!-- Bookings Table -->
-                <div class="glass rounded-2xl overflow-hidden">
-                    <div class="overflow-x-auto">
-                        <table class="w-full">
-                            <thead>
-                                <tr class="border-b border-dark-500 text-left">
-                                    <th class="px-4 py-3 text-sm font-semibold text-dark-200">Client</th>
-                                    <th class="px-4 py-3 text-sm font-semibold text-dark-200">Date & Time</th>
-                                    <th class="px-4 py-3 text-sm font-semibold text-dark-200">Service</th>
-                                    <th class="px-4 py-3 text-sm font-semibold text-dark-200">Price</th>
-                                    <th class="px-4 py-3 text-sm font-semibold text-dark-200">Status</th>
-                                    <th class="px-4 py-3 text-sm font-semibold text-dark-200">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="adminBookingsTable">
-                                <tr>
-                                    <td colspan="6" class="px-4 py-8 text-center text-dark-400">
-                                        <div class="flex flex-col items-center gap-2">
-                                            <i data-lucide="calendar-x" class="w-8 h-8"></i>
-                                            <p>No bookings yet</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </section>
-    </main>
-
-    <!-- Booking Modal -->
-    <div id="bookingModal" class="fixed inset-0 z-[60] hidden">
-        <div class="modal-overlay absolute inset-0" onclick="closeBookingModal()"></div>
-        <div class="relative z-10 flex items-center justify-center min-h-full p-4">
-            <div class="glass rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto slide-up">
-                <!-- Modal Header -->
-                <div class="flex items-center justify-between p-6 border-b border-dark-500">
-                    <h3 class="text-xl font-bold">Book Appointment</h3>
-                    <button onclick="closeBookingModal()" class="w-8 h-8 rounded-lg hover:bg-dark-600 flex items-center justify-center transition-colors">
-                        <i data-lucide="x" class="w-5 h-5"></i>
-                    </button>
-                </div>
-
-                <!-- Step Indicators -->
-                <div class="px-6 py-4 flex items-center justify-center gap-2">
-                    <div id="step1Indicator" class="step-indicator w-8 h-8 rounded-full bg-dark-500 text-dark-200 flex items-center justify-center text-sm font-semibold">1</div>
-                    <div class="w-8 h-0.5 bg-dark-500" id="line1"></div>
-                    <div id="step2Indicator" class="step-indicator w-8 h-8 rounded-full bg-dark-500 text-dark-200 flex items-center justify-center text-sm font-semibold">2</div>
-                    <div class="w-8 h-0.5 bg-dark-500" id="line2"></div>
-                    <div id="step3Indicator" class="step-indicator w-8 h-8 rounded-full bg-dark-500 text-dark-200 flex items-center justify-center text-sm font-semibold">3</div>
-                    <div class="w-8 h-0.5 bg-dark-500" id="line3"></div>
-                    <div id="step4Indicator" class="step-indicator w-8 h-8 rounded-full bg-dark-500 text-dark-200 flex items-center justify-center text-sm font-semibold">4</div>
-                    <div class="w-8 h-0.5 bg-dark-500" id="line4"></div>
-                    <div id="step5Indicator" class="step-indicator w-8 h-8 rounded-full bg-dark-500 text-dark-200 flex items-center justify-center text-sm font-semibold">5</div>
-                </div>
-
-                <!-- Step 1: Date Selection -->
-                <div id="step1Content" class="step-content px-6 py-4">
-                    <h4 class="text-lg font-semibold mb-4">Select Date</h4>
-                    <div class="glass-light rounded-xl p-4 mb-4">
-                        <div class="flex items-center justify-between mb-4">
-                            <button onclick="changeMonth(-1)" class="w-8 h-8 rounded-lg hover:bg-dark-500 flex items-center justify-center transition-colors">
-                                <i data-lucide="chevron-left" class="w-5 h-5"></i>
-                            </button>
-                            <span id="currentMonthYear" class="text-lg font-semibold"></span>
-                            <button onclick="changeMonth(1)" class="w-8 h-8 rounded-lg hover:bg-dark-500 flex items-center justify-center transition-colors">
-                                <i data-lucide="chevron-right" class="w-5 h-5"></i>
-                            </button>
-                        </div>
-                        <div class="grid grid-cols-7 gap-1 text-center mb-2">
-                            <span class="text-xs text-dark-300 py-2">Su</span>
-                            <span class="text-xs text-dark-300 py-2">Mo</span>
-                            <span class="text-xs text-dark-300 py-2">Tu</span>
-                            <span class="text-xs text-dark-300 py-2">We</span>
-                            <span class="text-xs text-dark-300 py-2">Th</span>
-                            <span class="text-xs text-dark-300 py-2">Fr</span>
-                            <span class="text-xs text-dark-300 py-2">Sa</span>
-                        </div>
-                        <div id="calendarGrid" class="grid grid-cols-7 gap-1 text-center">
-                            <!-- Calendar days will be inserted here -->
-                        </div>
-                    </div>
-                    <div class="flex justify-end">
-                        <button onclick="nextStep(2)" id="dateNextBtn" class="btn-gold px-6 py-3 rounded-xl font-semibold text-dark-900 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                            Next <i data-lucide="arrow-right" class="w-4 h-4 inline ml-1"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Step 2: Time Selection -->
-                <div id="step2Content" class="step-content px-6 py-4 hidden">
-                    <h4 class="text-lg font-semibold mb-2">Select Time</h4>
-                    <p class="text-sm text-dark-300 mb-4">Available slots for <span id="selectedDateDisplay" class="text-gold-400"></span></p>
-                    <div id="timeSlotsContainer" class="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto">
-                        <!-- Time slots will be inserted here -->
-                    </div>
-                    <div class="flex justify-between mt-6">
-                        <button onclick="prevStep(1)" class="btn-outline-gold px-6 py-3 rounded-xl font-semibold">
-                            <i data-lucide="arrow-left" class="w-4 h-4 inline mr-1"></i> Back
-                        </button>
-                        <button onclick="nextStep(3)" id="timeNextBtn" class="btn-gold px-6 py-3 rounded-xl font-semibold text-dark-900 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                            Next <i data-lucide="arrow-right" class="w-4 h-4 inline ml-1"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Step 3: Service Selection -->
-                <div id="step3Content" class="step-content px-6 py-4 hidden">
-                    <h4 class="text-lg font-semibold mb-4">Select Service</h4>
-                    <div class="flex flex-col gap-3">
-                        <div onclick="selectService('dye', 100)" id="serviceDye" class="service-card glass rounded-xl p-4 cursor-pointer border border-dark-500">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <h5 class="font-semibold">Haircut with Dye</h5>
-                                    <p class="text-sm text-dark-300 mt-1">Complete cut + premium color treatment</p>
-                                </div>
-                                <span class="text-xl font-bold text-gold-400">R100</span>
-                            </div>
-                        </div>
-                        <div onclick="selectService('nodye', 80)" id="serviceNoDye" class="service-card glass rounded-xl p-4 cursor-pointer border border-dark-500">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <h5 class="font-semibold">Haircut without Dye</h5>
-                                    <p class="text-sm text-dark-300 mt-1">Classic precision cut with styling</p>
-                                </div>
-                                <span class="text-xl font-bold text-gold-400">R80</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="flex justify-between mt-6">
-                        <button onclick="prevStep(2)" class="btn-outline-gold px-6 py-3 rounded-xl font-semibold">
-                            <i data-lucide="arrow-left" class="w-4 h-4 inline mr-1"></i> Back
-                        </button>
-                        <button onclick="nextStep(4)" id="serviceNextBtn" class="btn-gold px-6 py-3 rounded-xl font-semibold text-dark-900 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                            Next <i data-lucide="arrow-right" class="w-4 h-4 inline ml-1"></i>
-                        </button>
-                    </div>
-                </div>
-
-<!-- Step 4: Details -->
-<div id="step4Content" class="step-content px-6 py-4 hidden">
-    <h4 class="text-lg font-semibold mb-4">Your Details</h4>
-    <div class="flex flex-col gap-4">
-        <div>
-            <label class="text-sm text-dark-200 mb-1 block">Full Name *</label>
-            <input type="text" id="clientName" placeholder="Enter your name" class="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-dark-400 focus:border-gold-400 transition-all">
-        </div>
-        <div>
-            <label class="text-sm text-dark-200 mb-1 block">Phone Number *</label>
-            <input type="tel" id="clientPhone" placeholder="+27 XX XXX XXXX" class="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-dark-400 focus:border-gold-400 transition-all">
-        </div>
-        <div>
-            <label class="text-sm text-dark-200 mb-1 block">Email Address *</label>
-            <input type="email" id="clientEmail" placeholder="your@email.com" class="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white placeholder-dark-400 focus:border-gold-400 transition-all">
-        </div>
-        <!-- Summary -->
-        <div class="glass-light rounded-xl p-4 mt-2">
-            <h5 class="text-sm font-semibold text-dark-200 mb-3">Booking Summary</h5>
-            <div class="flex flex-col gap-2 text-sm">
-                <div class="flex justify-between">
-                    <span class="text-dark-300">Date & Time</span>
-                    <span id="summaryDateTime" class="text-white"></span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-dark-300">Service</span>
-                    <span id="summaryService" class="text-white"></span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-dark-300">Base Price</span>
-                    <span id="summaryBasePrice" class="text-white"></span>
-                </div>
-                <div id="lateFeeRow" class="flex justify-between hidden">
-                    <span class="text-dark-300 flex items-center gap-1">
-                        <i data-lucide="alert-triangle" class="w-3 h-3 text-red-400"></i>
-                        Late Fee (after 7:30 PM)
-                    </span>
-                    <span id="summaryLateFee" class="text-red-400">R20</span>
-                </div>
-                <div class="border-t border-dark-500 pt-2 flex justify-between">
-                    <span class="font-semibold">Total</span>
-                    <span id="summaryTotal" class="font-bold text-gold-400"></span>
-                </div>
-            </div>
-            <div class="mt-3 p-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                <p class="text-xs text-yellow-400 flex items-center gap-1">
-                    <i data-lucide="info" class="w-3 h-3"></i>
-                    Cancellation within 5 hours incurs a R20 fee
-                </p>
-            </div>
-        </div>
-    </div>
-    <div class="flex justify-between mt-6">
-        <button onclick="prevStep(3)" class="btn-outline-gold px-6 py-3 rounded-xl font-semibold">
-            <i data-lucide="arrow-left" class="w-4 h-4 inline mr-1"></i> Back
-        </button>
-        <button onclick="confirmBooking()" id="confirmBtn" class="btn-gold px-8 py-3 rounded-xl font-semibold text-dark-900">
-            <i data-lucide="check-circle" class="w-4 h-4 inline mr-1"></i> Confirm
-        </button>
-    </div>
+    <div id="bookings-results"></div>
+  </div>
 </div>
 
-                <!-- Step 5: Confirmation -->
-                <div id="step5Content" class="step-content px-6 py-4 hidden">
-                    <div class="text-center">
-                        <div class="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-6 pulse-gold">
-                            <i data-lucide="check" class="w-10 h-10 text-green-400"></i>
-                        </div>
-                        <h4 class="text-2xl font-bold mb-2">Booking Confirmed!</h4>
-                        <p class="text-dark-300 mb-6">Your appointment has been booked successfully</p>
-                        <div class="glass-light rounded-xl p-4 text-left">
-                            <div class="flex flex-col gap-2 text-sm">
-                                <div class="flex justify-between">
-                                    <span class="text-dark-300">Name</span>
-                                    <span id="confirmName" class="text-white"></span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-dark-300">Date & Time</span>
-                                    <span id="confirmDateTime" class="text-white"></span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-dark-300">Service</span>
-                                    <span id="confirmService" class="text-white"></span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-dark-300">Total Paid</span>
-                                    <span id="confirmTotal" class="font-bold text-gold-400"></span>
-                                </div>
-                            </div>
-                            <div class="mt-4 p-3 rounded-lg bg-dark-700">
-                                <p class="text-xs text-dark-300">Booking ID: <span id="confirmBookingId" class="text-gold-400 font-mono"></span></p>
-                            </div>
-                        </div>
-                        <div class="flex flex-col gap-3 mt-6">
-                            <button onclick="closeBookingModal()" class="btn-gold w-full py-3 rounded-xl font-semibold text-dark-900">
-                                Done
-                            </button>
-                            <button onclick="showSection('my-bookings'); closeBookingModal();" class="btn-outline-gold w-full py-3 rounded-xl font-semibold">
-                                <i data-lucide="list-checks" class="w-4 h-4 inline mr-1"></i> View My Bookings
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+<!-- ══════════════════════════════════════
+     ADMIN
+══════════════════════════════════════ -->
+<div id="page-admin" class="page">
+  <!-- LOGIN -->
+  <div id="admin-login-panel">
+    <div class="admin-login">
+      <div style="font-size:2rem;margin-bottom:16px">🔐</div>
+      <div class="step-title" style="margin-bottom:4px">Admin Access</div>
+      <div class="step-subtitle" style="margin-bottom:24px">Private Barber Management</div>
+      <div class="form-group">
+        <label class="form-label">Username</label>
+        <input type="text" class="form-input" id="admin-user" placeholder="admin">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" class="form-input" id="admin-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')adminLogin()">
+      </div>
+      <button class="btn-gold" style="width:100%;justify-content:center" onclick="adminLogin()">Login →</button>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="admin-dashboard" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:12px">
+      <div>
+        <div class="section-label">Management Panel</div>
+        <h2 class="step-title" style="margin-bottom:0">Admin Dashboard</h2>
+      </div>
+      <button class="logout-btn" onclick="adminLogout()">Logout</button>
     </div>
 
-    <!-- Reschedule Modal -->
-    <div id="rescheduleModal" class="fixed inset-0 z-[60] hidden">
-        <div class="modal-overlay absolute inset-0" onclick="closeRescheduleModal()"></div>
-        <div class="relative z-10 flex items-center justify-center min-h-full p-4">
-            <div class="glass rounded-2xl w-full max-w-lg slide-up">
-                <div class="flex items-center justify-between p-6 border-b border-dark-500">
-                    <h3 class="text-xl font-bold">Reschedule</h3>
-                    <button onclick="closeRescheduleModal()" class="w-8 h-8 rounded-lg hover:bg-dark-600 flex items-center justify-center transition-colors">
-                        <i data-lucide="x" class="w-5 h-5"></i>
-                    </button>
-                </div>
-                <div class="p-6">
-                    <p class="text-dark-300 text-sm mb-4">Select new date and time for your appointment</p>
-                    
-                    <!-- New Date -->
-                    <div class="mb-4">
-                        <label class="text-sm text-dark-200 mb-1 block">New Date</label>
-                        <input type="date" id="rescheduleDate" class="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white focus:border-gold-400 transition-all">
-                    </div>
-                    
-                    <!-- New Time -->
-                    <div class="mb-4">
-                        <label class="text-sm text-dark-200 mb-1 block">New Time</label>
-                        <select id="rescheduleTime" class="w-full bg-dark-700 border border-dark-500 rounded-xl px-4 py-3 text-white focus:border-gold-400 transition-all">
-                            <option value="">Select time</option>
-                        </select>
-                    </div>
+    <!-- STATS -->
+    <div class="admin-stats" id="admin-stats"></div>
 
-                    <div class="flex justify-end gap-3 mt-6">
-                        <button onclick="closeRescheduleModal()" class="btn-outline-gold px-6 py-3 rounded-xl font-semibold">
-                            Cancel
-                        </button>
-                        <button onclick="submitReschedule()" class="btn-gold px-6 py-3 rounded-xl font-semibold text-dark-900">
-                            Confirm Reschedule
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <!-- QUICK ACTIONS -->
+    <div class="admin-section-title">Quick Actions</div>
+    <div class="admin-quick-actions">
+      <button class="btn-gold" onclick="adminMsgToday()">📲 Message Today's Clients</button>
+      <button class="btn-outline" onclick="adminRemindUpcoming()">🔔 Remind Upcoming Bookings</button>
     </div>
 
-    <script>
-        // ============================================
-        // FIREBASE CONFIGURATION - Replace with your own
-        // ============================================
- const firebaseConfig = {
-    apiKey: "AIzaSyDUWX1gUg63-OQN9FCaOttAtuZqZ-ZQ8Tw",
-    authDomain: "barberpro-booking.firebaseapp.com",
-    projectId: "barberpro-booking",
-    storageBucket: "barberpro-booking.firebasestorage.app",
-    messagingSenderId: "402281543517",
-    appId: "1:402281543517:web:18f78d8ee3b0ba1d95dab4"
+    <!-- BOOKINGS -->
+    <div class="admin-section-title">
+      <span>All Bookings</span>
+      <div class="filter-row" style="margin:0">
+        <button class="filter-btn active" id="af-all" onclick="adminFilter('all')">All</button>
+        <button class="filter-btn" id="af-pending" onclick="adminFilter('pending')">Pending</button>
+        <button class="filter-btn" id="af-confirmed" onclick="adminFilter('confirmed')">Confirmed</button>
+        <button class="filter-btn" id="af-cancelled" onclick="adminFilter('cancelled')">Cancelled</button>
+      </div>
+    </div>
+    <div id="admin-bookings-list"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     MODALS
+══════════════════════════════════════ -->
+<!-- Reschedule Modal -->
+<div class="modal-overlay" id="reschedule-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('reschedule-modal')">✕</button>
+    <div class="modal-title">Reschedule Booking</div>
+    <div class="modal-sub">Select a new date and time for your appointment</div>
+    <div class="calendar" id="reschedule-calendar"></div>
+    <div id="reschedule-time-grid" style="margin-bottom:20px"></div>
+    <button class="btn-gold" style="width:100%;justify-content:center" onclick="confirmReschedule()">Confirm Reschedule</button>
+  </div>
+</div>
+
+<!-- Cancel Warning Modal -->
+<div class="modal-overlay" id="cancel-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('cancel-modal')">✕</button>
+    <div class="modal-title">Cancel Appointment</div>
+    <div id="cancel-warning-text" class="modal-sub"></div>
+    <div class="warning-box" id="cancel-fee-warning" style="display:none">
+      ⚠️ <span>This cancellation is within 5 hours. A <strong style="color:#e07060">R20 cancellation fee</strong> will apply.</span>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:20px">
+      <button class="btn-outline" style="flex:1" onclick="closeModal('cancel-modal')">Keep Booking</button>
+      <button class="btn-sm btn-sm-cancel" style="flex:1;padding:13px 16px;font-size:0.78rem" onclick="proceedCancel()">Yes, Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════
+// STORAGE HELPERS
+// ══════════════════════════════════════
+const getBookings = () => JSON.parse(localStorage.getItem('pb_bookings') || '[]');
+const saveBookings = (b) => localStorage.setItem('pb_bookings', JSON.stringify(b));
+
+// ══════════════════════════════════════
+// STATE
+// ══════════════════════════════════════
+const state = {
+  currentPage: 'home',
+  booking: {
+    step: 1,
+    date: null,       // Date obj
+    time: null,       // "09:00"
+    service: null,    // 'dye' | 'nodye'
+    name: '', phone: '', email: '',
+    lateFee: false,
+    totalPrice: 0
+  },
+  calendar: { year: 0, month: 0 },
+  reschedule: { bookingId: null, date: null, time: null, calYear: 0, calMonth: 0 },
+  cancelTarget: null,
+  adminFilter: 'all'
 };
 
-        // Initialize Firebase (with error handling for demo)
-        let db;
-        let isFirebaseInitialized = false;
-        try {
-            firebase.initializeApp(firebaseConfig);
-            db = firebase.firestore();
-            isFirebaseInitialized = true;
-        } catch (e) {
-            console.warn("Firebase not configured - using localStorage fallback");
-            isFirebaseInitialized = false;
-        }
-
-        // ============================================
-        // EMAILJS CONFIGURATION - Replace with your own
-        // ============================================
-       const EMAILJS_PUBLIC_KEY = "kPJxV4OcpoS6AFdgA";
-const EMAILJS_SERVICE_ID = "service_u6e9y47";
-const EMAILJS_TEMPLATE_ID = "template_4fg78jn";
-
-        try {
-            emailjs.init(EMAILJS_PUBLIC_KEY);
-        } catch (e) {
-            console.warn("EmailJS not configured");
-        }
-
-        // ============================================
-        // STATE MANAGEMENT
-        // ============================================
-        let bookingState = {
-            currentStep: 1,
-            selectedDate: null,
-            selectedTime: null,
-            selectedService: null,
-            serviceName: '',
-            basePrice: 0,
-            lateFee: 0,
-            clientName: '',
-            clientPhone: '',
-            clientEmail: '',
-            total: 0
-        };
-
-        let calendarState = {
-            currentMonth: new Date().getMonth(),
-            currentYear: new Date().getFullYear()
-        };
-
-        let adminState = {
-            isLoggedIn: false,
-            adminPassword: "voka123" // Change this in production
-        };
-
-      let customerState = {
-    email: null
-};
-        let rescheduleState = {
-            bookingId: null
-        };
-
-        // ============================================
-        // LOCAL STORAGE FALLBACK
-        // ============================================
-        function getBookingsFromStorage() {
-            const stored = localStorage.getItem('barberBookings');
-            return stored ? JSON.parse(stored) : [];
-        }
-
-        function saveBookingsToStorage(bookings) {
-            localStorage.setItem('barberBookings', JSON.stringify(bookings));
-        }
-
-        async function addBookingToStorage(booking) {
-            const bookings = getBookingsFromStorage();
-            bookings.push(booking);
-            saveBookingsToStorage(bookings);
-        }
-
-        async function updateBookingInStorage(bookingId, updates) {
-            const bookings = getBookingsFromStorage();
-            const index = bookings.findIndex(b => b.id === bookingId);
-            if (index !== -1) {
-                bookings[index] = { ...bookings[index], ...updates };
-                saveBookingsToStorage(bookings);
-            }
-        }
-
-        async function deleteBookingFromStorage(bookingId) {
-            const bookings = getBookingsFromStorage();
-            const filtered = bookings.filter(b => b.id !== bookingId);
-            saveBookingsToStorage(filtered);
-        }
-
-        async function clearAllBookingsFromStorage() {
-            localStorage.removeItem('barberBookings');
-        }
-
-        // ============================================
-        // FIRESTORE HELPERS
-        // ============================================
-        async function addBookingFirestore(booking) {
-            if (isFirebaseInitialized) {
-                return await db.collection('bookings').add(booking);
-            }
-            await addBookingFirestore(booking);
-        }
-
-        async function updateBookingFirestore(bookingId, updates) {
-            if (isFirebaseInitialized) {
-                return await db.collection('bookings').doc(bookingId).update(updates);
-            }
-            await updateBookingFirestore(bookingId, updates);
-        }
-
-        async function deleteBookingFirestore(bookingId) {
-            if (isFirebaseInitialized) {
-                return await db.collection('bookings').doc(bookingId).delete();
-            }
-            await deleteBookingFromStorage(bookingId);
-        }
-
-        async function getAllBookings() {
-            if (isFirebaseInitialized) {
-                const snapshot = await db.collection('bookings').orderBy('createdAt', 'desc').get();
-                return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            }
-            return getBookingsFromStorage();
-        }
-
-       async function getBookingsByEmail(email) {
-    if (isFirebaseInitialized) {
-        const snapshot = await db.collection('bookings').where('email', '==', email).orderBy('createdAt', 'desc').get();
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    }
-    return getBookingsFromStorage().filter(b => b.email === email);
+// ══════════════════════════════════════
+// PAGE ROUTING
+// ══════════════════════════════════════
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  state.currentPage = name;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (name === 'booking') initBookingPage();
+  if (name === 'bookings') { document.getElementById('bookings-results').innerHTML = ''; document.getElementById('lookup-email').value = ''; }
+  if (name === 'admin') initAdminPage();
+  if (name === 'home') initReveal();
 }
 
-        async function getBookingsByDate(date) {
-            if (isFirebaseInitialized) {
-                const snapshot = await db.collection('bookings').where('date', '==', date).get();
-                return snapshot.docs.map(doc => doc.data());
-            }
-            return getBookingsFromStorage().filter(b => b.date === date);
-        }
+// ══════════════════════════════════════
+// NAV SCROLL
+// ══════════════════════════════════════
+window.addEventListener('scroll', () => {
+  document.getElementById('nav').classList.toggle('scrolled', window.scrollY > 40);
+});
 
-        async function clearAllBookings() {
-            if (isFirebaseInitialized) {
-                const snapshot = await db.collection('bookings').get();
-                const batch = db.batch();
-                snapshot.docs.forEach(doc => batch.delete(doc.ref));
-                await batch.commit();
-            }
-            await clearAllBookingsFromStorage();
-        }
+// ══════════════════════════════════════
+// REVEAL ANIMATION
+// ══════════════════════════════════════
+function initReveal() {
+  setTimeout(() => {
+    const els = document.querySelectorAll('.reveal');
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); } });
+    }, { threshold: 0.15 });
+    els.forEach(el => obs.observe(el));
+  }, 100);
+}
+initReveal();
 
-        // ============================================
-        // NOTIFICATIONS
-        // ============================================
-        function showNotification(message, type = 'success') {
-            const container = document.getElementById('notificationsContainer');
-            const notif = document.createElement('div');
-            const bgColor = type === 'success' ? 'bg-green-500/20 border-green-500/30 text-green-400' :
-                          type === 'error' ? 'bg-red-500/20 border-red-500/30 text-red-400' :
-                          'bg-blue-500/20 border-blue-500/30 text-blue-400';
-            
-            notif.className = `notification ${bgColor} border px-4 py-3 rounded-xl flex items-center gap-2 min-w-[280px]`;
-            notif.innerHTML = `
-                <i data-lucide="${type === 'success' ? 'check-circle' : type === 'error' ? 'x-circle' : 'info'}" class="w-5 h-5"></i>
-                <span class="text-sm">${message}</span>
-            `;
-            container.appendChild(notif);
-            lucide.createIcons({ nodes: [notif] });
-
-            setTimeout(() => {
-                notif.style.opacity = '0';
-                notif.style.transform = 'translateY(-20px)';
-                notif.style.transition = 'all 0.3s ease';
-                setTimeout(() => notif.remove(), 300);
-            }, 3000);
-        }
-
-        // ============================================
-        // NAVIGATION
-        // ============================================
-        function showSection(section) {
-            // Hide all sections
-            document.getElementById('homeSection').classList.add('hidden');
-            document.getElementById('myBookingsSection').classList.add('hidden');
-            document.getElementById('adminSection').classList.add('hidden');
-
-            // Update nav links
-            document.querySelectorAll('.nav-link').forEach(link => {
-                link.classList.remove('text-gold-400');
-            });
-
-            // Show selected section
-            if (section === 'home') {
-                document.getElementById('homeSection').classList.remove('hidden');
-                document.querySelector('[data-nav="home"]').classList.add('text-gold-400');
-            } else if (section === 'my-bookings') {
-                document.getElementById('myBookingsSection').classList.remove('hidden');
-                document.querySelector('[data-nav="my-bookings"]').classList.add('text-gold-400');
-            } else if (section === 'admin') {
-                document.getElementById('adminSection').classList.remove('hidden');
-                document.querySelector('[data-nav="admin"]').classList.add('text-gold-400');
-                if (adminState.isLoggedIn) {
-                    document.getElementById('adminLogin').classList.add('hidden');
-                    document.getElementById('adminDashboard').classList.remove('hidden');
-                    loadAdminBookings();
-                }
-            }
-
-            lucide.createIcons();
-        }
-
-        // ============================================
-        // BOOKING MODAL
-        // ============================================
-        function openBookingModal() {
-            document.getElementById('bookingModal').classList.remove('hidden');
-            document.body.style.overflow = 'hidden';
-            resetBookingState();
-            goToStep(1);
-            lucide.createIcons();
-        }
-
-        function closeBookingModal() {
-            document.getElementById('bookingModal').classList.add('hidden');
-            document.body.style.overflow = '';
-        }
-
-        function resetBookingState() {
-            bookingState = {
-                currentStep: 1,
-                selectedDate: null,
-                selectedTime: null,
-                selectedService: null,
-                serviceName: '',
-                basePrice: 0,
-                lateFee: 0,
-                clientName: '',
-                clientPhone: '',
-                clientEmail: '',
-                total: 0
-            };
-            calendarState = {
-                currentMonth: new Date().getMonth(),
-                currentYear: new Date().getFullYear()
-            };
-        }
-
-        function goToStep(step) {
-            bookingState.currentStep = step;
-            
-            // Hide all steps
-            for (let i = 1; i <= 5; i++) {
-                document.getElementById(`step${i}Content`).classList.add('hidden');
-                const indicator = document.getElementById(`step${i}Indicator`);
-                indicator.classList.remove('active', 'completed');
-                indicator.classList.add('bg-dark-500', 'text-dark-200');
-            }
-
-            // Show current step
-            document.getElementById(`step${step}Content`).classList.remove('hidden');
-            document.getElementById(`step${step}Content`).classList.add('fade-in');
-            
-            // Update indicators
-            for (let i = 1; i <= step; i++) {
-                const indicator = document.getElementById(`step${i}Indicator`);
-                indicator.classList.remove('bg-dark-500', 'text-dark-200');
-                if (i < step) {
-                    indicator.classList.add('completed');
-                    indicator.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i>';
-                } else {
-                    indicator.classList.add('active');
-                }
-            }
-
-            // Update lines
-            for (let i = 1; i <= 4; i++) {
-                const line = document.getElementById(`line${i}`);
-                if (i < step) {
-                    line.style.background = '#D4AF37';
-                } else {
-                    line.style.background = '';
-                }
-            }
-
-            lucide.createIcons();
-        }
-
-        function nextStep(step) {
-            if (step === 2 && !bookingState.selectedDate) return;
-            if (step === 3 && !bookingState.selectedTime) return;
-            if (step === 4 && !bookingState.selectedService) return;
-            if (step === 5) return;
-
-            goToStep(step);
-
-            if (step === 2) {
-                renderTimeSlots();
-            }
-            if (step === 4) {
-                updateSummary();
-            }
-        }
-
-        function prevStep(step) {
-            goToStep(step);
-        }
-
-        // ============================================
-        // CALENDAR
-        // ============================================
-        function renderCalendar() {
-            const year = calendarState.currentYear;
-            const month = calendarState.currentMonth;
-            
-            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
-                               'July', 'August', 'September', 'October', 'November', 'December'];
-            
-            document.getElementById('currentMonthYear').textContent = `${monthNames[month]} ${year}`;
-            
-            const grid = document.getElementById('calendarGrid');
-            grid.innerHTML = '';
-            
-            const firstDay = new Date(year, month, 1).getDay();
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
-            
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            
-            // Empty cells
-            for (let i = 0; i < firstDay; i++) {
-                const emptyCell = document.createElement('div');
-                emptyCell.className = 'calendar-day empty p-2';
-                grid.appendChild(emptyCell);
-            }
-            
-            // Day cells
-            for (let day = 1; day <= daysInMonth; day++) {
-                const cell = document.createElement('div');
-                const cellDate = new Date(year, month, day);
-                const dateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                
-                const isToday = cellDate.getTime() === today.getTime();
-                const isPast = cellDate < today;
-                const isSunday = cellDate.getDay() === 0;
-                const isSelected = bookingState.selectedDate === dateString;
-                
-                cell.textContent = day;
-                cell.className = 'calendar-day p-2 rounded-lg cursor-pointer text-sm';
-                
-                if (isSelected) {
-                    cell.classList.add('selected');
-                } else if (isPast || isSunday) {
-                    cell.classList.add('disabled');
-                } else if (isToday) {
-                    cell.classList.add('today');
-                }
-                
-                if (!isPast && !isSunday) {
-                    cell.onclick = () => selectDate(dateString);
-                }
-                
-                grid.appendChild(cell);
-            }
-        }
-
-        function changeMonth(delta) {
-            calendarState.currentMonth += delta;
-            if (calendarState.currentMonth > 11) {
-                calendarState.currentMonth = 0;
-                calendarState.currentYear++;
-            } else if (calendarState.currentMonth < 0) {
-                calendarState.currentMonth = 11;
-                calendarState.currentYear--;
-            }
-            renderCalendar();
-        }
-
-        function selectDate(dateString) {
-            bookingState.selectedDate = dateString;
-            bookingState.selectedTime = null;
-            
-            document.getElementById('dateNextBtn').disabled = false;
-            document.getElementById('selectedDateDisplay').textContent = formatDateDisplay(dateString);
-            
-            renderCalendar();
-        }
-
-        function formatDateDisplay(dateString) {
-            const date = new Date(dateString + 'T00:00:00');
-            const options = { weekday: 'short', month: 'short', day: 'numeric' };
-            return date.toLocaleDateString('en-ZA', options);
-        }
-
-        // ============================================
-        // TIME SLOTS
-        // ============================================
-        function renderTimeSlots() {
-            const container = document.getElementById('timeSlotsContainer');
-            container.innerHTML = '';
-            
-            const allSlots = generateTimeSlots();
-            
-            // Check booked slots
-            getBookingsByDate(bookingState.selectedDate).then(bookedBookings => {
-                const bookedTimes = bookedBookings.filter(b => b.status !== 'cancelled').map(b => b.time);
-                
-                allSlots.forEach(slot => {
-                    const isBooked = bookedTimes.includes(slot.time);
-                    
-                    const slotEl = document.createElement('div');
-                    slotEl.className = `time-slot p-3 rounded-lg border border-dark-500 text-center cursor-pointer text-sm font-medium ${isBooked ? 'disabled' : ''} ${bookingState.selectedTime === slot.time ? 'selected' : ''}`;
-                    slotEl.textContent = slot.display;
-                    
-                    if (slot.late) {
-                        slotEl.innerHTML = `${slot.display} <span class="text-xs block text-red-400">+R20</span>`;
-                    }
-                    
-                    if (!isBooked) {
-                        slotEl.onclick = () => selectTime(slot.time, slot.display, slot.late);
-                    }
-                    
-                    container.appendChild(slotEl);
-                });
-            });
-        }
-
-        function generateTimeSlots() {
-            const slots = [];
-            const startHour = 9;
-            const endHour = 20; // 8 PM
-            
-            for (let hour = startHour; hour < endHour; hour++) {
-                // Hour
-                const h12h = hour > 12 ? hour - 12 : hour;
-                const ampm = hour >= 12 ? 'PM' : 'AM';
-                slots.push({
-                    time: `${String(hour).padStart(2, '0')}:00`,
-                    display: `${h12h}:00 ${ampm}`,
-                    late: hour >= 19 && 30 > 0
-                });
-                
-                // Half hour
-                const isLate = hour >= 19;
-                slots.push({
-                    time: `${String(hour).padStart(2, '0')}:30`,
-                    display: `${h12h}:30 ${ampm}`,
-                    late: isLate
-                });
-            }
-            
-            return slots;
-        }
-
-        function selectTime(time, display, isLate) {
-            bookingState.selectedTime = time;
-            bookingState.lateFee = isLate ? 20 : 0;
-            
-            document.getElementById('timeNextBtn').disabled = false;
-            renderTimeSlots();
-        }
-
-        // ============================================
-        // SERVICE SELECTION
-        // ============================================
-        function selectService(type, price) {
-            bookingState.selectedService = type;
-            bookingState.basePrice = price;
-            bookingState.serviceName = type === 'dye' ? 'Haircut with Dye' : 'Haircut without Dye';
-            
-            document.getElementById('serviceDye').classList.toggle('selected', type === 'dye');
-            document.getElementById('serviceNoDye').classList.toggle('selected', type === 'nodye');
-            
-            document.getElementById('serviceNextBtn').disabled = false;
-        }
-
-        // ============================================
-        // SUMMARY
-        // ============================================
-        function updateSummary() {
-            document.getElementById('summaryDateTime').textContent = `${formatDateDisplay(bookingState.selectedDate)} at ${formatTimeDisplay(bookingState.selectedTime)}`;
-            document.getElementById('summaryService').textContent = bookingState.serviceName;
-            document.getElementById('summaryBasePrice').textContent = `R${bookingState.basePrice}`;
-            
-            bookingState.total = bookingState.basePrice + bookingState.lateFee;
-            
-            if (bookingState.lateFee > 0) {
-                document.getElementById('lateFeeRow').classList.remove('hidden');
-                document.getElementById('summaryLateFee').textContent = `R${bookingState.lateFee}`;
-            } else {
-                document.getElementById('lateFeeRow').classList.add('hidden');
-            }
-            
-            document.getElementById('summaryTotal').textContent = `R${bookingState.total}`;
-        }
-
-        function formatTimeDisplay(time) {
-            const [hour, minute] = time.split(':').map(Number);
-            const h12h = hour > 12 ? hour - 12 : hour;
-            const ampm = hour >= 12 ? 'PM' : 'AM';
-            return `${h12h}:${String(minute).padStart(2, '0')} ${ampm}`;
-        }
-
-        // ============================================
-        // CONFIRM BOOKING
-        // ============================================
-        async function confirmBooking() {
-    const name = document.getElementById('clientName').value.trim();
-    const phone = document.getElementById('clientPhone').value.trim();
-    const email = document.getElementById('clientEmail').value.trim();
-            
-            if (!name) {
-        showNotification('Please enter your name', 'error');
-        return;
-    }
-    if (!phone) {
-        showNotification('Please enter your phone number', 'error');
-        return;
-    }
-    if (!email) {
-        showNotification('Please enter your email address (required for booking management)', 'error');
-        return;
-    }
-            
-             bookingState.clientName = name;
-    bookingState.clientPhone = phone;
-    bookingState.clientEmail = email;
-            
-            // Check if slot is still available
-            const bookedBookings = await getBookingsByDate(bookingState.selectedDate);
-            const isSlotBooked = bookedBookings.some(b => b.time === bookingState.selectedTime && b.status !== 'cancelled');
-            
-            if (isSlotBooked) {
-                showNotification('Sorry, this slot was just booked! Please select another time.', 'error');
-                return;
-            }
-            
-            // Create booking
-            const booking = {
-                id: generateId(),
-                name: bookingState.clientName,
-                phone: bookingState.clientPhone,
-                email: bookingState.clientEmail,
-                date: bookingState.selectedDate,
-                time: bookingState.selectedTime,
-                service: bookingState.selectedService,
-                serviceName: bookingState.serviceName,
-                basePrice: bookingState.basePrice,
-                lateFee: bookingState.lateFee,
-                total: bookingState.total,
-                status: 'confirmed',
-                createdAt: new Date().toISOString()
-            };
-            
-            try {
-                await addBookingToStorage(booking);
-                
-                // Send email confirmation (if EmailJS configured)
-                if (bookingState.clientEmail && window.emailjs) {
-                    try {
-                        await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
-                            to_name: bookingState.clientName,
-                            to_email: bookingState.clientEmail,
-                            booking_date: formatDateDisplay(bookingState.selectedDate),
-                            booking_time: formatTimeDisplay(bookingState.selectedTime),
-                            service_name: bookingState.serviceName,
-                            total_price: `R${bookingState.total}`,
-                            booking_id: booking.id
-                        });
-                    } catch (e) {
-                        console.warn('EmailJS error:', e);
-                    }
-                }
-                
-                // Show confirmation
-                document.getElementById('confirmName').textContent = bookingState.clientName;
-                document.getElementById('confirmDateTime').textContent = `${formatDateDisplay(bookingState.selectedDate)} at ${formatTimeDisplay(bookingState.selectedTime)}`;
-                document.getElementById('confirmService').textContent = bookingState.serviceName;
-                document.getElementById('confirmTotal').textContent = `R${bookingState.total}`;
-                document.getElementById('confirmBookingId').textContent = booking.id;
-                
-                goToStep(5);
-                showNotification('Booking confirmed successfully!', 'success');
-            } catch (error) {
-                showNotification('Error creating booking. Please try again.', 'error');
-            }
-        }
-
-        function generateId() {
-            return 'BK' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substr(2, 4).toUpperCase();
-        }
-
-        // ============================================
-        // MY BOOKINGS
-        // ============================================
-        async function searchBookings() {
-    const email = document.getElementById('searchEmail').value.trim();
-    
-    if (!email) {
-        showNotification('Please enter your email address', 'error');
-        return;
-    }
-    
-    customerState.email = email;
-    
-    try {
-        const bookings = await getBookingsByEmail(email);
-        renderMyBookings(bookings);
-    } catch (error) {
-        showNotification('Error retrieving bookings', 'error');
-    }
+// ══════════════════════════════════════
+// TOAST
+// ══════════════════════════════════════
+function toast(msg, type = 'default', icon = '💬') {
+  const container = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span class="toast-icon">${icon}</span><span>${msg}</span>`;
+  container.appendChild(el);
+  setTimeout(() => {
+    el.style.animation = 'toastOut 0.3s forwards';
+    setTimeout(() => el.remove(), 300);
+  }, 3500);
 }
 
-        function renderMyBookings(bookings) {
-            const container = document.getElementById('bookingsContainer');
-            container.innerHTML = '';
-            
-            document.getElementById('myBookingsList').classList.remove('hidden');
-            
-            if (bookings.length === 0) {
-                container.innerHTML = `
-                    <div class="glass rounded-xl p-8 text-center">
-                        <div class="flex flex-col items-center gap-2">
-                            <i data-lucide="calendar-x" class="w-8 h-8 text-dark-400"></i>
-                            <p class="text-dark-300">No bookings found</p>
-                            <button onclick="openBookingModal()" class="mt-4 btn-gold px-6 py-2 rounded-lg text-dark-900 text-sm font-semibold">Book Now</button>
-                        </div>
-                    </div>
-                `;
-                lucide.createIcons();
-                return;
-            }
-            
-            bookings.forEach(booking => {
-                const isPast = new Date(booking.date + 'T' + booking.time) < new Date();
-                const within5Hours = booking.status === 'confirmed' && !isPast && 
-                    (new Date(booking.date + 'T' + booking.time) - new Date()) < 5 * 60 * 60 * 1000;
-                
-                const card = document.createElement('div');
-                card.className = 'glass rounded-xl p-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between slide-in-right';
-                
-                const statusClass = booking.status === 'cancelled' ? 'booking-status-cancelled' : 'booking-status-confirmed';
-                
-                card.innerHTML = `
-                    <div class="flex-1">
-                        <div class="flex items-center gap-2 mb-1">
-                            <span class="font-semibold">${booking.serviceName}</span>
-                            <span class="text-xs px-2 py-0.5 rounded-full ${statusClass} ${booking.status === 'confirmed' ? 'bg-green-500/10' : 'bg-red-500/10'}">${booking.status}</span>
-                            ${booking.lateFee > 0 ? '<span class="text-xs late-fee-badge px-2 py-0.5 rounded-full">Late Fee</span>' : ''}
-                        </div>
-                        <p class="text-sm text-dark-300">${formatDateDisplay(booking.date)} at ${formatTimeDisplay(booking.time)}</p>
-                        <p class="text-sm text-dark-400">ID: ${booking.id}</p>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <span class="text-gold-400 font-bold">R${booking.total}</span>
-                        ${booking.status === 'confirmed' && !isPast ? `
-                            <button onclick="openReschedule('${booking.id}')" class="btn-outline-gold px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1">
-                                <i data-lucide="refresh-cw" class="w-3 h-3"></i>
-                                Reschedule
-                            </button>
-                            <button onclick="cancelBooking('${booking.id}')" class="bg-red-500/10 border border-red-500/20 text-red-400 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 hover:bg-red-500/20 transition-colors">
-                                <i data-lucide="x" class="w-3 h-3"></i>
-                                ${within5Hours ? 'Cancel (R20)' : 'Cancel'}
-                            </button>
-                        ` : ''}
-                    </div>
-                `;
-                
-                container.appendChild(card);
-            });
-            
-            lucide.createIcons();
-        }
-
-       function changeEmailAddress() {
-    document.getElementById('myBookingsList').classList.add('hidden');
-    document.getElementById('searchEmail').value = '';
+// ══════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════
+function pad2(n) { return String(n).padStart(2, '0'); }
+function formatDate(d) {
+  if (!d) return '—';
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+function formatDateShort(d) {
+  if (!d) return '';
+  return `${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()}`;
+}
+function generateId() {
+  return 'PB' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 5).toUpperCase();
+}
+function isLateSlot(time) {
+  const [h, m] = time.split(':').map(Number);
+  return h > 19 || (h === 19 && m >= 30);
+}
+function getServiceLabel(svc) {
+  return svc === 'dye' ? 'Haircut with Dye' : 'Haircut without Dye';
+}
+function getServicePrice(svc) {
+  return svc === 'dye' ? 100 : 80;
+}
+function getBookedSlots(dateStr) {
+  return getBookings()
+    .filter(b => b.dateStr === dateStr && b.status !== 'cancelled')
+    .map(b => b.time);
 }
 
-        // ============================================
-        // CANCELLATION
-        // ============================================
-     async function cancelBooking(bookingId) {
-    const bookings = await getBookingsByEmail(customerState.email);
-    const booking = bookings.find(b => b.id === bookingId);
-    
-    if (!booking) return;
-    
-    // Check if within 5 hours
-    const bookingDate = new Date(booking.date + 'T' + booking.time);
-    const now = new Date();
-    const hoursDiff = (bookingDate - now) / (1000 * 60 * 60);
-    
-    let lateFee = 0;
-    if (hoursDiff < 5) {
-        lateFee = 20;
-        if (!confirm(`Cancellation within 5 hours incurs a R20 late fee. Continue?`)) {
-            return;
-        }
+// ══════════════════════════════════════
+// CALENDAR
+// ══════════════════════════════════════
+function buildCalendar(containerId, year, month, selectedDate, onSelect) {
+  const container = document.getElementById(containerId);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDay = new Date(year, month, 1).getDay();
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  let html = `<div class="cal-header">
+    <button class="cal-nav" onclick="${onSelect.nav}(-1)">‹</button>
+    <div class="cal-month">${months[month]} ${year}</div>
+    <button class="cal-nav" onclick="${onSelect.nav}(1)">›</button>
+  </div>
+  <div class="cal-grid">
+    <div class="cal-day-label">Su</div><div class="cal-day-label">Mo</div><div class="cal-day-label">Tu</div>
+    <div class="cal-day-label">We</div><div class="cal-day-label">Th</div><div class="cal-day-label">Fr</div><div class="cal-day-label">Sa</div>`;
+
+  for (let i = 0; i < firstDay; i++) html += `<div class="cal-day empty"></div>`;
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const thisDate = new Date(year, month, d);
+    const isSunday = thisDate.getDay() === 0;
+    const isPast = thisDate < today;
+    const disabled = isSunday || isPast;
+    const isToday = thisDate.getTime() === today.getTime();
+    const isSel = selectedDate && thisDate.toDateString() === selectedDate.toDateString();
+    const cls = ['cal-day', disabled ? 'disabled' : '', isToday ? 'today' : '', isSel ? 'selected' : ''].filter(Boolean).join(' ');
+    const click = disabled ? '' : `onclick="${onSelect.click}(${year},${month},${d})"`;
+    html += `<div class="${cls}" ${click}>${d}</div>`;
+  }
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+// Main booking calendar
+function initBookingCalendar() {
+  const now = new Date();
+  state.calendar.year = now.getFullYear();
+  state.calendar.month = now.getMonth();
+  renderBookingCalendar();
+}
+function navBookingCal(dir) {
+  state.calendar.month += dir;
+  if (state.calendar.month > 11) { state.calendar.month = 0; state.calendar.year++; }
+  if (state.calendar.month < 0) { state.calendar.month = 11; state.calendar.year--; }
+  renderBookingCalendar();
+}
+function renderBookingCalendar() {
+  buildCalendar('calendar', state.calendar.year, state.calendar.month, state.booking.date, {
+    nav: 'navBookingCal',
+    click: 'selectBookingDate'
+  });
+}
+function selectBookingDate(y, m, d) {
+  state.booking.date = new Date(y, m, d);
+  renderBookingCalendar();
+  document.getElementById('selected-date-display').textContent = '📅 ' + formatDate(state.booking.date);
+  document.getElementById('next-1').disabled = false;
+}
+
+// ══════════════════════════════════════
+// TIME SLOTS
+// ══════════════════════════════════════
+function buildTimeGrid(containerId, dateStr, selectedTime, onSelect) {
+  const booked = getBookedSlots(dateStr);
+  const slots = [];
+  for (let h = 9; h < 20; h++) {
+    slots.push(`${pad2(h)}:00`);
+    if (h < 20) slots.push(`${pad2(h)}:30`);
+  }
+  // 20:00 removed (only up to 19:30)
+  // Actually include up to 19:30
+  const filtered = slots.filter(s => {
+    const [h, m] = s.split(':').map(Number);
+    return h < 20;
+  });
+
+  let html = '<div class="time-grid">';
+  filtered.forEach(slot => {
+    const isBooked = booked.includes(slot);
+    const isLate = isLateSlot(slot);
+    const isSel = slot === selectedTime;
+    const cls = ['time-slot', isBooked ? 'booked' : '', isSel ? 'selected' : ''].filter(Boolean).join(' ');
+    const click = isBooked ? '' : `onclick="${onSelect}('${slot}')"`;
+    html += `<div class="${cls}" ${click}>${slot}${isLate ? `<span class="late-badge">+R20 late</span>` : ''}</div>`;
+  });
+  html += '</div>';
+  document.getElementById(containerId).innerHTML = html;
+}
+
+function selectTime(slot) {
+  state.booking.time = slot;
+  state.booking.lateFee = isLateSlot(slot);
+  const dateStr = state.booking.date ? state.booking.date.toDateString() : '';
+  buildTimeGrid('time-grid', dateStr, slot, 'selectTime');
+  document.getElementById('next-2').disabled = false;
+}
+
+// ══════════════════════════════════════
+// SERVICES
+// ══════════════════════════════════════
+function selectService(svc) {
+  state.booking.service = svc;
+  document.querySelectorAll('.service-option').forEach(el => el.classList.remove('selected'));
+  document.getElementById('svc-' + svc).classList.add('selected');
+  document.getElementById('next-3').disabled = false;
+}
+
+// ══════════════════════════════════════
+// SUMMARY
+// ══════════════════════════════════════
+function updateSummary() {
+  const b = state.booking;
+  document.getElementById('sum-date').textContent = b.date ? formatDate(b.date) : '—';
+  document.getElementById('sum-time').textContent = b.time || '—';
+  document.getElementById('sum-service').textContent = b.service ? getServiceLabel(b.service) : '—';
+  const price = b.service ? getServicePrice(b.service) : 0;
+  document.getElementById('sum-price').textContent = b.service ? `R${price}` : '—';
+  const lateRow = document.getElementById('sum-late-row');
+  lateRow.style.display = b.lateFee ? 'flex' : 'none';
+  const total = price + (b.lateFee ? 20 : 0);
+  state.booking.totalPrice = total;
+  document.getElementById('sum-total').textContent = b.service ? `R${total}` : '—';
+}
+
+// ══════════════════════════════════════
+// BOOKING FLOW STEPS
+// ══════════════════════════════════════
+function initBookingPage() {
+  if (state.booking.step === 5) return; // keep confirmation
+  goStep(1);
+}
+function goStep(n) {
+  state.booking.step = n;
+  document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('step-' + n).classList.add('active');
+
+  // Update dots
+  for (let i = 1; i <= 5; i++) {
+    const dot = document.getElementById('sdot-' + i);
+    dot.classList.remove('active', 'done');
+    if (i < n) dot.classList.add('done'), dot.textContent = '✓';
+    else if (i === n) { dot.classList.add('active'); dot.textContent = i; }
+    else dot.textContent = i;
+  }
+  for (let i = 1; i <= 4; i++) {
+    const line = document.getElementById('sline-' + i);
+    line.classList.toggle('done', i < n);
+  }
+
+  if (n === 1) initBookingCalendar();
+  if (n === 2) {
+    const dateStr = state.booking.date ? state.booking.date.toDateString() : '';
+    buildTimeGrid('time-grid', dateStr, state.booking.time, 'selectTime');
+  }
+  if (n === 4) updateSummary();
+}
+function resetBooking() {
+  state.booking = { step: 1, date: null, time: null, service: null, name: '', phone: '', email: '', lateFee: false, totalPrice: 0 };
+}
+
+function startBookingWithService(svc) {
+  resetBooking();
+  showPage('booking');
+  state.booking.service = svc;
+}
+
+function confirmBooking() {
+  const name = document.getElementById('inp-name').value.trim();
+  const phone = document.getElementById('inp-phone').value.trim();
+  const email = document.getElementById('inp-email').value.trim();
+
+  if (!name || !phone || !email) {
+    toast('Please fill in all required fields.', 'error', '⚠️');
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    toast('Please enter a valid email address.', 'error', '⚠️');
+    return;
+  }
+
+  const b = state.booking;
+  const id = generateId();
+  const dateStr = b.date.toDateString();
+  const booking = {
+    id, name, phone, email,
+    date: formatDate(b.date),
+    dateStr,
+    time: b.time,
+    service: getServiceLabel(b.service),
+    serviceKey: b.service,
+    lateFee: b.lateFee,
+    totalPrice: b.totalPrice,
+    status: 'pending',
+    createdAt: Date.now()
+  };
+
+  const bookings = getBookings();
+  bookings.push(booking);
+  saveBookings(bookings);
+
+  // Show confirmation
+  document.getElementById('confirm-id').textContent = id;
+  document.getElementById('confirm-summary').innerHTML = `
+    <div class="summary-row"><span>👤 Name</span><span>${name}</span></div>
+    <div class="summary-row"><span>📅 Date</span><span>${booking.date}</span></div>
+    <div class="summary-row"><span>🕐 Time</span><span>${b.time}</span></div>
+    <div class="summary-row"><span>✂️ Service</span><span>${booking.service}</span></div>
+    ${b.lateFee ? `<div class="summary-row"><span>🌙 Late Fee</span><span>+R20</span></div>` : ''}
+    <div class="summary-row total"><span>Total</span><span>R${b.totalPrice}</span></div>
+  `;
+  goStep(5);
+  toast('Booking confirmed! 🎉', 'success', '✅');
+}
+
+// ══════════════════════════════════════
+// MY BOOKINGS
+// ══════════════════════════════════════
+function lookupBookings() {
+  const email = document.getElementById('lookup-email').value.trim().toLowerCase();
+  if (!email) { toast('Please enter your email.', 'error', '⚠️'); return; }
+
+  const all = getBookings().filter(b => b.email.toLowerCase() === email);
+  const container = document.getElementById('bookings-results');
+
+  if (all.length === 0) {
+    container.innerHTML = `<div class="empty-state"><div class="icon">📭</div>No bookings found for this email address.</div>`;
+    return;
+  }
+
+  all.sort((a, b) => b.createdAt - a.createdAt);
+  container.innerHTML = all.map(b => buildBookingCard(b)).join('');
+}
+
+function buildBookingCard(b) {
+  const now = Date.now();
+  const apptTime = parseDateTimeMs(b.dateStr, b.time);
+  const isFuture = apptTime > now;
+  const isActive = b.status !== 'cancelled' && isFuture;
+  const isPast = !isFuture || b.status === 'cancelled';
+
+  const actions = isActive ? `
+    <button class="btn-sm btn-sm-reschedule" onclick="openReschedule('${b.id}')">🔁 Reschedule</button>
+    <button class="btn-sm btn-sm-cancel" onclick="openCancel('${b.id}')">✕ Cancel</button>
+  ` : '';
+
+  return `<div class="booking-card" id="bc-${b.id}">
+    <div class="bc-header">
+      <div>
+        <div class="bc-id">ID: ${b.id}</div>
+        <div class="bc-name">${b.name}</div>
+      </div>
+      <div class="status-badge ${b.status}">${b.status.charAt(0).toUpperCase()+b.status.slice(1)}</div>
+    </div>
+    <div class="bc-details">
+      <div class="bc-detail">📅 <strong>${b.date}</strong></div>
+      <div class="bc-detail">🕐 <strong>${b.time}</strong></div>
+      <div class="bc-detail">✂️ <strong>${b.service}</strong></div>
+      <div class="bc-detail">📧 <strong>${b.email}</strong></div>
+    </div>
+    <div class="bc-price">Total: R${b.totalPrice}</div>
+    ${actions ? `<div class="bc-actions">${actions}</div>` : ''}
+  </div>`;
+}
+
+function parseDateTimeMs(dateStr, time) {
+  const d = new Date(dateStr);
+  const [h, m] = time.split(':').map(Number);
+  d.setHours(h, m, 0, 0);
+  return d.getTime();
+}
+
+// ══════════════════════════════════════
+// CANCEL
+// ══════════════════════════════════════
+function openCancel(id) {
+  state.cancelTarget = id;
+  const b = getBookings().find(x => x.id === id);
+  const apptMs = parseDateTimeMs(b.dateStr, b.time);
+  const now = Date.now();
+  const hoursUntil = (apptMs - now) / (1000 * 60 * 60);
+  const within5 = hoursUntil < 5 && hoursUntil > 0;
+
+  document.getElementById('cancel-warning-text').textContent =
+    `Are you sure you want to cancel your ${b.service} on ${b.date} at ${b.time}?`;
+  document.getElementById('cancel-fee-warning').style.display = within5 ? 'flex' : 'none';
+  openModal('cancel-modal');
+  state.cancelFeeApplied = within5;
+}
+function proceedCancel() {
+  const bookings = getBookings();
+  const idx = bookings.findIndex(b => b.id === state.cancelTarget);
+  if (idx > -1) {
+    bookings[idx].status = 'cancelled';
+    if (state.cancelFeeApplied) {
+      bookings[idx].cancellationFee = 20;
+      toast('Booking cancelled. R20 fee applied.', 'warning', '⚠️');
     } else {
-        if (!confirm('Are you sure you want to cancel this booking?')) {
-            return;
-        }
+      toast('Booking cancelled successfully.', 'default', '✓');
     }
-    
-    try {
-        await updateBookingFirestore(bookingId, {
-            status: 'cancelled',
-            cancelledAt: new Date().toISOString(),
-            cancellationFee: lateFee
-        });
-        
-        const updatedBookings = await getBookingsByEmail(customerState.email);
-        renderMyBookings(updatedBookings);
-        showNotification(lateFee > 0 ? `Booking cancelled. R${lateFee} cancellation fee applied.` : 'Booking cancelled successfully.', 'success');
-    } catch (error) {
-        showNotification('Error cancelling booking', 'error');
-    }
+    saveBookings(bookings);
+  }
+  closeModal('cancel-modal');
+  // Refresh view
+  const email = document.getElementById('lookup-email').value.trim();
+  if (email) lookupBookings();
 }
 
-        // ============================================
-        // RESCHEDULE
-        // ============================================
-        function openReschedule(bookingId) {
-    rescheduleState.bookingId = bookingId;
-    document.getElementById('rescheduleModal').classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
-           // Populate time slots
-    const timeSelect = document.getElementById('rescheduleTime');
-    timeSelect.innerHTML = '<option value="">Select time</option>';
-    
-    const slots = generateTimeSlots();
-    slots.forEach(slot => {
-        const option = document.createElement('option');
-        option.value = slot.time;
-        option.textContent = slot.display;
-        timeSelect.appendChild(option);
-    });
+// ══════════════════════════════════════
+// RESCHEDULE
+// ══════════════════════════════════════
+function openReschedule(id) {
+  state.reschedule.bookingId = id;
+  state.reschedule.date = null;
+  state.reschedule.time = null;
+  const now = new Date();
+  state.reschedule.calYear = now.getFullYear();
+  state.reschedule.calMonth = now.getMonth();
+  renderRescheduleCalendar();
+  document.getElementById('reschedule-time-grid').innerHTML = '';
+  openModal('reschedule-modal');
+}
+function navRescheduleCal(dir) {
+  state.reschedule.calMonth += dir;
+  if (state.reschedule.calMonth > 11) { state.reschedule.calMonth = 0; state.reschedule.calYear++; }
+  if (state.reschedule.calMonth < 0) { state.reschedule.calMonth = 11; state.reschedule.calYear--; }
+  renderRescheduleCalendar();
+}
+function renderRescheduleCalendar() {
+  buildCalendar('reschedule-calendar', state.reschedule.calYear, state.reschedule.calMonth, state.reschedule.date, {
+    nav: 'navRescheduleCal',
+    click: 'selectRescheduleDate'
+  });
+}
+function selectRescheduleDate(y, m, d) {
+  state.reschedule.date = new Date(y, m, d);
+  state.reschedule.time = null;
+  renderRescheduleCalendar();
+  const dateStr = state.reschedule.date.toDateString();
+  buildTimeGrid('reschedule-time-grid', dateStr, null, 'selectRescheduleTime');
+}
+function selectRescheduleTime(slot) {
+  state.reschedule.time = slot;
+  const dateStr = state.reschedule.date ? state.reschedule.date.toDateString() : '';
+  buildTimeGrid('reschedule-time-grid', dateStr, slot, 'selectRescheduleTime');
+}
+function confirmReschedule() {
+  if (!state.reschedule.date || !state.reschedule.time) {
+    toast('Please select a new date and time.', 'error', '⚠️'); return;
+  }
+  const bookings = getBookings();
+  const idx = bookings.findIndex(b => b.id === state.reschedule.bookingId);
+  if (idx > -1) {
+    bookings[idx].dateStr = state.reschedule.date.toDateString();
+    bookings[idx].date = formatDate(state.reschedule.date);
+    bookings[idx].time = state.reschedule.time;
+    bookings[idx].lateFee = isLateSlot(state.reschedule.time);
+    const basePrice = bookings[idx].serviceKey === 'dye' ? 100 : 80;
+    bookings[idx].totalPrice = basePrice + (bookings[idx].lateFee ? 20 : 0);
+    bookings[idx].status = 'pending';
+    saveBookings(bookings);
+    toast('Booking rescheduled! ✓', 'success', '🔁');
+    closeModal('reschedule-modal');
+    const email = document.getElementById('lookup-email').value.trim();
+    if (email) lookupBookings();
+  }
 }
 
-        function closeRescheduleModal() {
-            document.getElementById('rescheduleModal').classList.add('hidden');
-            document.body.style.overflow = '';
-        }
+// ══════════════════════════════════════
+// MODAL HELPERS
+// ══════════════════════════════════════
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(o => {
+  o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); });
+});
 
-        async function submitReschedule() {
-    const newDate = document.getElementById('rescheduleDate').value;
-    const newTime = document.getElementById('rescheduleTime').value;
-    
-    if (!newDate || !newTime) {
-        showNotification('Please select both date and time', 'error');
-        return;
-    }
-    
-    try {
-        await updateBookingFirestore(rescheduleState.bookingId, {
-            date: newDate,
-            time: newTime,
-            rescheduledAt: new Date().toISOString()
-        });
-        
-        closeRescheduleModal();
-        
-        const updatedBookings = await getBookingsByEmail(customerState.email);
-        renderMyBookings(updatedBookings);
-        showNotification('Booking rescheduled successfully!', 'success');
-    } catch (error) {
-        showNotification('Error rescheduling booking', 'error');
-    }
-}
-     // ============================================
+// ══════════════════════════════════════
 // ADMIN
-// ============================================
+// ══════════════════════════════════════
+let adminLoggedIn = false;
+
+function initAdminPage() {
+  if (adminLoggedIn) {
+    document.getElementById('admin-login-panel').style.display = 'none';
+    document.getElementById('admin-dashboard').style.display = 'block';
+    renderAdminDashboard();
+  } else {
+    document.getElementById('admin-login-panel').style.display = 'block';
+    document.getElementById('admin-dashboard').style.display = 'none';
+  }
+}
 function adminLogin() {
-    const username = document.getElementById('adminUsername').value.trim();
-    const password = document.getElementById('adminPassword').value;
-    
-    if (username === adminState.adminUsername && password === adminState.adminPassword) {
-        adminState.isLoggedIn = true;
-        document.getElementById('adminLogin').classList.add('hidden');
-        document.getElementById('adminDashboard').classList.remove('hidden');
-        loadAdminBookings();
-        showNotification('Welcome back, Admin!', 'success');
-    } else {
-        showNotification('Invalid username or password', 'error');
-    }
+  const u = document.getElementById('admin-user').value.trim();
+  const p = document.getElementById('admin-pass').value.trim();
+  if (u === 'admin' && p === 'voka123') {
+    adminLoggedIn = true;
+    toast('Welcome back, Admin! 👋', 'success', '🔐');
+    initAdminPage();
+  } else {
+    toast('Invalid credentials.', 'error', '✕');
+    document.getElementById('admin-pass').value = '';
+  }
+}
+function adminLogout() {
+  adminLoggedIn = false;
+  toast('Logged out.', 'default', '👋');
+  initAdminPage();
 }
 
-  function adminLogout() {
-    adminState.isLoggedIn = false;
-    document.getElementById('adminLogin').classList.remove('hidden');
-    document.getElementById('adminDashboard').classList.add('hidden');
-    document.getElementById('adminUsername').value = '';
-    document.getElementById('adminPassword').value = '';
+function renderAdminDashboard() {
+  const bookings = getBookings();
+  const now = Date.now();
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayStr = today.toDateString();
+
+  const total = bookings.length;
+  const pending = bookings.filter(b => b.status === 'pending').length;
+  const confirmed = bookings.filter(b => b.status === 'confirmed').length;
+  const cancelled = bookings.filter(b => b.status === 'cancelled').length;
+  const todayCount = bookings.filter(b => b.dateStr === todayStr && b.status !== 'cancelled').length;
+  const revenue = bookings.filter(b => b.status !== 'cancelled').reduce((s, b) => s + b.totalPrice, 0);
+
+  document.getElementById('admin-stats').innerHTML = `
+    <div class="stat-card"><div class="stat-num">${total}</div><div class="stat-label">Total Bookings</div></div>
+    <div class="stat-card"><div class="stat-num">${todayCount}</div><div class="stat-label">Today's Appointments</div></div>
+    <div class="stat-card"><div class="stat-num">${pending}</div><div class="stat-label">Pending</div></div>
+    <div class="stat-card"><div class="stat-num" style="font-size:1.6rem">R${revenue}</div><div class="stat-label">Total Revenue</div></div>
+  `;
+
+  renderAdminBookings();
 }
 
-        async function loadAdminBookings() {
-            try {
-                const bookings = await getAllBookings();
-                renderAdminTable(bookings);
-                updateAdminStats(bookings);
-            } catch (error) {
-                showNotification('Error loading bookings', 'error');
-            }
-        }
+function adminFilter(f) {
+  state.adminFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('af-' + f).classList.add('active');
+  renderAdminBookings();
+}
 
-        async function refreshAdminBookings() {
-            await loadAdminBookings();
-            showNotification('Bookings refreshed', 'success');
-        }
+function renderAdminBookings() {
+  let bookings = getBookings();
+  if (state.adminFilter !== 'all') bookings = bookings.filter(b => b.status === state.adminFilter);
+  bookings.sort((a, b) => {
+    const at = parseDateTimeMs(a.dateStr, a.time);
+    const bt = parseDateTimeMs(b.dateStr, b.time);
+    return bt - at;
+  });
 
-        function renderAdminTable(bookings) {
-            const tbody = document.getElementById('adminBookingsTable');
-            tbody.innerHTML = '';
-            
-            if (bookings.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="6" class="px-4 py-8 text-center text-dark-400">
-                            <div class="flex flex-col items-center gap-2">
-                                <i data-lucide="calendar-x" class="w-8 h-8"></i>
-                                <p>No bookings yet</p>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-                lucide.createIcons();
-                return;
-            }
-            
-            bookings.forEach(booking => {
-                const tr = document.createElement('tr');
-                tr.className = 'border-b border-dark-600 table-row-hover';
-                
-                const statusClass = booking.status === 'cancelled' ? 'text-red-400' : 'text-green-400';
-                
-                tr.innerHTML = `
-                    <td class="px-4 py-3">
-                        <div>
-                            <p class="font-medium text-sm">${booking.name}</p>
-                            <p class="text-xs text-dark-400">${booking.phone}</p>
-                        </div>
-                    </td>
-                    <td class="px-4 py-3 text-sm">
-                        <p>${formatDateDisplay(booking.date)}</p>
-                        <p class="text-dark-400">${formatTimeDisplay(booking.time)}</p>
-                    </td>
-                    <td class="px-4 py-3 text-sm">${booking.serviceName}</td>
-                    <td class="px-4 py-3 text-sm font-medium">R${booking.total}</td>
-                    <td class="px-4 py-3">
-                        <span class="text-xs px-2 py-1 rounded-full ${booking.status === 'cancelled' ? 'bg-red-500/10 text-red-400' : 'bg-green-500/10 text-green-400'}">${booking.status}</span>
-                    </td>
-                    <td class="px-4 py-3">
-                        <button onclick="adminCancelBooking('${booking.id}')" class="text-red-400 hover:text-red-300 text-xs flex items-center gap-1 transition-colors ${booking.status === 'cancelled' ? 'hidden' : ''}">
-                            <i data-lucide="x-circle" class="w-4 h-4"></i>
-                            Cancel
-                        </button>
-                    </td>
-                `;
-                
-                tbody.appendChild(tr);
-            });
-            
-            lucide.createIcons();
-        }
+  const container = document.getElementById('admin-bookings-list');
+  if (bookings.length === 0) {
+    container.innerHTML = `<div class="empty-state"><div class="icon">📋</div>No bookings found.</div>`;
+    return;
+  }
 
-        function updateAdminStats(bookings) {
-            const total = bookings.length;
-            const confirmed = bookings.filter(b => b.status === 'confirmed').length;
-            const cancelled = bookings.filter(b => b.status === 'cancelled').length;
-            
-            const today = new Date().toISOString().split('T')[0];
-            const todayCount = bookings.filter(b => b.date === today).length;
-            
-            document.getElementById('statTotal').textContent = total;
-            document.getElementById('statUpcoming').textContent = confirmed;
-            document.getElementById('statCancelled').textContent = cancelled;
-            document.getElementById('statToday').textContent = todayCount;
-        }
+  const WA = '2768502521';
+  container.innerHTML = bookings.map(b => {
+    const confirmMsg = encodeURIComponent(`Hello 👋, this is PRIVATE BARBER 💈. Your appointment on ${b.date} at ${b.time} has been confirmed. See you soon.`);
+    const cancelMsg = encodeURIComponent(`Hello 👋, this is PRIVATE BARBER 💈. Unfortunately your appointment on ${b.date} at ${b.time} has been cancelled. Please contact us to reschedule.`);
+    const reschedMsg = encodeURIComponent(`Hello 👋, this is PRIVATE BARBER 💈. We need to reschedule your appointment on ${b.date} at ${b.time}. Please reply with a new suitable time.`);
 
-        async function adminCancelBooking(bookingId) {
-            if (!confirm('Are you sure you want to cancel this booking?')) return;
-            
-            try {
-                await updateBookingFirestore(bookingId, {
-                    status: 'cancelled',
-                    cancelledAt: new Date().toISOString()
-                });
-                await loadAdminBookings();
-                showNotification('Booking cancelled', 'success');
-            } catch (error) {
-                showNotification('Error cancelling booking', 'error');
-            }
-        }
+    return `<div class="admin-booking-card">
+      <div class="abc-top">
+        <div>
+          <div class="abc-name">${b.name}</div>
+          <div class="abc-phone">📞 ${b.phone} · 📧 ${b.email}</div>
+        </div>
+        <div class="status-badge ${b.status}">${b.status.charAt(0).toUpperCase()+b.status.slice(1)}</div>
+      </div>
+      <div class="abc-info">
+        <span>📅 <strong>${b.date}</strong></span>
+        <span>🕐 <strong>${b.time}</strong></span>
+        <span>✂️ <strong>${b.service}</strong></span>
+        <span>💰 <strong>R${b.totalPrice}</strong></span>
+        <span>🔖 <strong>${b.id}</strong></span>
+      </div>
+      <div class="abc-actions">
+        <a class="btn-wa btn-wa-confirm" href="https://wa.me/${WA}?text=${confirmMsg}" target="_blank" onclick="adminUpdateStatus('${b.id}','confirmed')">✅ Confirm</a>
+        <a class="btn-wa btn-wa-reschedule" href="https://wa.me/${WA}?text=${reschedMsg}" target="_blank">🔁 Reschedule</a>
+        <a class="btn-wa btn-wa-cancel" href="https://wa.me/${WA}?text=${cancelMsg}" target="_blank" onclick="adminUpdateStatus('${b.id}','cancelled')">❌ Cancel</a>
+      </div>
+    </div>`;
+  }).join('');
+}
 
-        function confirmClearAll() {
-            if (confirm('Are you sure you want to delete ALL bookings? This cannot be undone.')) {
-                if (confirm('FINAL WARNING: This will permanently delete all bookings. Continue?')) {
-                    clearAllBookings().then(() => {
-                        loadAdminBookings();
-                        showNotification('All bookings cleared', 'success');
-                    });
-                }
-            }
-        }
+function adminUpdateStatus(id, status) {
+  setTimeout(() => {
+    const bookings = getBookings();
+    const idx = bookings.findIndex(b => b.id === id);
+    if (idx > -1) { bookings[idx].status = status; saveBookings(bookings); }
+    renderAdminDashboard();
+  }, 500);
+}
 
-        // ============================================
-        // INITIALIZATION
-        // ============================================
-        document.addEventListener('DOMContentLoaded', () => {
-            lucide.createIcons();
-            renderCalendar();
-            
-            // Set min date for reschedule
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('rescheduleDate').min = today;
-            
-            // Show home section
-            showSection('home');
-        });
-    </script>
+function adminMsgToday() {
+  const todayStr = new Date().toDateString();
+  const todayBookings = getBookings().filter(b => b.dateStr === todayStr && b.status !== 'cancelled');
+  if (todayBookings.length === 0) { toast("No appointments today.", 'default', '📅'); return; }
+  const WA = '2768502521';
+  const msg = encodeURIComponent(`Hello 👋, this is PRIVATE BARBER 💈. A reminder of your appointment today. See you soon!`);
+  todayBookings.forEach((b, i) => {
+    setTimeout(() => window.open(`https://wa.me/${WA}?text=${msg}`, '_blank'), i * 400);
+  });
+  toast(`Messaging ${todayBookings.length} client(s) today.`, 'success', '📲');
+}
+
+function adminRemindUpcoming() {
+  const now = Date.now();
+  const upcoming = getBookings().filter(b => {
+    const apptMs = parseDateTimeMs(b.dateStr, b.time);
+    return apptMs > now && b.status !== 'cancelled';
+  });
+  if (upcoming.length === 0) { toast("No upcoming appointments.", 'default', '📅'); return; }
+  const WA = '2768502521';
+  upcoming.slice(0, 3).forEach((b, i) => {
+    const msg = encodeURIComponent(`Hello 👋 ${b.name}, this is PRIVATE BARBER 💈. Just a reminder of your upcoming appointment on ${b.date} at ${b.time}. See you soon!`);
+    setTimeout(() => window.open(`https://wa.me/${WA}?text=${msg}`, '_blank'), i * 400);
+  });
+  toast(`Reminders sent to ${Math.min(upcoming.length, 3)} upcoming client(s).`, 'success', '🔔');
+}
+</script>
 </body>
 </html>
-

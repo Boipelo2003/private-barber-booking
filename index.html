@@ -933,6 +933,7 @@ body::before{
   border:1px solid;
   text-decoration:none;
   display:inline-flex;align-items:center;gap:6px;
+  background:none;
 }
 .btn-wa-confirm{
   background:var(--success-dim);
@@ -1368,6 +1369,8 @@ footer .footer-logo{
         <div class="confirm-sub">Your appointment has been successfully booked</div>
         <div class="booking-id">Booking ID: <strong id="confirm-id"></strong></div>
         <div class="summary-box confirm-details" id="confirm-summary"></div>
+        <!-- WhatsApp notification buttons (populated by JS) -->
+        <div id="confirm-wa-buttons" style="margin-bottom:12px"></div>
         <button class="btn-gold" style="width:100%;justify-content:center;margin-bottom:12px" onclick="showPage('bookings')">View My Bookings</button>
         <button class="btn-outline" style="width:100%" onclick="resetBooking();showPage('home')">Back to Home</button>
       </div>
@@ -1490,6 +1493,102 @@ footer .footer-logo{
 // ══════════════════════════════════════
 const getBookings = () => JSON.parse(localStorage.getItem('pb_bookings') || '[]');
 const saveBookings = (b) => localStorage.setItem('pb_bookings', JSON.stringify(b));
+
+// ══════════════════════════════════════
+// WHATSAPP HELPERS
+// ══════════════════════════════════════
+const ADMIN_WA = '27768502521'; // Admin number (always receives new booking alerts)
+
+/**
+ * Normalise a South African phone number to international WhatsApp format.
+ * Examples:  0761234567  → 27761234567
+ *            +2776...    → 2776...
+ *            2776...     → 2776...  (already correct)
+ *            076...      → 2776...
+ */
+function formatWANumber(raw) {
+  // Strip everything that isn't a digit
+  let num = String(raw).replace(/\D/g, '');
+  // Remove leading +
+  if (num.startsWith('+')) num = num.slice(1);
+  // South-African local: starts with 0 → replace with 27
+  if (num.startsWith('0')) num = '27' + num.slice(1);
+  // If it doesn't start with 27 and looks like an 9-digit number, prepend 27
+  if (!num.startsWith('27') && num.length === 9) num = '27' + num;
+  return num;
+}
+
+/**
+ * Build and open a WhatsApp URL.
+ * @param {string} number  - raw phone number (any SA format)
+ * @param {string} message - plain-text message (will be URL-encoded)
+ */
+function openWhatsApp(number, message) {
+  const waNum = formatWANumber(number);
+  const encoded = encodeURIComponent(message);
+  window.open(`https://wa.me/${waNum}?text=${encoded}`, '_blank');
+}
+
+/**
+ * Build the full new-booking notification message (sent to ADMIN).
+ */
+function buildNewBookingMsg(booking) {
+  const late = booking.lateFee ? '\n🌙 Late Fee: +R20' : '';
+  return `🆕 *NEW BOOKING — PRIVATE BARBER 💈*\n\n` +
+    `👤 *Name:* ${booking.name}\n` +
+    `📞 *Phone:* ${booking.phone}\n` +
+    `✂️ *Service:* ${booking.service}\n` +
+    `📅 *Date:* ${booking.date}\n` +
+    `🕐 *Time:* ${booking.time}${late}\n` +
+    `💰 *Total:* R${booking.totalPrice}\n` +
+    `🔖 *Booking ID:* ${booking.id}\n\n` +
+    `_Please confirm or follow up with the client._`;
+}
+
+/**
+ * Build the customer confirmation message (sent to CLIENT).
+ */
+function buildCustomerConfirmMsg(booking) {
+  return `Hello ${booking.name} 👋, thank you for booking with *PRIVATE BARBER 💈*!\n\n` +
+    `Here are your booking details:\n` +
+    `✂️ *Service:* ${booking.service}\n` +
+    `📅 *Date:* ${booking.date}\n` +
+    `🕐 *Time:* ${booking.time}\n` +
+    `💰 *Total:* R${booking.totalPrice}\n` +
+    `🔖 *Booking ID:* ${booking.id}\n\n` +
+    `We look forward to seeing you! If you need to reschedule, please contact us. 😊`;
+}
+
+/**
+ * Build an admin → client CANCEL message.
+ */
+function buildAdminCancelMsg(booking) {
+  return `Hello ${booking.name} 👋, this is *PRIVATE BARBER 💈*.\n\n` +
+    `Unfortunately, your booking for *${booking.service}* on *${booking.date}* at *${booking.time}* has been *cancelled* because the schedule is full.\n\n` +
+    `Please choose another available time — we apologise for the inconvenience and hope to see you soon! 🙏`;
+}
+
+/**
+ * Build an admin → client CONFIRM message.
+ */
+function buildAdminConfirmMsg(booking) {
+  return `Hello ${booking.name} 👋, this is *PRIVATE BARBER 💈*.\n\n` +
+    `✅ Your appointment has been *confirmed*!\n\n` +
+    `✂️ *Service:* ${booking.service}\n` +
+    `📅 *Date:* ${booking.date}\n` +
+    `🕐 *Time:* ${booking.time}\n` +
+    `💰 *Total:* R${booking.totalPrice}\n\n` +
+    `See you soon! 💈`;
+}
+
+/**
+ * Build an admin → client RESCHEDULE message.
+ */
+function buildAdminReschedMsg(booking) {
+  return `Hello ${booking.name} 👋, this is *PRIVATE BARBER 💈*.\n\n` +
+    `🔁 We need to *reschedule* your appointment that was booked for *${booking.date}* at *${booking.time}*.\n\n` +
+    `Please reply with a new date and time that works for you and we will lock it in right away. Sorry for any inconvenience! 🙏`;
+}
 
 // ══════════════════════════════════════
 // STATE
@@ -1766,7 +1865,7 @@ function startBookingWithService(svc) {
 }
 
 function confirmBooking() {
-  const name = document.getElementById('inp-name').value.trim();
+  const name  = document.getElementById('inp-name').value.trim();
   const phone = document.getElementById('inp-phone').value.trim();
   const email = document.getElementById('inp-email').value.trim();
 
@@ -1778,39 +1877,70 @@ function confirmBooking() {
     toast('Please enter a valid email address.', 'error', '⚠️');
     return;
   }
+  // Basic SA phone validation
+  const cleanPhone = phone.replace(/\D/g, '');
+  if (cleanPhone.length < 9 || cleanPhone.length > 13) {
+    toast('Please enter a valid phone number.', 'error', '⚠️');
+    return;
+  }
 
-  const b = state.booking;
-  const id = generateId();
+  const b   = state.booking;
+  const id  = generateId();
   const dateStr = b.date.toDateString();
   const booking = {
     id, name, phone, email,
-    date: formatDate(b.date),
+    date:       formatDate(b.date),
     dateStr,
-    time: b.time,
-    service: getServiceLabel(b.service),
+    time:       b.time,
+    service:    getServiceLabel(b.service),
     serviceKey: b.service,
-    lateFee: b.lateFee,
+    lateFee:    b.lateFee,
     totalPrice: b.totalPrice,
-    status: 'pending',
-    createdAt: Date.now()
+    status:     'pending',
+    createdAt:  Date.now()
   };
 
   const bookings = getBookings();
   bookings.push(booking);
   saveBookings(bookings);
 
-  // Show confirmation
+  // ── STEP 5: Confirmation screen ──────────────────────────────────
   document.getElementById('confirm-id').textContent = id;
   document.getElementById('confirm-summary').innerHTML = `
     <div class="summary-row"><span>👤 Name</span><span>${name}</span></div>
+    <div class="summary-row"><span>📞 Phone</span><span>${phone}</span></div>
     <div class="summary-row"><span>📅 Date</span><span>${booking.date}</span></div>
     <div class="summary-row"><span>🕐 Time</span><span>${b.time}</span></div>
     <div class="summary-row"><span>✂️ Service</span><span>${booking.service}</span></div>
     ${b.lateFee ? `<div class="summary-row"><span>🌙 Late Fee</span><span>+R20</span></div>` : ''}
     <div class="summary-row total"><span>Total</span><span>R${b.totalPrice}</span></div>
   `;
+
+  // ── WhatsApp buttons on Step 5 ────────────────────────────────────
+  const waAdminMsg   = encodeURIComponent(buildNewBookingMsg(booking));
+  const waClientMsg  = encodeURIComponent(buildCustomerConfirmMsg(booking));
+  const clientWaNum  = formatWANumber(phone);
+
+  document.getElementById('confirm-wa-buttons').innerHTML = `
+    <button class="btn-wa btn-wa-confirm"
+      style="width:100%;justify-content:center;margin-bottom:8px;padding:12px 16px;font-size:0.8rem;"
+      onclick="window.open('https://wa.me/${ADMIN_WA}?text=${waAdminMsg}','_blank')">
+      📲 Notify Barber via WhatsApp
+    </button>
+    <button class="btn-wa btn-wa-reschedule"
+      style="width:100%;justify-content:center;padding:12px 16px;font-size:0.8rem;"
+      onclick="window.open('https://wa.me/${clientWaNum}?text=${waClientMsg}','_blank')">
+      💬 Send Booking Details to Myself
+    </button>
+  `;
+
   goStep(5);
   toast('Booking confirmed! 🎉', 'success', '✅');
+
+  // ── Auto-notify admin (slight delay so step-5 renders first) ──────
+  setTimeout(() => {
+    openWhatsApp(ADMIN_WA, buildNewBookingMsg(booking));
+  }, 800);
 }
 
 // ══════════════════════════════════════
@@ -2053,17 +2183,45 @@ function renderAdminBookings() {
     return;
   }
 
-  const WA = '2768502521';
   container.innerHTML = bookings.map(b => {
-    const confirmMsg = encodeURIComponent(`Hello 👋, this is PRIVATE BARBER 💈. Your appointment on ${b.date} at ${b.time} has been confirmed. See you soon.`);
-    const cancelMsg = encodeURIComponent(`Hello 👋, this is PRIVATE BARBER 💈. Unfortunately your appointment on ${b.date} at ${b.time} has been cancelled. Please contact us to reschedule.`);
-    const reschedMsg = encodeURIComponent(`Hello 👋, this is PRIVATE BARBER 💈. We need to reschedule your appointment on ${b.date} at ${b.time}. Please reply with a new suitable time.`);
+    // Each action WhatsApp link goes to THE CLIENT'S number
+    const clientNum    = formatWANumber(b.phone);
+    const confirmMsg   = encodeURIComponent(buildAdminConfirmMsg(b));
+    const cancelMsg    = encodeURIComponent(buildAdminCancelMsg(b));
+    const reschedMsg   = encodeURIComponent(buildAdminReschedMsg(b));
 
-    return `<div class="admin-booking-card">
+    // "Copy summary" shortcut for admin's own records
+    const now          = Date.now();
+    const apptMs       = parseDateTimeMs(b.dateStr, b.time);
+    const isFuture     = apptMs > now;
+    const actionBtns   = (b.status !== 'cancelled' && isFuture) ? `
+      <a class="btn-wa btn-wa-confirm"
+         href="https://wa.me/${clientNum}?text=${confirmMsg}"
+         target="_blank"
+         onclick="adminUpdateStatus('${b.id}','confirmed')">
+         ✅ Confirm
+      </a>
+      <a class="btn-wa btn-wa-reschedule"
+         href="https://wa.me/${clientNum}?text=${reschedMsg}"
+         target="_blank">
+         🔁 Reschedule
+      </a>
+      <a class="btn-wa btn-wa-cancel"
+         href="https://wa.me/${clientNum}?text=${cancelMsg}"
+         target="_blank"
+         onclick="adminUpdateStatus('${b.id}','cancelled')">
+         ❌ Cancel
+      </a>` : `<span style="font-size:0.72rem;color:var(--white3);padding:4px 0">${b.status === 'cancelled' ? '🚫 Cancelled' : '⏰ Past appointment'}</span>`;
+
+    return `<div class="admin-booking-card" id="abc-${b.id}">
       <div class="abc-top">
         <div>
           <div class="abc-name">${b.name}</div>
-          <div class="abc-phone">📞 ${b.phone} · 📧 ${b.email}</div>
+          <div class="abc-phone">
+            📞 <a href="https://wa.me/${clientNum}" target="_blank"
+                  style="color:var(--gold);text-decoration:none;">${b.phone}</a>
+            &nbsp;·&nbsp; 📧 ${b.email}
+          </div>
         </div>
         <div class="status-badge ${b.status}">${b.status.charAt(0).toUpperCase()+b.status.slice(1)}</div>
       </div>
@@ -2074,11 +2232,7 @@ function renderAdminBookings() {
         <span>💰 <strong>R${b.totalPrice}</strong></span>
         <span>🔖 <strong>${b.id}</strong></span>
       </div>
-      <div class="abc-actions">
-        <a class="btn-wa btn-wa-confirm" href="https://wa.me/${WA}?text=${confirmMsg}" target="_blank" onclick="adminUpdateStatus('${b.id}','confirmed')">✅ Confirm</a>
-        <a class="btn-wa btn-wa-reschedule" href="https://wa.me/${WA}?text=${reschedMsg}" target="_blank">🔁 Reschedule</a>
-        <a class="btn-wa btn-wa-cancel" href="https://wa.me/${WA}?text=${cancelMsg}" target="_blank" onclick="adminUpdateStatus('${b.id}','cancelled')">❌ Cancel</a>
-      </div>
+      <div class="abc-actions">${actionBtns}</div>
     </div>`;
   }).join('');
 }
@@ -2095,13 +2249,15 @@ function adminUpdateStatus(id, status) {
 function adminMsgToday() {
   const todayStr = new Date().toDateString();
   const todayBookings = getBookings().filter(b => b.dateStr === todayStr && b.status !== 'cancelled');
-  if (todayBookings.length === 0) { toast("No appointments today.", 'default', '📅'); return; }
-  const WA = '2768502521';
-  const msg = encodeURIComponent(`Hello 👋, this is PRIVATE BARBER 💈. A reminder of your appointment today. See you soon!`);
+  if (todayBookings.length === 0) { toast('No appointments today.', 'default', '📅'); return; }
   todayBookings.forEach((b, i) => {
-    setTimeout(() => window.open(`https://wa.me/${WA}?text=${msg}`, '_blank'), i * 400);
+    const msg = `Hello ${b.name} 👋, this is *PRIVATE BARBER 💈*!\n\n` +
+      `Just a reminder that your appointment is *TODAY* 🎉\n` +
+      `🕐 *Time:* ${b.time}\n✂️ *Service:* ${b.service}\n\n` +
+      `See you soon! 💈`;
+    setTimeout(() => openWhatsApp(b.phone, msg), i * 500);
   });
-  toast(`Messaging ${todayBookings.length} client(s) today.`, 'success', '📲');
+  toast(`Messaging ${todayBookings.length} client(s) for today.`, 'success', '📲');
 }
 
 function adminRemindUpcoming() {
@@ -2110,13 +2266,15 @@ function adminRemindUpcoming() {
     const apptMs = parseDateTimeMs(b.dateStr, b.time);
     return apptMs > now && b.status !== 'cancelled';
   });
-  if (upcoming.length === 0) { toast("No upcoming appointments.", 'default', '📅'); return; }
-  const WA = '2768502521';
-  upcoming.slice(0, 3).forEach((b, i) => {
-    const msg = encodeURIComponent(`Hello 👋 ${b.name}, this is PRIVATE BARBER 💈. Just a reminder of your upcoming appointment on ${b.date} at ${b.time}. See you soon!`);
-    setTimeout(() => window.open(`https://wa.me/${WA}?text=${msg}`, '_blank'), i * 400);
+  if (upcoming.length === 0) { toast('No upcoming appointments.', 'default', '📅'); return; }
+  upcoming.slice(0, 5).forEach((b, i) => {
+    const msg = `Hello ${b.name} 👋, this is *PRIVATE BARBER 💈*!\n\n` +
+      `🔔 Friendly reminder of your upcoming appointment:\n` +
+      `📅 *Date:* ${b.date}\n🕐 *Time:* ${b.time}\n✂️ *Service:* ${b.service}\n\n` +
+      `See you then! If anything changes please let us know. 💈`;
+    setTimeout(() => openWhatsApp(b.phone, msg), i * 500);
   });
-  toast(`Reminders sent to ${Math.min(upcoming.length, 3)} upcoming client(s).`, 'success', '🔔');
+  toast(`Reminders sent to ${Math.min(upcoming.length, 5)} upcoming client(s).`, 'success', '🔔');
 }
 </script>
 </body>

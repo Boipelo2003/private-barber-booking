@@ -1653,11 +1653,27 @@ function saveBookings(list) {
   _bookingsCache = list;
   localStorage.setItem('pb_bookings', JSON.stringify(list));
   if (_db) {
-    // Firebase Realtime DB stores arrays poorly — convert to keyed object
-    const keyed = {};
-    list.forEach(b => { keyed[b.id] = b; });
-    _db.ref('pb_bookings').set(keyed).catch(err => {
+    // Write each booking individually — this matches the per-item Firebase rules
+    // which prevent bulk deletion of the entire collection
+    const updates = {};
+    list.forEach(b => { updates[`pb_bookings/${b.id}`] = b; });
+    _db.ref('/').update(updates).catch(err => {
       console.warn('Firebase write failed', err);
+    });
+  }
+}
+
+// Update a single booking field without rewriting everything
+function saveBookingStatus(id, status) {
+  const bookings = getBookings();
+  const idx = bookings.findIndex(b => b.id === id);
+  if (idx === -1) return;
+  bookings[idx].status = status;
+  _bookingsCache = bookings;
+  localStorage.setItem('pb_bookings', JSON.stringify(bookings));
+  if (_db) {
+    _db.ref(`pb_bookings/${id}/status`).set(status).catch(err => {
+      console.warn('Firebase status update failed', err);
     });
   }
 }
@@ -2424,9 +2440,7 @@ function renderAdminBookings() {
 
 function adminUpdateStatus(id, status) {
   setTimeout(() => {
-    const bookings = getBookings();
-    const idx = bookings.findIndex(b => b.id === id);
-    if (idx > -1) { bookings[idx].status = status; saveBookings(bookings); }
+    saveBookingStatus(id, status);
     renderAdminDashboard();
   }, 500);
 }

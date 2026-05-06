@@ -8,6 +8,7 @@
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <style>
 :root {
   --black: #0b0b0b;
@@ -1649,15 +1650,20 @@ footer .footer-instagram:hover {
       <div style="font-size:2rem;margin-bottom:16px">🔐</div>
       <div class="step-title" style="margin-bottom:4px">Admin Access</div>
       <div class="step-subtitle" style="margin-bottom:24px">Private Barber Management</div>
+
       <div class="form-group">
-        <label class="form-label">Username</label>
-        <input type="text" class="form-input" id="admin-user" placeholder="admin">
+        <label class="form-label">Email</label>
+        <input type="email" class="form-input" id="admin-email" placeholder="your@email.com">
       </div>
       <div class="form-group">
         <label class="form-label">Password</label>
-        <input type="password" class="form-input" id="admin-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')adminLogin()">
+        <input type="password" class="form-input" id="admin-password" placeholder="••••••••"
+          onkeydown="if(event.key==='Enter')adminLogin()">
       </div>
-      <button class="btn-gold" style="width:100%;justify-content:center" onclick="adminLogin()">Login →</button>
+
+      <button class="btn-gold" style="width:100%;justify-content:center" onclick="adminLogin()">
+        Sign In →
+      </button>
     </div>
   </div>
 
@@ -1800,6 +1806,16 @@ function initFirebase() {
     });
 
     console.log('🔥 Firebase connected');
+    // ── Firebase Auth (compat) ──────────────────────────────────────────
+window._auth     = firebase.auth();
+window._firebase = {
+  signInWithEmailAndPassword: (auth, email, pw) =>
+    auth.signInWithEmailAndPassword(email, pw),
+  signOut: (auth) => auth.signOut(),
+  onAuthStateChanged: (auth, cb) => auth.onAuthStateChanged(cb)
+};
+// Start watching auth state immediately
+startAuthWatcher();
   } catch (err) {
     console.warn('Firebase init failed — using localStorage fallback', err);
     _fbConnected = false;
@@ -2477,36 +2493,69 @@ document.querySelectorAll('.modal-overlay').forEach(o => {
 // ══════════════════════════════════════
 // ADMIN
 // ══════════════════════════════════════
-let adminLoggedIn = false;
 
+// ── UI helpers ──────────────────────
+function showAdminLoginForm() {
+  document.getElementById('admin-login-panel').style.display = 'block';
+  document.getElementById('admin-dashboard').style.display  = 'none';
+}
+
+function showAdminDashboard() {
+  document.getElementById('admin-login-panel').style.display = 'none';
+  document.getElementById('admin-dashboard').style.display  = 'block';
+  renderAdminDashboard(); // your existing render function
+}
+
+// ── Called when user navigates to admin page ──
 function initAdminPage() {
-  if (adminLoggedIn) {
-    document.getElementById('admin-login-panel').style.display = 'none';
-    document.getElementById('admin-dashboard').style.display = 'block';
-    renderAdminDashboard();
-  } else {
-    document.getElementById('admin-login-panel').style.display = 'block';
-    document.getElementById('admin-dashboard').style.display = 'none';
-  }
-}
-function adminLogin() {
-  const u = document.getElementById('admin-user').value.trim();
-  const p = document.getElementById('admin-pass').value.trim();
-  if (u === 'admin' && p === 'voka123') {
-    adminLoggedIn = true;
-    toast('Welcome back, Admin! 👋', 'success', '🔐');
-    initAdminPage();
-  } else {
-    toast('Invalid credentials.', 'error', '✕');
-    document.getElementById('admin-pass').value = '';
-  }
-}
-function adminLogout() {
-  adminLoggedIn = false;
-  toast('Logged out.', 'default', '👋');
-  initAdminPage();
+  // Auth state is already being watched below — nothing needed here
+  // The onAuthStateChanged listener handles show/hide automatically
 }
 
+// ── Login ────────────────────────────
+async function adminLogin() {
+  const email    = document.getElementById('admin-email').value.trim();
+  const password = document.getElementById('admin-password').value.trim();
+
+  if (!email || !password) {
+    toast('Please enter your email and password.', 'error');
+    return;
+  }
+
+  try {
+    await window._firebase.signInWithEmailAndPassword(window._auth, email, password);
+    // onAuthStateChanged fires automatically after this — no extra calls needed
+  } catch (err) {
+    toast('Incorrect email or password.', 'error');
+    console.error(err);
+  }
+}
+
+// ── Logout ───────────────────────────
+async function adminLogout() {
+  try {
+    await window._firebase.signOut(window._auth);
+    toast('Logged out successfully.', 'success');
+    showPage('home');
+  } catch (err) {
+    toast('Logout failed. Try again.', 'error');
+    console.error(err);
+  }
+}
+
+// ── Auth state watcher ───────────────
+// Waits for Firebase to be ready before attaching the listener
+function startAuthWatcher() {
+  window._firebase.onAuthStateChanged(window._auth, (user) => {
+    if (user) {
+      adminLoggedIn = true;   // ← add this
+      showAdminDashboard();
+    } else {
+      adminLoggedIn = false;  // ← add this
+      showAdminLoginForm();
+    }
+  });
+}
 function renderAdminDashboard() {
   const bookings = getBookings();
   const now = Date.now();

@@ -1342,6 +1342,19 @@ footer .footer-instagram:hover {
   font-weight: 500;
   border-bottom: 1px solid rgba(255,255,255,0.35);
 }
+.cal-day.closed-day {
+  opacity: 0.3;
+  cursor: not-allowed;
+  position: relative;
+}
+.cal-day.closed-day::after {
+  content: '✕';
+  position: absolute;
+  font-size: 0.55rem;
+  top: 2px;
+  right: 2px;
+  color: #e07060;
+}
 </style>
 </head>
 <body>
@@ -1687,6 +1700,18 @@ footer .footer-instagram:hover {
       <button class="btn-outline" onclick="adminRemindUpcoming()">🔔 Remind Upcoming Bookings</button>
     </div>
 
+    <div class="admin-section-title" style="margin-top:32px">Manage Availability</div>
+<p style="font-size:0.8rem;color:var(--white3);margin-bottom:16px">
+  Click any date to <strong style="color:#e07060">close</strong> it (clients can't book) or re-click to <strong style="color:#4ecb80">reopen</strong> it.
+</p>
+<div style="background:var(--black2);border:1px solid rgba(255,255,255,0.1);border-radius:var(--radius);padding:24px;max-width:380px">
+  <div class="calendar" id="availability-calendar"></div>
+  <div style="display:flex;gap:16px;margin-top:12px;font-size:0.72rem;color:var(--white3)">
+    <span>🟢 Open</span>
+    <span>🔴 Closed (✕ shown)</span>
+    <span>⬜ Past</span>
+  </div>
+</div>
     <!-- BOOKINGS -->
     <div class="admin-section-title">
       <span>All Bookings</span>
@@ -1873,6 +1898,30 @@ function updateConnectionBadge(connected) {
 
 // Start Firebase
 initFirebase();
+
+let _closedDates = new Set();
+
+// Listen for closed dates from Firebase
+if (_db) {
+  _db.ref('pb_closed_dates').on('value', (snap) => {
+    const val = snap.val() || {};
+    _closedDates = new Set(Object.keys(val).filter(k => val[k] === true));
+    // Re-render booking calendar if open
+    if (state.currentPage === 'booking') renderBookingCalendar();
+  });
+}
+
+function toggleClosedDate(dateStr) {
+  const key = dateStr.replace(/\s/g, '_');
+  const isCurrentlyClosed = _closedDates.has(dateStr);
+  if (_db) {
+    _db.ref(`pb_closed_dates/${key}`).set(isCurrentlyClosed ? null : true);
+  }
+  // Optimistic local update
+  if (isCurrentlyClosed) _closedDates.delete(dateStr);
+  else _closedDates.add(dateStr);
+  renderAvailabilityCalendar();
+}
 
 // ══════════════════════════════════════
 // WHATSAPP HELPERS
@@ -2099,12 +2148,13 @@ function buildCalendar(containerId, year, month, selectedDate, onSelect) {
 
   for (let d = 1; d <= daysInMonth; d++) {
     const thisDate = new Date(year, month, d);
-    const isSunday = thisDate.getDay() === 0;
+   
     const isPast = thisDate < today;
-    const disabled = isSunday || isPast;
+    const isClosed = _closedDates && _closedDates.has(thisDate.toDateString());
+    const disabled = isPast || isClosed;
     const isToday = thisDate.getTime() === today.getTime();
     const isSel = selectedDate && thisDate.toDateString() === selectedDate.toDateString();
-    const cls = ['cal-day', disabled ? 'disabled' : '', isToday ? 'today' : '', isSel ? 'selected' : ''].filter(Boolean).join(' ');
+    const cls = ['cal-day', disabled ? 'disabled' : '', isToday ? 'today' : '', isSel ? 'selected' : '', isClosed && !isPast ? 'closed-day' : ''].filter(Boolean).join(' ');
     const click = disabled ? '' : `onclick="${onSelect.click}(${year},${month},${d})"`;
     html += `<div class="${cls}" ${click}>${d}</div>`;
   }
@@ -2136,6 +2186,31 @@ function selectBookingDate(y, m, d) {
   renderBookingCalendar();
   document.getElementById('selected-date-display').textContent = '📅 ' + formatDate(state.booking.date);
   document.getElementById('next-1').disabled = false;
+}
+// Availability calendar for admin
+let _availCal = { year: new Date().getFullYear(), month: new Date().getMonth() };
+
+function renderAvailabilityCalendar() {
+  buildCalendar('availability-calendar', _availCal.year, _availCal.month, null, {
+    nav: 'navAvailCal',
+    click: 'adminToggleDate'
+  });
+}
+
+function navAvailCal(dir) {
+  _availCal.month += dir;
+  if (_availCal.month > 11) { _availCal.month = 0; _availCal.year++; }
+  if (_availCal.month < 0)  { _availCal.month = 11; _availCal.year--; }
+  renderAvailabilityCalendar();
+}
+
+function adminToggleDate(y, m, d) {
+  const dateStr = new Date(y, m, d).toDateString();
+  toggleClosedDate(dateStr);
+  toast(
+    _closedDates.has(dateStr) ? `🔴 ${d}/${m+1} closed` : `🟢 ${d}/${m+1} reopened`,
+    _closedDates.has(dateStr) ? 'error' : 'success'
+  );
 }
 
 // ══════════════════════════════════════
@@ -2578,6 +2653,8 @@ function renderAdminDashboard() {
 
   renderAdminBookings();
 }
+
+if (document.getElementById('availability-calendar')) renderAvailabilityCalendar();
 
 function adminFilter(f) {
   state.adminFilter = f;

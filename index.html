@@ -1840,25 +1840,35 @@ function initFirebase() {
       updateConnectionBadge(_fbConnected);
     });
 
-    _db.ref('pb_closed_dates').on('value', (snap) => {
-      const val = snap.val() || {};
-      _closedDates = new Set(Object.keys(val).filter(k => val[k] === true));
-      if (state.currentPage === 'booking') renderBookingCalendar();
-    });
+ _db.ref('pb_closed_dates').on('value', (snap) => {
+  const val = snap.val() || {};
+  _closedDates = new Set(Object.keys(val).filter(k => val[k] === true));
+  if (state.currentPage === 'booking') {
+    renderBookingCalendar();
+    if (state.booking.step === 2 && state.booking.date) {
+      buildTimeGrid('time-grid', state.booking.date.toDateString(), state.booking.time, 'selectTime');
+    }
+  }
+});
 
     _db.ref('pb_closed_slots').on('value', (snap) => {
-      const val = snap.val() || {};
-      _closedSlots = {};
-      Object.keys(val).forEach(dateKey => {
-        const realDateStr = dateKey.replace(/_/g, ' ');
-        _closedSlots[realDateStr] = new Set(
-          Object.keys(val[dateKey])
-            .filter(t => val[dateKey][t] === true)
-            .map(t => t.slice(0, 2) + ':' + t.slice(2))
-        );
-      });
-      if (state.currentPage === 'booking') renderBookingCalendar();
-    });
+  const val = snap.val() || {};
+  _closedSlots = {};
+  Object.keys(val).forEach(dateKey => {
+    const realDateStr = dateKey.replace(/_/g, ' ');
+    _closedSlots[realDateStr] = new Set(
+      Object.keys(val[dateKey])
+        .filter(t => val[dateKey][t] === true)
+        .map(t => t.slice(0, 2) + ':' + t.slice(2))
+    );
+  });
+  if (state.currentPage === 'booking') {
+    renderBookingCalendar();
+    if (state.booking.step === 2 && state.booking.date) {
+      buildTimeGrid('time-grid', state.booking.date.toDateString(), state.booking.time, 'selectTime');
+    }
+  }
+});
 
     console.log('🔥 Firebase connected');
     window._auth = firebase.auth();
@@ -2329,8 +2339,8 @@ function adminToggleDate(y, m, d) {
 // ══════════════════════════════════════
 function buildTimeGrid(containerId, dateStr, selectedTime, onSelect) {
   const booked = getBookedSlots(dateStr);
+  const isDayClosed = _closedDates && _closedDates.has(dateStr);
 
-  // Hourly slots only, 08:00 through 19:00
   const slots = [];
   for (let h = 8; h <= 19; h++) {
     slots.push(`${pad2(h)}:00`);
@@ -2338,12 +2348,20 @@ function buildTimeGrid(containerId, dateStr, selectedTime, onSelect) {
 
   let html = '<div class="time-grid">';
   slots.forEach(slot => {
-    const isBooked = booked.includes(slot) || (_closedSlots[dateStr] && _closedSlots[dateStr].has(slot));
-    const isLate = isLateSlot(slot);
-    const isSel = slot === selectedTime;
-    const cls = ['time-slot', isBooked ? 'booked' : '', isSel ? 'selected' : ''].filter(Boolean).join(' ');
-    const click = isBooked ? '' : `onclick="${onSelect}('${slot}')"`;
-    html += `<div class="${cls}" ${click}>${slot}${isLate ? `<span class="late-badge">+R20 late</span>` : ''}</div>`;
+    const isClientBooked = booked.includes(slot);
+    const isSlotClosed   = isDayClosed || (_closedSlots[dateStr] && _closedSlots[dateStr].has(slot));
+    const unavailable    = isClientBooked || isSlotClosed;
+    const isLate         = isLateSlot(slot);
+    const isSel          = slot === selectedTime;
+
+    const cls   = ['time-slot', unavailable ? 'booked' : '', isSel ? 'selected' : ''].filter(Boolean).join(' ');
+    const click = unavailable ? '' : `onclick="${onSelect}('${slot}')"`;
+
+    let badge = '';
+    if (isSlotClosed && !isClientBooked) badge = `<span class="late-badge">Closed</span>`;
+    else if (isLate && !unavailable)      badge = `<span class="late-badge">+R20 late</span>`;
+
+    html += `<div class="${cls}" ${click}>${slot}${badge}</div>`;
   });
   html += '</div>';
   document.getElementById(containerId).innerHTML = html;

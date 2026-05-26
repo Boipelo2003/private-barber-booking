@@ -2483,10 +2483,14 @@ function confirmBooking() {
     createdAt:  Date.now()
   };
 
-  const bookings = getBookings();
-  bookings.push(booking);
-  _justCreatedIds.add(id); // prevent self-alert from Firebase echo
-  saveBookings(bookings);
+// WITH THIS:
+_justCreatedIds.add(id);
+_bookingsCache.push(booking);
+localStorage.setItem('pb_bookings', JSON.stringify(_bookingsCache));
+if (_db) {
+  _db.ref(`pb_bookings/${id}`).set(booking)
+    .catch(err => console.warn('Firebase write failed', err));
+}
 
   // ── STEP 5: Confirmation screen ──────────────────────────────────
   document.getElementById('confirm-id').textContent = id;

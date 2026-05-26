@@ -2714,7 +2714,7 @@ async function adminLogin() {
   }
 
   try {
-    await window._firebase.signInWithEmailAndPassword(window._auth, email, password);
+  await window._auth.signInWithEmailAndPassword(email, password);
     // onAuthStateChanged fires automatically after this — no extra calls needed
   } catch (err) {
     toast('Incorrect email or password.', 'error');
@@ -2725,7 +2725,7 @@ async function adminLogin() {
 // ── Logout ───────────────────────────
 async function adminLogout() {
   try {
-    await window._firebase.signOut(window._auth);
+    await window._auth.signOut();
     toast('Logged out successfully.', 'success');
     showPage('home');
   } catch (err) {
@@ -2737,7 +2737,7 @@ async function adminLogout() {
 // ── Auth state watcher ───────────────
 // Waits for Firebase to be ready before attaching the listener
 function startAuthWatcher() {
-  window._firebase.onAuthStateChanged(window._auth, (user) => {
+window._auth.onAuthStateChanged((user) => {
     if (user) {
       adminLoggedIn = true;   // ← add this
       showAdminDashboard();

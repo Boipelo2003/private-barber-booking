@@ -1805,11 +1805,9 @@ function initFirebase() {
     if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
     _db = firebase.database();
 
-    // ── Real-time listener: fires whenever ANY device saves a booking ──
     _db.ref('pb_bookings').on('value', (snapshot) => {
       const raw = snapshot.val();
       const incoming = raw ? Object.values(raw) : [];
-      // Detect genuinely new bookings (not in our cache yet)
       const cachedIds = new Set(_bookingsCache.map(b => b.id));
       const added = incoming.filter(b => !cachedIds.has(b.id));
 
@@ -1817,12 +1815,9 @@ function initFirebase() {
       _fbReady = true;
       _fbConnected = true;
 
-      // Mirror to localStorage as offline fallback
       localStorage.setItem('pb_bookings', JSON.stringify(_bookingsCache));
 
-      // Push live alerts for bookings made on OTHER devices
       added.forEach(b => {
-        // Only alert if WE didn't just create this booking
         if (!_justCreatedIds.has(b.id)) {
           pushLiveAlert(b);
         }
@@ -1831,76 +1826,52 @@ function initFirebase() {
 
       updateAdminBadge();
 
-      // Refresh admin dashboard if it's open
       if (adminLoggedIn && state.currentPage === 'admin') {
         renderAdminDashboard();
       }
-      // Refresh My Bookings if open
       if (state.currentPage === 'bookings') {
         const email = document.getElementById('lookup-email').value.trim();
         if (email) lookupBookings();
       }
     });
 
-    // ── Connection state monitoring ───────────────────────────────────
     _db.ref('.info/connected').on('value', (snap) => {
       _fbConnected = snap.val() === true;
       updateConnectionBadge(_fbConnected);
     });
-console.log('🔥 Firebase connected'); 
-// ── ADD THE NEW LISTENERS RIGHT HERE ──
+
     _db.ref('pb_closed_dates').on('value', (snap) => {
       const val = snap.val() || {};
       _closedDates = new Set(Object.keys(val).filter(k => val[k] === true));
       if (state.currentPage === 'booking') renderBookingCalendar();
     });
 
-_db.ref('pb_closed_slots').on('value', (snap) => {
-  const val = snap.val() || {};
-  _closedSlots = {};
-  Object.keys(val).forEach(dateKey => {
-    const realDateStr = dateKey.replace(/_/g, ' ');
-    _closedSlots[realDateStr] = new Set(
-      Object.keys(val[dateKey])
-        .filter(t => val[dateKey][t] === true)
-        .map(t => t.slice(0, 2) + ':' + t.slice(2))
-    );
-  });
+    _db.ref('pb_closed_slots').on('value', (snap) => {
+      const val = snap.val() || {};
+      _closedSlots = {};
+      Object.keys(val).forEach(dateKey => {
+        const realDateStr = dateKey.replace(/_/g, ' ');
+        _closedSlots[realDateStr] = new Set(
+          Object.keys(val[dateKey])
+            .filter(t => val[dateKey][t] === true)
+            .map(t => t.slice(0, 2) + ':' + t.slice(2))
+        );
+      });
+      if (state.currentPage === 'booking') renderBookingCalendar();
+    });
 
-  console.log('📡 Firebase update received. _closedSlots:', JSON.stringify([...Object.keys(_closedSlots)]));
-console.log('Current page:', state.currentPage, 'booking.date:', state.booking.date, 'grid visible:', !!document.getElementById('time-grid')?.offsetParent);
-  // Always refresh the booking calendar if the booking page is open
-  if (state.currentPage === 'booking') {
-    renderBookingCalendar();
+    console.log('🔥 Firebase connected');
+    window._auth = firebase.auth();
+    window._firebase = { /* ... */ };
+    startAuthWatcher();
 
-    // Refresh any visible time grid on the page (e.g., Step 2)
-    const timeGrid = document.getElementById('time-grid');
-    if (timeGrid && timeGrid.offsetParent !== null && state.booking.date) {
-      // Only rebuild if the grid is visible (not hidden by CSS)
-      buildTimeGrid('time-grid', state.booking.date.toDateString(), state.booking.time, 'selectTime');
-    }
-  }
-
-  // Also refresh the admin availability panel if it's visible
-  if (_availSelectedDate) renderAvailabilityTimeGrid(_availSelectedDate);
-});
-    // ── Firebase Auth (compat) ──────────────────────────────────────────
-window._auth     = firebase.auth();
-window._firebase = {
-  signInWithEmailAndPassword: (auth, email, pw) =>
-    auth.signInWithEmailAndPassword(email, pw),
-  signOut: (auth) => auth.signOut(),
-  onAuthStateChanged: (auth, cb) => auth.onAuthStateChanged(cb)
-};
-// Start watching auth state immediately
-startAuthWatcher();
   } catch (err) {
     console.warn('Firebase init failed — using localStorage fallback', err);
     _fbConnected = false;
     updateConnectionBadge(false);
   }
 }
-
+ 
 // Track IDs we just created so we don't double-alert ourselves
 const _justCreatedIds = new Set();
 
@@ -2169,10 +2140,7 @@ function formatDateShort(d) {
 function generateId() {
   return 'PB' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 5).toUpperCase();
 }
-function isLateSlot(time) {
-  const [h, m] = time.split(':').map(Number);
-  return h > 19 || (h === 19 && m >= 30);
-}
+
 function getServiceLabel(svc) {
   return svc === 'dye' ? 'Haircut with Dye' : 'Haircut without Dye';
 }
@@ -2726,6 +2694,7 @@ function showAdminDashboard() {
   document.getElementById('admin-login-panel').style.display = 'none';
   document.getElementById('admin-dashboard').style.display  = 'block';
   renderAdminDashboard(); // your existing render function
+renderAvailabilityCalendar(); // ← add this
 }
 
 // ── Called when user navigates to admin page ──

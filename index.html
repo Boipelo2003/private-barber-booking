@@ -1855,17 +1855,20 @@ console.log('🔥 Firebase connected');
       if (state.currentPage === 'booking') renderBookingCalendar();
     });
 
-    _db.ref('pb_closed_slots').on('value', (snap) => {
-      const val = snap.val() || {};
-      _closedSlots = {};
-      Object.keys(val).forEach(dateKey => {
-        const realDateStr = dateKey.replace(/_/g, ' ');
-        _closedSlots[realDateStr] = new Set(Object.keys(val[dateKey]).filter(t => val[dateKey][t] === true));
-      });
-      if (state.currentPage === 'booking') renderBookingCalendar();
-      if (_availSelectedDate) renderAvailabilityTimeGrid(_availSelectedDate);
-    });
-
+_db.ref('pb_closed_slots').on('value', (snap) => {
+  const val = snap.val() || {};
+  _closedSlots = {};
+  Object.keys(val).forEach(dateKey => {
+    const realDateStr = dateKey.replace(/_/g, ' ');
+    _closedSlots[realDateStr] = new Set(
+      Object.keys(val[dateKey])
+        .filter(t => val[dateKey][t] === true)
+        .map(t => t.slice(0, 2) + ':' + t.slice(2))
+    );
+  });
+  if (state.currentPage === 'booking') renderBookingCalendar();
+  if (_availSelectedDate) renderAvailabilityTimeGrid(_availSelectedDate);
+});
     // ── Firebase Auth (compat) ──────────────────────────────────────────
 window._auth     = firebase.auth();
 window._firebase = {

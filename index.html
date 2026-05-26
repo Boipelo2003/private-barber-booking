@@ -1867,6 +1867,8 @@ _db.ref('pb_closed_slots').on('value', (snap) => {
     );
   });
 
+  console.log('📡 Firebase update received. _closedSlots:', JSON.stringify([...Object.keys(_closedSlots)]));
+console.log('Current page:', state.currentPage, 'booking.date:', state.booking.date, 'grid visible:', !!document.getElementById('time-grid')?.offsetParent);
   // Always refresh the booking calendar if the booking page is open
   if (state.currentPage === 'booking') {
     renderBookingCalendar();
@@ -1971,8 +1973,10 @@ function toggleClosedSlot(dateStr, time) {
   const slots = _closedSlots[dateStr] || new Set();
   const isClosed = slots.has(time);
   if (_db) {
+    console.log('📤 Writing to Firebase:', `pb_closed_slots/${key}/${time.replace(':', '')}`, isClosed ? null : true);
     _db.ref(`pb_closed_slots/${key}/${time.replace(':', '')}`).set(isClosed ? null : true);
   }
+
   // Optimistic update
   if (!_closedSlots[dateStr]) _closedSlots[dateStr] = new Set();
   if (isClosed) _closedSlots[dateStr].delete(time);

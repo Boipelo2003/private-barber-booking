@@ -1866,7 +1866,13 @@ _db.ref('pb_closed_slots').on('value', (snap) => {
         .map(t => t.slice(0, 2) + ':' + t.slice(2))
     );
   });
-  if (state.currentPage === 'booking') renderBookingCalendar();
+  if (state.currentPage === 'booking') {
+    renderBookingCalendar();
+    // ADD THIS — refreshes time grid if client is on step 2:
+    if (state.booking.step === 2 && state.booking.date) {
+      buildTimeGrid('time-grid', state.booking.date.toDateString(), state.booking.time, 'selectTime');
+    }
+  }
   if (_availSelectedDate) renderAvailabilityTimeGrid(_availSelectedDate);
 });
     // ── Firebase Auth (compat) ──────────────────────────────────────────
@@ -1934,12 +1940,12 @@ function updateConnectionBadge(connected) {
   dot.style.background = connected ? '#27ae60' : '#e05252';
 }
 
-// Start Firebase
-initFirebase();
-
 let _closedDates = new Set();
 let _closedSlots = {}; // { "Mon May 26 2026": Set(["09:00","14:00"]) }
 let _availSelectedDate = null; // which date admin has selected in avail calendar
+// Start Firebase
+initFirebase();
+
 
 function toggleClosedDate(dateStr) {
   const key = dateStr.replace(/\s/g, '_');

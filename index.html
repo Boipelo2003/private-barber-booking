@@ -1866,13 +1866,20 @@ _db.ref('pb_closed_slots').on('value', (snap) => {
         .map(t => t.slice(0, 2) + ':' + t.slice(2))
     );
   });
+
+  // Always refresh the booking calendar if the booking page is open
   if (state.currentPage === 'booking') {
     renderBookingCalendar();
-    // ADD THIS — refreshes time grid if client is on step 2:
-    if (state.booking.step === 2 && state.booking.date) {
+
+    // Refresh any visible time grid on the page (e.g., Step 2)
+    const timeGrid = document.getElementById('time-grid');
+    if (timeGrid && timeGrid.offsetParent !== null && state.booking.date) {
+      // Only rebuild if the grid is visible (not hidden by CSS)
       buildTimeGrid('time-grid', state.booking.date.toDateString(), state.booking.time, 'selectTime');
     }
   }
+
+  // Also refresh the admin availability panel if it's visible
   if (_availSelectedDate) renderAvailabilityTimeGrid(_availSelectedDate);
 });
     // ── Firebase Auth (compat) ──────────────────────────────────────────

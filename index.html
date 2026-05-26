@@ -1847,8 +1847,25 @@ function initFirebase() {
       _fbConnected = snap.val() === true;
       updateConnectionBadge(_fbConnected);
     });
+console.log('🔥 Firebase connected'); 
+// ── ADD THE NEW LISTENERS RIGHT HERE ──
+    _db.ref('pb_closed_dates').on('value', (snap) => {
+      const val = snap.val() || {};
+      _closedDates = new Set(Object.keys(val).filter(k => val[k] === true));
+      if (state.currentPage === 'booking') renderBookingCalendar();
+    });
 
-    console.log('🔥 Firebase connected');
+    _db.ref('pb_closed_slots').on('value', (snap) => {
+      const val = snap.val() || {};
+      _closedSlots = {};
+      Object.keys(val).forEach(dateKey => {
+        const realDateStr = dateKey.replace(/_/g, ' ');
+        _closedSlots[realDateStr] = new Set(Object.keys(val[dateKey]).filter(t => val[dateKey][t] === true));
+      });
+      if (state.currentPage === 'booking') renderBookingCalendar();
+      if (_availSelectedDate) renderAvailabilityTimeGrid(_availSelectedDate);
+    });
+
     // ── Firebase Auth (compat) ──────────────────────────────────────────
 window._auth     = firebase.auth();
 window._firebase = {
@@ -1921,28 +1938,6 @@ let _closedDates = new Set();
 let _closedSlots = {}; // { "Mon May 26 2026": Set(["09:00","14:00"]) }
 let _availSelectedDate = null; // which date admin has selected in avail calendar
 
-// Listen for closed dates from Firebase
-if (_db) {
-  _db.ref('pb_closed_dates').on('value', (snap) => {
-    const val = snap.val() || {};
-    _closedDates = new Set(Object.keys(val).filter(k => val[k] === true));
-    // Re-render booking calendar if open
-    if (state.currentPage === 'booking') renderBookingCalendar();
-  });
-}
-
-if (_db) {
-  _db.ref('pb_closed_slots').on('value', (snap) => {
-    const val = snap.val() || {};
-    _closedSlots = {};
-    Object.keys(val).forEach(dateKey => {
-      const realDateStr = dateKey.replace(/_/g, ' ');
-      _closedSlots[realDateStr] = new Set(Object.keys(val[dateKey]).filter(t => val[dateKey][t] === true));
-    });
-    if (state.currentPage === 'booking') renderBookingCalendar();
-    if (_availSelectedDate) renderAvailabilityTimeGrid(_availSelectedDate);
-  });
-}
 function toggleClosedDate(dateStr) {
   const key = dateStr.replace(/\s/g, '_');
   const isCurrentlyClosed = _closedDates.has(dateStr);

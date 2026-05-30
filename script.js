@@ -61,18 +61,14 @@ function initFirebase() {
       updateConnectionBadge(_fbConnected);
     });
 
-  _db.ref('pb_closed_dates').on('value', (snap) => {
+_db.ref('pb_closed_dates').on('value', (snap) => {
   const val = snap.val() || {};
-  // ✅ normalize all keys on read
-  _closedDates = new Set(
-    Object.keys(val)
-      .filter(k => val[k] === true)
-      .map(k => normalizeDateStr(k.replace(/_/g, ' ')))
-  );
+  // ✅ Keys are already "2026-06-02" — use directly
+  _closedDates = new Set(Object.keys(val).filter(k => val[k] === true));
   if (state.currentPage === 'booking') {
     renderBookingCalendar();
     if (state.booking.step === 2 && state.booking.date) {
-      buildTimeGrid('time-grid', state.booking.date.toDateString(), state.booking.time, 'selectTime');
+      buildTimeGrid('time-grid', state.booking.date, state.booking.time, 'selectTime');
     }
   }
 });
@@ -81,9 +77,8 @@ _db.ref('pb_closed_slots').on('value', (snap) => {
   const val = snap.val() || {};
   _closedSlots = {};
   Object.keys(val).forEach(dateKey => {
-    const rawDateStr = dateKey.replace(/_/g, ' ');
-    const normalized = normalizeDateStr(rawDateStr);  // ✅ normalize on read
-    _closedSlots[normalized] = new Set(
+    // Keys are already "2026-06-02" — use directly, no conversion needed
+    _closedSlots[dateKey] = new Set(
       Object.keys(val[dateKey])
         .filter(t => val[dateKey][t] === true)
         .map(t => t.slice(0, 2) + ':' + t.slice(2))
@@ -92,11 +87,11 @@ _db.ref('pb_closed_slots').on('value', (snap) => {
   if (state.currentPage === 'booking') {
     renderBookingCalendar();
     if (state.booking.step === 2 && state.booking.date) {
-      buildTimeGrid('time-grid', state.booking.date.toDateString(), state.booking.time, 'selectTime');
+      buildTimeGrid('time-grid', state.booking.date, state.booking.time, 'selectTime');
     }
   }
   if (state.reschedule.date) {
-    buildTimeGrid('reschedule-time-grid', state.reschedule.date.toDateString(), state.reschedule.time, 'selectRescheduleTime');
+    buildTimeGrid('reschedule-time-grid', state.reschedule.date, state.reschedule.time, 'selectRescheduleTime');
   }
 });
 
@@ -165,32 +160,29 @@ initFirebase();
 // AVAILABILITY TOGGLES
 // ══════════════════════════════════════
 function toggleClosedDate(dateStr) {
-  const normalized = normalizeDateStr(dateStr);
-  const key = normalized.replace(/\s/g, '_');
-  const isCurrentlyClosed = _closedDates.has(normalized);
+  const key = dateToKey(new Date(dateStr));
+  const isCurrentlyClosed = _closedDates.has(key);
   if (_db) {
     _db.ref(`pb_closed_dates/${key}`).set(isCurrentlyClosed ? null : true);
   }
-  if (isCurrentlyClosed) _closedDates.delete(normalized);
-  else _closedDates.add(normalized);
+  if (isCurrentlyClosed) _closedDates.delete(key);
+  else _closedDates.add(key);
   renderAvailabilityCalendar();
-  renderAvailabilityTimeGrid(normalized);
+  renderAvailabilityTimeGrid(key);
 }
 
 function toggleClosedSlot(dateStr, time) {
-  const normalized = normalizeDateStr(dateStr);
-  const key = normalized.replace(/\s/g, '_');
-  const slots = _closedSlots[normalized] || new Set();
+  const key = dateToKey(new Date(dateStr));
+  const slots = _closedSlots[key] || new Set();
   const isClosed = slots.has(time);
   if (_db) {
     _db.ref(`pb_closed_slots/${key}/${time.replace(':', '')}`).set(isClosed ? null : true);
   }
-  if (!_closedSlots[normalized]) _closedSlots[normalized] = new Set();
-  if (isClosed) _closedSlots[normalized].delete(time);
-  else _closedSlots[normalized].add(time);
-  renderAvailabilityTimeGrid(normalized);
+  if (!_closedSlots[key]) _closedSlots[key] = new Set();
+  if (isClosed) _closedSlots[key].delete(time);
+  else _closedSlots[key].add(time);
+  renderAvailabilityTimeGrid(key);
 }
-
 
 // ══════════════════════════════════════
 // WHATSAPP HELPERS
@@ -370,20 +362,24 @@ function getServicePrice(svc) { return svc === 'dye' ? 100 : 80; }
 
 // ✅ Normalizes any date string to "Mon Jun 02 2026" format (zero-padded day)
 // Ensures Safari/Chrome/Android all produce identical keys for Firebase lookups
+// ✅ Produces "2026-06-02" format — consistent on every browser/device
 function normalizeDateStr(dateStr) {
   const d = new Date(dateStr);
-  const days   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return `${days[d.getDay()]} ${months[d.getMonth()]} ${pad2(d.getDate())} ${d.getFullYear()}`;
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
-function getBookedSlots(dateStr) {
-  const normalized = normalizeDateStr(dateStr);
+// ✅ Use this when you already have a Date object (year, month, day)
+// Never parses a string — 100% consistent on every device
+function dateToKey(date) {
+  const d = new Date(date);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+function getBookedSlots(dateKey) {
   return getBookings()
-    .filter(b => normalizeDateStr(b.dateStr) === normalized && b.status !== 'cancelled')
+    .filter(b => dateToKey(new Date(b.dateStr)) === dateKey && b.status !== 'cancelled')
     .map(b => b.time);
 }
-
 
 // ══════════════════════════════════════
 // CALENDAR
@@ -414,7 +410,8 @@ function buildCalendar(containerId, year, month, selectedDate, onSelect) {
     const thisDate = new Date(year, month, d);
     const isPast   = thisDate < today;
    // ✅ FIXED
-const isClosed = _closedDates && _closedDates.has(normalizeDateStr(thisDate.toDateString()));
+// ✅ Use dateToKey from the Date object directly — never toDateString()
+const isClosed = _closedDates && _closedDates.has(dateToKey(thisDate));
     const disabled = isPast || isClosed;
     const isToday  = thisDate.getTime() === today.getTime();
     const isSel    = selectedDate && thisDate.toDateString() === selectedDate.toDateString();
@@ -469,26 +466,22 @@ function renderAvailabilityTimeGrid(dateStr) {
   const container = document.getElementById('availability-time-grid');
   if (!container) return;
 
-  // ✅ Always normalize before any lookup
-  const normalized = normalizeDateStr(dateStr);
+  const key         = dateToKey(new Date(dateStr));
+  const bookedSlots = getBookedSlots(key);
+  const closedSlots = _closedSlots[key] || new Set();
+  const isDayClosed = _closedDates.has(key);
 
-  const bookedSlots = getBookedSlots(normalized);
-  const closedSlots = _closedSlots[normalized] || new Set();
-  const isDayClosed = _closedDates.has(normalized);
-
-  const d      = new Date(normalized);
+  const d      = new Date(dateStr);
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const dateLabel = `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
 
   const slots = [];
   for (let h = 8; h <= 19; h++) slots.push(`${pad2(h)}:00`);
 
-  // NOTE: The inline styles here have been converted to CSS classes.
-  // Add the matching .avail-* rules from the CSS block provided in the review notes.
-   let html = `
+  let html = `
     <div class="avail-date-heading">📅 ${dateLabel}</div>
     <div class="avail-toggle-row">
-      <button onclick="toggleClosedDate('${normalized}')"
+      <button onclick="toggleClosedDate('${key}')"
               class="avail-day-btn ${isDayClosed ? 'reopen' : 'close'}">
         ${isDayClosed ? '🟢 Reopen Entire Day' : '🔴 Close Entire Day'}
       </button>
@@ -515,7 +508,7 @@ function renderAvailabilityTimeGrid(dateStr) {
     }
 
     const clickable = !isBooked && !isDayClosed;
-    const onclick   = clickable ? `onclick="toggleClosedSlot('${normalized}','${slot}')"` : '';
+    const onclick   = clickable ? `onclick="toggleClosedSlot('${key}','${slot}')"` : '';
 
     html += `<div ${onclick} class="avail-slot ${stateClass}${clickable ? '' : ' avail-slot-disabled'}">${slotLabel}</div>`;
   });
@@ -539,13 +532,12 @@ function navAvailCal(dir) {
 }
 
 function adminToggleDate(y, m, d) {
-   const dateStr = normalizeDateStr(new Date(y, m, d).toDateString());
-  _availSelectedDate = dateStr;
+  const key = dateToKey(new Date(y, m, d));
+  _availSelectedDate = key;
   renderAvailabilityCalendar();
-  renderAvailabilityTimeGrid(dateStr);
+  renderAvailabilityTimeGrid(key);
   document.getElementById('availability-time-panel').style.display = 'block';
 }
-
 
 // ══════════════════════════════════════
 // TIME SLOTS
@@ -553,16 +545,18 @@ function adminToggleDate(y, m, d) {
 // FIX: removed inner <div class="time-grid"> wrapper — the container
 // already has the class in HTML for #time-grid.
 // For #reschedule-time-grid: add class="time-grid" to that element in index.html.
-function buildTimeGrid(containerId, dateStr, selectedTime, onSelect) {
+function buildTimeGrid(containerId, date, selectedTime, onSelect) {
   if (!_fbReady) {
     document.getElementById(containerId).innerHTML =
       '<div style="text-align:center;padding:20px;color:var(--gold)">⏳ Loading slots...</div>';
     return;
   }
 
-  const normalized = normalizeDateStr(dateStr);
-  const booked      = getBookedSlots(normalized);
-  const isDayClosed = _closedDates && _closedDates.has(normalized);
+  // ✅ Always derive key from Date object — never from a string
+  const dateKey     = dateToKey(new Date(date));
+  const booked      = getBookedSlots(dateKey);
+  const isDayClosed = _closedDates.has(dateKey);
+  const closedSet   = _closedSlots[dateKey] || new Set();
   const slots       = [];
 
   for (let h = 8; h <= 19; h++) slots.push(`${pad2(h)}:00`);
@@ -570,7 +564,7 @@ function buildTimeGrid(containerId, dateStr, selectedTime, onSelect) {
   let html = '';
   slots.forEach(slot => {
     const isClientBooked = booked.includes(slot);
-    const isSlotClosed   = isDayClosed || (_closedSlots[normalized] && _closedSlots[normalized].has(slot));
+    const isSlotClosed   = isDayClosed || closedSet.has(slot);
     const unavailable    = isClientBooked || isSlotClosed;
     const isLate         = isLateSlot(slot);
     const isSel          = slot === selectedTime;

@@ -413,7 +413,8 @@ function buildCalendar(containerId, year, month, selectedDate, onSelect) {
   for (let d = 1; d <= daysInMonth; d++) {
     const thisDate = new Date(year, month, d);
     const isPast   = thisDate < today;
-    const isClosed = _closedDates && _closedDates.has(thisDate.toDateString());
+   // ✅ FIXED
+const isClosed = _closedDates && _closedDates.has(normalizeDateStr(thisDate.toDateString()));
     const disabled = isPast || isClosed;
     const isToday  = thisDate.getTime() === today.getTime();
     const isSel    = selectedDate && thisDate.toDateString() === selectedDate.toDateString();
@@ -535,7 +536,7 @@ function navAvailCal(dir) {
 }
 
 function adminToggleDate(y, m, d) {
-  const dateStr      = new Date(y, m, d).toDateString();
+   const dateStr = normalizeDateStr(new Date(y, m, d).toDateString());
   _availSelectedDate = dateStr;
   renderAvailabilityCalendar();
   renderAvailabilityTimeGrid(dateStr);
@@ -983,12 +984,12 @@ function startAuthWatcher() {
 function renderAdminDashboard() {
   const bookings = getBookings();
   const today    = new Date(); today.setHours(0,0,0,0);
-  const todayStr = today.toDateString();
+const todayStr = normalizeDateStr(new Date().toDateString());
 
   // REMOVED: unused variables 'now', 'confirmed', 'cancelled'
   const total      = bookings.length;
   const pending    = bookings.filter(b => b.status === 'pending').length;
-  const todayCount = bookings.filter(b => b.dateStr === todayStr && b.status !== 'cancelled').length;
+  const todayCount = bookings.filter(b => normalizeDateStr(b.dateStr) === todayStr && b.status !== 'cancelled').length;
   const revenue    = bookings.filter(b => b.status !== 'cancelled').reduce((s, b) => s + b.totalPrice, 0);
 
   document.getElementById('admin-stats').innerHTML = `
@@ -1074,7 +1075,7 @@ function adminUpdateStatus(id, status) {
 
 function adminMsgToday() {
   const todayStr     = new Date().toDateString();
-  const todayBookings = getBookings().filter(b => b.dateStr === todayStr && b.status !== 'cancelled');
+const todayBookings = getBookings().filter(b => normalizeDateStr(b.dateStr) === todayStr && b.status !== 'cancelled');
   if (todayBookings.length === 0) { toast('No appointments today.', 'default', '📅'); return; }
   todayBookings.forEach((b, i) => {
     const msg = `Hello ${b.name} 👋, this is *PRIVATE BARBER 💈*!\n\n` +

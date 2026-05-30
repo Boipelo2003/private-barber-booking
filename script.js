@@ -36,6 +36,10 @@ function initFirebase() {
       _fbReady       = true;
       _fbConnected   = true;
 
+      if (state.currentPage === 'booking' && state.booking.step === 2 && state.booking.date) {
+    buildTimeGrid('time-grid', state.booking.date.toDateString(), state.booking.time, 'selectTime');
+  }
+
       localStorage.setItem('pb_bookings', JSON.stringify(_bookingsCache));
 
       added.forEach(b => {
@@ -68,7 +72,7 @@ function initFirebase() {
       }
     });
 
-    _db.ref('pb_closed_slots').on('value', (snap) => {
+_db.ref('pb_closed_slots').on('value', (snap) => {
       const val = snap.val() || {};
       _closedSlots = {};
       Object.keys(val).forEach(dateKey => {
@@ -85,11 +89,13 @@ function initFirebase() {
           buildTimeGrid('time-grid', state.booking.date.toDateString(), state.booking.time, 'selectTime');
         }
       }
+      if (state.reschedule.date) {
+        buildTimeGrid('reschedule-time-grid', state.reschedule.date.toDateString(), state.reschedule.time, 'selectRescheduleTime');
+      }
     });
 
     console.log('🔥 Firebase connected');
     window._auth = firebase.auth();
-    // REMOVED: window._firebase = { /* ... */ }; — dead placeholder deleted
     startAuthWatcher();
 
   } catch (err) {
@@ -530,6 +536,12 @@ function adminToggleDate(y, m, d) {
 // already has the class in HTML for #time-grid.
 // For #reschedule-time-grid: add class="time-grid" to that element in index.html.
 function buildTimeGrid(containerId, dateStr, selectedTime, onSelect) {
+    if (!_fbReady) {
+    document.getElementById(containerId).innerHTML =
+      '<div style="text-align:center;padding:20px;color:var(--gold)">⏳ Loading slots...</div>';
+    return;
+  }
+
   const booked      = getBookedSlots(dateStr);
   const isDayClosed = _closedDates && _closedDates.has(dateStr);
   const slots       = [];

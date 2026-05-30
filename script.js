@@ -469,11 +469,14 @@ function renderAvailabilityTimeGrid(dateStr) {
   const container = document.getElementById('availability-time-grid');
   if (!container) return;
 
-  const bookedSlots = getBookedSlots(dateStr);
-  const closedSlots = _closedSlots[dateStr] || new Set();
-  const isDayClosed = _closedDates.has(dateStr);
+  // ✅ Always normalize before any lookup
+  const normalized = normalizeDateStr(dateStr);
 
-  const d      = new Date(dateStr);
+  const bookedSlots = getBookedSlots(normalized);
+  const closedSlots = _closedSlots[normalized] || new Set();
+  const isDayClosed = _closedDates.has(normalized);
+
+  const d      = new Date(normalized);
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const dateLabel = `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
 
@@ -482,10 +485,10 @@ function renderAvailabilityTimeGrid(dateStr) {
 
   // NOTE: The inline styles here have been converted to CSS classes.
   // Add the matching .avail-* rules from the CSS block provided in the review notes.
-  let html = `
+   let html = `
     <div class="avail-date-heading">📅 ${dateLabel}</div>
     <div class="avail-toggle-row">
-      <button onclick="toggleClosedDate('${dateStr}')"
+      <button onclick="toggleClosedDate('${normalized}')"
               class="avail-day-btn ${isDayClosed ? 'reopen' : 'close'}">
         ${isDayClosed ? '🟢 Reopen Entire Day' : '🔴 Close Entire Day'}
       </button>
@@ -512,7 +515,7 @@ function renderAvailabilityTimeGrid(dateStr) {
     }
 
     const clickable = !isBooked && !isDayClosed;
-    const onclick   = clickable ? `onclick="toggleClosedSlot('${dateStr}','${slot}')"` : '';
+    const onclick   = clickable ? `onclick="toggleClosedSlot('${normalized}','${slot}')"` : '';
 
     html += `<div ${onclick} class="avail-slot ${stateClass}${clickable ? '' : ' avail-slot-disabled'}">${slotLabel}</div>`;
   });

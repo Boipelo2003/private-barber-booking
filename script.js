@@ -73,26 +73,27 @@ function initFirebase() {
     });
 
 _db.ref('pb_closed_slots').on('value', (snap) => {
-      const val = snap.val() || {};
-      _closedSlots = {};
-      Object.keys(val).forEach(dateKey => {
-        const realDateStr = dateKey.replace(/_/g, ' ');
-        _closedSlots[realDateStr] = new Set(
-          Object.keys(val[dateKey])
-            .filter(t => val[dateKey][t] === true)
-            .map(t => t.slice(0, 2) + ':' + t.slice(2))
-        );
-      });
-      if (state.currentPage === 'booking') {
-        renderBookingCalendar();
-        if (state.booking.step === 2 && state.booking.date) {
-          buildTimeGrid('time-grid', state.booking.date.toDateString(), state.booking.time, 'selectTime');
-        }
-      }
-      if (state.reschedule.date) {
-        buildTimeGrid('reschedule-time-grid', state.reschedule.date.toDateString(), state.reschedule.time, 'selectRescheduleTime');
-      }
-    });
+  const val = snap.val() || {};
+  _closedSlots = {};
+  Object.keys(val).forEach(dateKey => {
+    // ✅ Normalize spaces when reading back
+    const realDateStr = dateKey.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+    _closedSlots[realDateStr] = new Set(
+      Object.keys(val[dateKey])
+        .filter(t => val[dateKey][t] === true)
+        .map(t => t.slice(0, 2) + ':' + t.slice(2))
+    );
+  });
+  if (state.currentPage === 'booking') {
+    renderBookingCalendar();
+    if (state.booking.step === 2 && state.booking.date) {
+      buildTimeGrid('time-grid', state.booking.date.toDateString(), state.booking.time, 'selectTime');
+    }
+  }
+  if (state.reschedule.date) {
+    buildTimeGrid('reschedule-time-grid', state.reschedule.date.toDateString(), state.reschedule.time, 'selectRescheduleTime');
+  }
+});
 
     console.log('🔥 Firebase connected');
     window._auth = firebase.auth();
@@ -174,17 +175,18 @@ function toggleClosedDate(dateStr) {
 }
 
 function toggleClosedSlot(dateStr, time) {
-  const key    = dateStr.replace(/\s/g, '_');
-  const slots  = _closedSlots[dateStr] || new Set();
+  const normalizedDateStr = dateStr.replace(/\s+/g, ' ').trim();
+  const key    = normalizedDateStr.replace(/\s/g, '_');
+  const slots  = _closedSlots[normalizedDateStr] || new Set();
   const isClosed = slots.has(time);
   if (_db) {
     _db.ref(`pb_closed_slots/${key}/${time.replace(':', '')}`).set(isClosed ? null : true);
   }
   // Optimistic local update
-  if (!_closedSlots[dateStr]) _closedSlots[dateStr] = new Set();
-  if (isClosed) _closedSlots[dateStr].delete(time);
-  else _closedSlots[dateStr].add(time);
-  renderAvailabilityTimeGrid(dateStr);
+  if (!_closedSlots[normalizedDateStr]) _closedSlots[normalizedDateStr] = new Set();
+  if (isClosed) _closedSlots[normalizedDateStr].delete(time);
+  else _closedSlots[normalizedDateStr].add(time);
+  renderAvailabilityTimeGrid(normalizedDateStr);
 }
 
 
@@ -536,14 +538,17 @@ function adminToggleDate(y, m, d) {
 // already has the class in HTML for #time-grid.
 // For #reschedule-time-grid: add class="time-grid" to that element in index.html.
 function buildTimeGrid(containerId, dateStr, selectedTime, onSelect) {
-    if (!_fbReady) {
+  if (!_fbReady) {
     document.getElementById(containerId).innerHTML =
       '<div style="text-align:center;padding:20px;color:var(--gold)">⏳ Loading slots...</div>';
     return;
   }
 
-  const booked      = getBookedSlots(dateStr);
-  const isDayClosed = _closedDates && _closedDates.has(dateStr);
+  // ✅ Normalize dateStr before any lookup
+  const normalizedDateStr = dateStr.replace(/\s+/g, ' ').trim();
+
+  const booked      = getBookedSlots(normalizedDateStr);
+  const isDayClosed = _closedDates && _closedDates.has(normalizedDateStr);
   const slots       = [];
 
   for (let h = 8; h <= 19; h++) slots.push(`${pad2(h)}:00`);
@@ -551,7 +556,7 @@ function buildTimeGrid(containerId, dateStr, selectedTime, onSelect) {
   let html = '';
   slots.forEach(slot => {
     const isClientBooked = booked.includes(slot);
-    const isSlotClosed   = isDayClosed || (_closedSlots[dateStr] && _closedSlots[dateStr].has(slot));
+    const isSlotClosed   = isDayClosed || (_closedSlots[normalizedDateStr] && _closedSlots[normalizedDateStr].has(slot));
     const unavailable    = isClientBooked || isSlotClosed;
     const isLate         = isLateSlot(slot);
     const isSel          = slot === selectedTime;

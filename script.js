@@ -1108,30 +1108,71 @@ function adminUpdateStatus(id, status) {
 }
 
 function adminMsgToday() {
-  const todayStr     = new Date().toDateString();
-const todayBookings = getBookings().filter(b => normalizeDateStr(b.dateStr) === todayStr && b.status !== 'cancelled');
+  const todayStr = new Date().toDateString();
+  const todayBookings = getBookings().filter(b => normalizeDateStr(b.dateStr) === todayStr && b.status !== 'cancelled');
   if (todayBookings.length === 0) { toast('No appointments today.', 'default', '📅'); return; }
-  todayBookings.forEach((b, i) => {
+
+  const messages = todayBookings.map(b => {
     const msg = `Hello ${b.name} 👋, this is *PRIVATE BARBER 💈*!\n\n` +
       `Just a reminder that your appointment is *TODAY* 🎉\n` +
       `🕐 *Time:* ${b.time}\n✂️ *Service:* ${b.service}\n\nSee you soon! 💈`;
-    setTimeout(() => openWhatsApp(b.phone, msg), i * 500);
+    return { booking: b, msg };
   });
-  toast(`Messaging ${todayBookings.length} client(s) for today.`, 'success', '📲');
+
+  showBulkWhatsAppModal(`Today's Clients (${messages.length})`, messages);
 }
 
 function adminRemindUpcoming() {
-  const now      = Date.now();
+  const now = Date.now();
   const upcoming = getBookings().filter(b => parseDateTimeMs(b.dateStr, b.time) > now && b.status !== 'cancelled');
   if (upcoming.length === 0) { toast('No upcoming appointments.', 'default', '📅'); return; }
-  upcoming.slice(0, 5).forEach((b, i) => {
+
+  const messages = upcoming.slice(0, 5).map(b => {
     const msg = `Hello ${b.name} 👋, this is *PRIVATE BARBER 💈*!\n\n` +
       `🔔 Friendly reminder of your upcoming appointment:\n` +
       `📅 *Date:* ${b.date}\n🕐 *Time:* ${b.time}\n✂️ *Service:* ${b.service}\n\n` +
       `See you then! If anything changes please let us know. 💈`;
-    setTimeout(() => openWhatsApp(b.phone, msg), i * 500);
+    return { booking: b, msg };
   });
-  toast(`Reminders sent to ${Math.min(upcoming.length, 5)} upcoming client(s).`, 'success', '🔔');
+
+  showBulkWhatsAppModal(`Upcoming Clients (${messages.length})`, messages);
+}
+
+// ══════════════════════════════════════
+// BULK WHATSAPP MODAL
+// (browsers block auto-opened popups after the first one in a loop,
+// so each message needs its own user click to open reliably)
+// ══════════════════════════════════════
+function showBulkWhatsAppModal(title, messages) {
+  let overlay = document.getElementById('bulk-wa-modal');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'bulk-wa-modal';
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal">
+        <button class="modal-close" onclick="closeModal('bulk-wa-modal')">✕</button>
+        <div class="modal-title" id="bulk-wa-title"></div>
+        <div class="modal-sub">Click each button below to send — browsers block auto-sending multiple messages at once.</div>
+        <div id="bulk-wa-list" style="display:flex;flex-direction:column;gap:10px;margin-top:16px"></div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
+  }
+
+  document.getElementById('bulk-wa-title').textContent = title;
+  document.getElementById('bulk-wa-list').innerHTML = messages.map(({ booking, msg }) => {
+    const num = formatWANumber(booking.phone);
+    const encoded = encodeURIComponent(msg);
+    return `
+      <a class="btn-wa btn-wa-confirm" style="justify-content:space-between"
+         href="https://wa.me/${num}?text=${encoded}" target="_blank">
+        <span>📲 ${booking.name} — ${booking.time}</span>
+        <span>Send →</span>
+      </a>`;
+  }).join('');
+
+  openModal('bulk-wa-modal');
 }
 
 

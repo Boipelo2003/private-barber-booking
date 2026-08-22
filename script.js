@@ -1017,20 +1017,28 @@ function startAuthWatcher() {
 
 function renderAdminDashboard() {
   const bookings = getBookings();
-  const today    = new Date(); today.setHours(0,0,0,0);
-const todayStr = normalizeDateStr(new Date().toDateString());
+  const now      = Date.now();
+  const todayStr = normalizeDateStr(new Date().toDateString());
 
-  // REMOVED: unused variables 'now', 'confirmed', 'cancelled'
   const total      = bookings.length;
   const pending    = bookings.filter(b => b.status === 'pending').length;
   const todayCount = bookings.filter(b => normalizeDateStr(b.dateStr) === todayStr && b.status !== 'cancelled').length;
-  const revenue    = bookings.filter(b => b.status !== 'cancelled').reduce((s, b) => s + b.totalPrice, 0);
+
+  // Split revenue: completed (appointment time already passed) vs upcoming (still to happen)
+  const nonCancelled   = bookings.filter(b => b.status !== 'cancelled');
+  const revenueDone    = nonCancelled
+    .filter(b => parseDateTimeMs(b.dateStr, b.time) <= now)
+    .reduce((s, b) => s + b.totalPrice, 0);
+  const revenueUpcoming = nonCancelled
+    .filter(b => parseDateTimeMs(b.dateStr, b.time) > now)
+    .reduce((s, b) => s + b.totalPrice, 0);
 
   document.getElementById('admin-stats').innerHTML = `
     <div class="stat-card"><div class="stat-num">${total}</div><div class="stat-label">Total Bookings</div></div>
     <div class="stat-card"><div class="stat-num">${todayCount}</div><div class="stat-label">Today's Appointments</div></div>
     <div class="stat-card"><div class="stat-num">${pending}</div><div class="stat-label">Pending</div></div>
-    <div class="stat-card"><div class="stat-num" style="font-size:1.6rem">R${revenue}</div><div class="stat-label">Total Revenue</div></div>
+    <div class="stat-card"><div class="stat-num" style="font-size:1.6rem">R${revenueDone}</div><div class="stat-label">Revenue (Completed)</div></div>
+    <div class="stat-card"><div class="stat-num" style="font-size:1.6rem">R${revenueUpcoming}</div><div class="stat-label">Revenue (Upcoming)</div></div>
   `;
 
   renderAdminBookings();

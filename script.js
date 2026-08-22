@@ -162,26 +162,63 @@ initFirebase();
 function toggleClosedDate(dateStr) {
   const key = dateToKey(new Date(dateStr));
   const isCurrentlyClosed = _closedDates.has(key);
-  if (_db) {
-    _db.ref(`pb_closed_dates/${key}`).set(isCurrentlyClosed ? null : true);
+  const newValue = isCurrentlyClosed ? null : true;
+
+  if (!_db) {
+    toast('Not connected to database — cannot update availability.', 'error', '⚠️');
+    return;
   }
-  if (isCurrentlyClosed) _closedDates.delete(key);
-  else _closedDates.add(key);
-  renderAvailabilityCalendar();
-  renderAvailabilityTimeGrid(key);
+
+  _db.ref(`pb_closed_dates/${key}`).set(newValue)
+    .then(() => {
+      // Only update local state after the write is confirmed
+      if (isCurrentlyClosed) _closedDates.delete(key);
+      else _closedDates.add(key);
+      renderAvailabilityCalendar();
+      renderAvailabilityTimeGrid(key);
+      toast(isCurrentlyClosed ? 'Day reopened.' : 'Day closed.', 'success', '✓');
+    })
+    .catch(err => {
+      console.error('toggleClosedDate failed:', err);
+      if (err.code === 'PERMISSION_DENIED') {
+        toast('Permission denied — check Firebase rules for pb_closed_dates.', 'error', '🚫');
+      } else {
+        toast('Failed to update availability: ' + err.message, 'error', '⚠️');
+      }
+      // Re-render with the unchanged (real) state so UI doesn't show a false toggle
+      renderAvailabilityCalendar();
+      renderAvailabilityTimeGrid(key);
+    });
 }
 
 function toggleClosedSlot(dateStr, time) {
   const key = dateToKey(new Date(dateStr));
   const slots = _closedSlots[key] || new Set();
   const isClosed = slots.has(time);
-  if (_db) {
-    _db.ref(`pb_closed_slots/${key}/${time.replace(':', '')}`).set(isClosed ? null : true);
+  const newValue = isClosed ? null : true;
+
+  if (!_db) {
+    toast('Not connected to database — cannot update availability.', 'error', '⚠️');
+    return;
   }
-  if (!_closedSlots[key]) _closedSlots[key] = new Set();
-  if (isClosed) _closedSlots[key].delete(time);
-  else _closedSlots[key].add(time);
-  renderAvailabilityTimeGrid(key);
+
+  _db.ref(`pb_closed_slots/${key}/${time.replace(':', '')}`).set(newValue)
+    .then(() => {
+      if (!_closedSlots[key]) _closedSlots[key] = new Set();
+      if (isClosed) _closedSlots[key].delete(time);
+      else _closedSlots[key].add(time);
+      renderAvailabilityTimeGrid(key);
+      toast(isClosed ? 'Slot reopened.' : 'Slot closed.', 'success', '✓');
+    })
+    .catch(err => {
+      console.error('toggleClosedSlot failed:', err);
+      if (err.code === 'PERMISSION_DENIED') {
+        toast('Permission denied — check Firebase rules for pb_closed_slots.', 'error', '🚫');
+      } else {
+        toast('Failed to update slot: ' + err.message, 'error', '⚠️');
+      }
+      renderAvailabilityTimeGrid(key);
+    });
 }
 
 // ══════════════════════════════════════

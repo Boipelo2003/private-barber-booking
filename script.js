@@ -718,7 +718,7 @@ function startBookingWithService(svc) {
   state.booking.service = svc;
 }
 
-function confirmBooking() {
+function openTermsGate() {
   const name  = document.getElementById('inp-name').value.trim();
   const phone = document.getElementById('inp-phone').value.trim();
   const email = document.getElementById('inp-email').value.trim();
@@ -734,9 +734,39 @@ function confirmBooking() {
     toast('Please enter a valid phone number.', 'error', '⚠️'); return;
   }
 
+  state.booking.name  = name;
+  state.booking.phone = phone;
+  state.booking.email = email;
+
+  document.getElementById('terms-checkbox').checked = false;
+  document.getElementById('terms-accept-btn').disabled = true;
+  openModal('terms-modal');
+}
+
+function toggleTermsAcceptBtn() {
+  document.getElementById('terms-accept-btn').disabled =
+    !document.getElementById('terms-checkbox').checked;
+}
+
+function declineTerms() {
+  closeModal('terms-modal');
+  toast('You must accept the Terms & Conditions to book.', 'default', 'ℹ️');
+}
+
+function acceptTermsAndBook() {
+  if (!document.getElementById('terms-checkbox').checked) return;
+  closeModal('terms-modal');
+  confirmBooking();
+}
+
+function confirmBooking() {
   const b       = state.booking;
+  const name    = b.name;
+  const phone   = b.phone;
+  const email   = b.email;
   const id      = generateId();
   const dateStr = b.date.toDateString();
+
   const booking = {
     id, name, phone, email,
     date:       formatDate(b.date),
@@ -747,7 +777,9 @@ function confirmBooking() {
     lateFee:    b.lateFee,
     totalPrice: b.totalPrice,
     status:     'pending',
-    createdAt:  Date.now()
+    createdAt:  Date.now(),
+    termsAccepted:   true,
+    termsAcceptedAt: Date.now()
   };
 
   _justCreatedIds.add(id);
@@ -758,7 +790,6 @@ function confirmBooking() {
       .catch(err => console.warn('Firebase write failed', err));
   }
 
-  // Step 5 — confirmation screen
   document.getElementById('confirm-id').textContent = id;
   document.getElementById('confirm-summary').innerHTML = `
     <div class="summary-row"><span>👤 Name</span><span>${name}</span></div>
@@ -791,9 +822,6 @@ function confirmBooking() {
   toast('Booking confirmed! 🎉', 'success', '✅');
   pushLiveAlert(booking);
   updateAdminBadge();
-
-  // REMOVED: auto-open WhatsApp setTimeout — the manual "Notify Barber" button
-  // on Step 5 is sufficient. Keeping both caused the admin to receive two messages.
 }
 
 

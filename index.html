@@ -116,6 +116,10 @@
     924 Mosidisi St, Ikageng, Potchefstroom, 2539
   </div>
 
+  <div style="margin-bottom:12px">
+    <a href="#" onclick="showPage('terms');return false;" style="color:var(--white3);text-decoration:none;font-size:0.72rem;letter-spacing:0.08em">Terms & Conditions</a>
+  </div>
+
   <div style="margin-bottom:24px">
     <a href="https://www.instagram.com/private_barber_sa" target="_blank"
        style="color:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:6px;opacity:0.7;transition:opacity 0.2s"
@@ -140,7 +144,6 @@
   </div>
 </footer>
 </div>
-
 <!-- ══════════════════════════════════════
      BOOKING
 ══════════════════════════════════════ -->
@@ -266,7 +269,7 @@
 
       <div class="step-nav">
         <button class="btn-back" onclick="goStep(3)">← Back</button>
-        <button class="btn-next" id="next-4" onclick="confirmBooking()">Confirm Booking ✓</button>
+        <button class="btn-next" id="next-4" onclick="openTermsGate()">Confirm Booking ✓</button>
       </div>
     </div>
 
@@ -306,6 +309,56 @@
     </div>
 
     <div id="bookings-results"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     TERMS & CONDITIONS
+══════════════════════════════════════ -->
+<div id="page-terms" class="page">
+  <div style="max-width:760px;margin:0 auto;padding-top:110px;padding-bottom:80px;padding-left:5%;padding-right:5%">
+    <div class="section-label">Legal</div>
+    <h2 class="step-title" style="margin-bottom:6px">Terms & Conditions</h2>
+    <p class="step-subtitle" style="margin-bottom:32px">Last updated: 24 August 2026</p>
+
+    <div style="font-size:0.88rem;line-height:1.8;color:var(--white2)">
+
+      <p style="margin-bottom:20px">These Terms & Conditions ("Terms") govern your use of the Private Barber booking website and your engagement of services from Private Barber ("we", "us", "our"), located at 924 Mosidisi St, Ikageng, Potchefstroom, 2539, South Africa. By booking an appointment through this website, you agree to be bound by these Terms.</p>
+
+      <h3 style="font-family:'Cormorant Garamond',serif;color:var(--gold);font-size:1.2rem;margin:28px 0 10px">1. Services & Pricing</h3>
+      <p style="margin-bottom:20px">We offer haircut services with and without dye treatment, at the prices displayed on this website at the time of booking. Prices are quoted in South African Rand (ZAR) and are subject to change without prior notice; the price applicable to your booking is the price displayed at the time you complete it. Appointments booked for slots from 19:00 onward incur an additional late-slot fee, as shown during booking.</p>
+
+      <h3 style="font-family:'Cormorant Garamond',serif;color:var(--gold);font-size:1.2rem;margin:28px 0 10px">2. Bookings</h3>
+      <p style="margin-bottom:20px">Each booked time slot is reserved for one client only. Bookings for two or more people require separate, individual bookings. You are responsible for ensuring the name, phone number, and email address you provide are accurate, as we rely on these details to confirm, reschedule, or contact you about your appointment.</p>
+
+      <h3 style="font-family:'Cormorant Garamond',serif;color:var(--gold);font-size:1.2rem;margin:28px 0 10px">3. Cancellations & Rescheduling</h3>
+      <p style="margin-bottom:20px">You may cancel or reschedule your appointment at any time via the "My Bookings" section of this website. Cancellations made <strong>within 5 hours</strong> of the scheduled appointment time incur a cancellation fee of R20. This fee reflects the cost to us of a slot held and then vacated at short notice, and is not a penalty for cancelling as such — you remain free to cancel at any time.</p>
+
+      <h3 style="font-family:'Cormorant Garamond',serif;color:var(--gold);font-size:1.2rem;margin:28px 0 10px">4. No-Shows</h3>
+      <p style="margin-bottom:20px">If you fail to arrive for a confirmed appointment without cancelling in advance, we reserve the right to treat this as a late cancellation for the purposes of any applicable fee, and may decline future bookings from repeat no-shows.</p>
+
+      <h3 style="font-family:'Cormorant Garamond',serif;color:var(--gold);font-size:1.2rem;margin:28px 0 10px">5. Health, Allergies & Patch Testing</h3>
+      <p style="margin-bottom:20px">If you book a service involving hair dye or colour treatment, it is your responsibility to inform us in advance of any known allergies, sensitivities, or scalp conditions. We recommend a patch test at least 48 hours before any colour service if you have not used a similar product before or have sensitive skin. We are not liable for allergic reactions arising from undisclosed conditions or a client's decision to forgo a recommended patch test.</p>
+
+      <h3 style="font-family:'Cormorant Garamond',serif;color:var(--gold);font-size:1.2rem;margin:28px 0 10px">6. Client Conduct</h3>
+      <p style="margin-bottom:20px">We reserve the right to refuse service to any client who behaves in an abusive, threatening, or unsafe manner toward our staff or other clients, without obligation to provide a refund for that appointment.</p>
+
+      <h3 style="font-family:'Cormorant Garamond',serif;color:var(--gold);font-size:1.2rem;margin:28px 0 10px">7. Limitation of Liability</h3>
+      <p style="margin-bottom:20px">While we take reasonable care in providing our services, we do not guarantee that every outcome will meet a client's personal aesthetic preference, and dissatisfaction with a subjective style choice does not, on its own, constitute a defect in service. To the fullest extent permitted by South African law, including the Consumer Protection Act 68 of 2008, our liability for any claim arising from services rendered is limited to the value of the service in question. Nothing in these Terms excludes or limits liability that cannot lawfully be excluded or limited, including liability for gross negligence or for harm caused by unsafe services as contemplated under the Consumer Protection Act.</p>
+
+      <h3 style="font-family:'Cormorant Garamond',serif;color:var(--gold);font-size:1.2rem;margin:28px 0 10px">8. Your Information & Privacy (POPIA)</h3>
+      <p style="margin-bottom:20px">We collect your name, phone number, email address, and appointment details solely to manage your bookings and to contact you regarding confirmations, reminders, rescheduling, or cancellations — including via WhatsApp. We do not sell or share your personal information with third parties for marketing purposes. Your information is processed in accordance with the Protection of Personal Information Act 4 of 2013 (POPIA). You may request access to, correction of, or deletion of your personal information at any time by contacting us using the details below.</p>
+
+      <h3 style="font-family:'Cormorant Garamond',serif;color:var(--gold);font-size:1.2rem;margin:28px 0 10px">9. Changes to These Terms</h3>
+      <p style="margin-bottom:20px">We may update these Terms from time to time. The version in effect at the time of your booking will apply to that booking. Continued use of this website after changes are posted constitutes acceptance of the updated Terms.</p>
+
+      <h3 style="font-family:'Cormorant Garamond',serif;color:var(--gold);font-size:1.2rem;margin:28px 0 10px">10. Governing Law</h3>
+      <p style="margin-bottom:20px">These Terms are governed by the laws of the Republic of South Africa. Any disputes arising from these Terms or your use of our services will be subject to the jurisdiction of the South African courts, without prejudice to any right you may have to refer a matter to the National Consumer Commission or another applicable regulatory body.</p>
+
+      <h3 style="font-family:'Cormorant Garamond',serif;color:var(--gold);font-size:1.2rem;margin:28px 0 10px">11. Contact Us</h3>
+      <p style="margin-bottom:20px">For questions about these Terms, your booking, or your personal information, contact us via WhatsApp at <a href="https://wa.me/27768502521" target="_blank" style="color:var(--gold)">+27 76 850 2521</a> or visit us at 924 Mosidisi St, Ikageng, Potchefstroom, 2539.</p>
+
+    </div>
   </div>
 </div>
 
@@ -450,6 +503,33 @@
     </div>
 
     <button class="btn-gold" style="width:100%;justify-content:center" onclick="confirmManualBooking()">Add Booking ✓</button>
+  </div>
+</div>
+
+<!-- Terms & Conditions Acceptance Modal -->
+<div class="modal-overlay" id="terms-modal">
+  <div class="modal" style="max-width:560px">
+    <button class="modal-close" onclick="declineTerms()">✕</button>
+    <div class="modal-title">Terms & Conditions</div>
+    <div class="modal-sub">Please review and accept before we confirm your booking.</div>
+
+    <div id="terms-scroll-box" style="max-height:280px;overflow-y:auto;background:var(--black);border:1px solid rgba(255,255,255,0.1);border-radius:var(--radius2);padding:18px 20px;margin-bottom:16px;font-size:0.78rem;line-height:1.7;color:var(--white2)">
+      <p style="margin-bottom:14px"><strong style="color:var(--gold)">Cancellations:</strong> Cancelling within 5 hours of your appointment incurs a R20 fee.</p>
+      <p style="margin-bottom:14px"><strong style="color:var(--gold)">Bookings:</strong> Each slot is for one person only. Please ensure your name, phone, and email are accurate — we use these to contact you about your appointment.</p>
+      <p style="margin-bottom:14px"><strong style="color:var(--gold)">Colour treatments:</strong> Please tell us in advance about any allergies or sensitivities. We recommend a patch test 48 hours before any dye service if you haven't used the product before.</p>
+      <p style="margin-bottom:14px"><strong style="color:var(--gold)">Your information:</strong> We use your details only to manage this booking and contact you about it (including via WhatsApp), in line with POPIA. We don't sell or share your information.</p>
+      <p style="margin-bottom:0"><strong style="color:var(--gold)">Full Terms:</strong> This is a summary. Read our complete <a href="#" onclick="showPage('terms');return false;" style="color:var(--gold)">Terms & Conditions</a> for full details.</p>
+    </div>
+
+    <label style="display:flex;align-items:flex-start;gap:10px;margin-bottom:20px;cursor:pointer;font-size:0.82rem;color:var(--white2)">
+      <input type="checkbox" id="terms-checkbox" onchange="toggleTermsAcceptBtn()" style="margin-top:3px;width:16px;height:16px;flex-shrink:0;accent-color:var(--gold)">
+      <span>I have read and agree to the <a href="#" onclick="showPage('terms');return false;" style="color:var(--gold)">Terms & Conditions</a>, including the cancellation fee policy.</span>
+    </label>
+
+    <div style="display:flex;gap:10px">
+      <button class="btn-outline" style="flex:1" onclick="declineTerms()">Cancel</button>
+      <button class="btn-gold" style="flex:1;justify-content:center" id="terms-accept-btn" disabled onclick="acceptTermsAndBook()">Accept & Confirm Booking</button>
+    </div>
   </div>
 </div>
 

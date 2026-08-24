@@ -234,6 +234,17 @@ body::before{
   box-shadow:0 8px 30px var(--gold-glow);
   transform:translateY(-2px);
 }
+.btn-gold:disabled{
+  background:var(--black4);
+  color:var(--white3);
+  cursor:not-allowed;
+  box-shadow:none;
+}
+.btn-gold:disabled:hover{
+  background:var(--black4);
+  box-shadow:none;
+  transform:none;
+}
 .btn-outline{
   background:none;
   color:var(--white2);

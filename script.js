@@ -306,6 +306,7 @@ const state = {
   },
   calendar:    { year: 0, month: 0 },
   reschedule:  { bookingId: null, date: null, time: null, calYear: 0, calMonth: 0 },
+  manualBooking: { date: null, time: null, service: null, calYear: 0, calMonth: 0 },
   cancelTarget:     null,
   cancelFeeApplied: false,   // FIX: declared here, not dynamically assigned later
   adminFilter: 'all'
@@ -954,6 +955,120 @@ function confirmReschedule() {
   }
 }
 
+// ══════════════════════════════════════
+// MANUAL / WALK-IN BOOKING (admin-side)
+// ══════════════════════════════════════
+function openManualBooking() {
+  const now = new Date();
+  state.manualBooking = {
+    date: null, time: null, service: null,
+    calYear: now.getFullYear(), calMonth: now.getMonth()
+  };
+  document.getElementById('manual-inp-name').value = '';
+  document.getElementById('manual-inp-phone').value = '';
+  document.getElementById('manual-inp-email').value = '';
+  document.querySelectorAll('#manual-service-options .service-option').forEach(el => el.classList.remove('selected'));
+  document.getElementById('manual-time-grid').innerHTML =
+    '<div style="color:var(--white3);font-size:0.8rem;padding:10px 0">Select a date first</div>';
+  renderManualCalendar();
+  openModal('manual-booking-modal');
+}
+
+function navManualCal(dir) {
+  state.manualBooking.calMonth += dir;
+  if (state.manualBooking.calMonth > 11) { state.manualBooking.calMonth = 0;  state.manualBooking.calYear++; }
+  if (state.manualBooking.calMonth < 0)  { state.manualBooking.calMonth = 11; state.manualBooking.calYear--; }
+  renderManualCalendar();
+}
+
+function renderManualCalendar() {
+  buildCalendar('manual-calendar', state.manualBooking.calYear, state.manualBooking.calMonth, state.manualBooking.date, {
+    nav: 'navManualCal', click: 'selectManualDate'
+  });
+}
+
+function selectManualDate(y, m, d) {
+  state.manualBooking.date = new Date(y, m, d);
+  state.manualBooking.time = null;
+  renderManualCalendar();
+  buildTimeGrid('manual-time-grid', state.manualBooking.date.toDateString(), null, 'selectManualTime');
+}
+
+function selectManualTime(slot) {
+  state.manualBooking.time = slot;
+  const dateStr = state.manualBooking.date ? state.manualBooking.date.toDateString() : '';
+  buildTimeGrid('manual-time-grid', dateStr, slot, 'selectManualTime');
+}
+
+function selectManualService(svc) {
+  state.manualBooking.service = svc;
+  document.querySelectorAll('#manual-service-options .service-option').forEach(el => el.classList.remove('selected'));
+  document.getElementById('manual-svc-' + svc).classList.add('selected');
+}
+
+function confirmManualBooking() {
+  const mb    = state.manualBooking;
+  const name  = document.getElementById('manual-inp-name').value.trim();
+  const phone = document.getElementById('manual-inp-phone').value.trim();
+  const email = document.getElementById('manual-inp-email').value.trim();
+
+  if (!mb.date)    { toast('Please select a date.', 'error', '⚠️'); return; }
+  if (!mb.time)    { toast('Please select a time slot.', 'error', '⚠️'); return; }
+  if (!mb.service) { toast('Please select a service.', 'error', '⚠️'); return; }
+  if (!name)       { toast("Please enter the client's name.", 'error', '⚠️'); return; }
+  if (!phone)      { toast('Please enter a phone number.', 'error', '⚠️'); return; }
+  const cleanPhone = phone.replace(/\D/g, '');
+  if (cleanPhone.length < 9 || cleanPhone.length > 13) {
+    toast('Please enter a valid phone number.', 'error', '⚠️'); return;
+  }
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    toast('Please enter a valid email address.', 'error', '⚠️'); return;
+  }
+
+  // Re-check the slot is still free (in case it got booked while this modal was open)
+  const dateKey       = dateToKey(mb.date);
+  const alreadyBooked = getBookedSlots(dateKey).includes(mb.time);
+  const isDayClosed   = _closedDates.has(dateKey);
+  const isSlotClosed  = (_closedSlots[dateKey] || new Set()).has(mb.time);
+  if (alreadyBooked || isDayClosed || isSlotClosed) {
+    toast('That slot is no longer available — please pick another.', 'error', '⚠️');
+    mb.time = null;
+    buildTimeGrid('manual-time-grid', mb.date.toDateString(), null, 'selectManualTime');
+    return;
+  }
+
+  const lateFee    = isLateSlot(mb.time);
+  const totalPrice = getServicePrice(mb.service) + (lateFee ? 20 : 0);
+  const id         = generateId();
+
+  const booking = {
+    id, name, phone,
+    email:      email || `no-email-${id.toLowerCase()}@privatebarber.local`,
+    date:       formatDate(mb.date),
+    dateStr:    mb.date.toDateString(),
+    time:       mb.time,
+    service:    getServiceLabel(mb.service),
+    serviceKey: mb.service,
+    lateFee,
+    totalPrice,
+    status:     'confirmed',
+    createdAt:  Date.now(),
+    manualEntry: true
+  };
+
+  _justCreatedIds.add(id);
+  _bookingsCache.push(booking);
+  localStorage.setItem('pb_bookings', JSON.stringify(_bookingsCache));
+  if (_db) {
+    _db.ref(`pb_bookings/${id}`).set(booking)
+      .catch(err => console.warn('Firebase write failed', err));
+  }
+
+  toast(`Booking added for ${name}.`, 'success', '✅');
+  closeModal('manual-booking-modal');
+  renderAdminDashboard();
+}
+
 
 // ══════════════════════════════════════
 // MODAL HELPERS
@@ -1056,11 +1171,24 @@ function adminFilter(f) {
 function renderAdminBookings() {
   let bookings = getBookings();
   if (state.adminFilter !== 'all') bookings = bookings.filter(b => b.status === state.adminFilter);
+
+  const searchInput = document.getElementById('admin-search');
+  const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+  if (query) {
+    bookings = bookings.filter(b =>
+      b.name.toLowerCase().includes(query) ||
+      b.phone.replace(/\D/g, '').includes(query.replace(/\D/g, '')) ||
+      b.id.toLowerCase().includes(query)
+    );
+  }
+
   bookings.sort((a, b) => parseDateTimeMs(b.dateStr, b.time) - parseDateTimeMs(a.dateStr, a.time));
 
   const container = document.getElementById('admin-bookings-list');
   if (bookings.length === 0) {
-    container.innerHTML = `<div class="empty-state"><div class="icon">📋</div>No bookings found.</div>`;
+    container.innerHTML = query
+      ? `<div class="empty-state"><div class="icon">🔍</div>No bookings match "${searchInput.value}".</div>`
+      : `<div class="empty-state"><div class="icon">📋</div>No bookings found.</div>`;
     return;
   }
 

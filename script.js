@@ -422,7 +422,12 @@ function getBookedSlots(dateKey) {
 // ══════════════════════════════════════
 // CALENDAR
 // ══════════════════════════════════════
-function buildCalendar(containerId, year, month, selectedDate, onSelect) {
+function buildCalendar(containerId, year, month, selectedDate, onSelect, opts = {}) {
+  // opts.disableClosed: default true (client calendars can't select a closed day).
+  // Pass { disableClosed: false } for the admin availability calendar so closed
+  // days stay CLICKABLE — otherwise, once a day is closed, the admin can never
+  // click it again in the calendar grid to reopen it.
+  const disableClosed = opts.disableClosed !== false;
   const container    = document.getElementById(containerId);
   const now          = new Date();
   const today        = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -450,7 +455,7 @@ function buildCalendar(containerId, year, month, selectedDate, onSelect) {
    // ✅ FIXED
 // ✅ Use dateToKey from the Date object directly — never toDateString()
 const isClosed = _closedDates && _closedDates.has(dateToKey(thisDate));
-    const disabled = isPast || isClosed;
+    const disabled = isPast || (isClosed && disableClosed);
     const isToday  = thisDate.getTime() === today.getTime();
     const isSel    = selectedDate && thisDate.toDateString() === selectedDate.toDateString();
     const cls = ['cal-day',
@@ -497,7 +502,7 @@ let _availCal = { year: new Date().getFullYear(), month: new Date().getMonth() }
 function renderAvailabilityCalendar() {
   buildCalendar('availability-calendar', _availCal.year, _availCal.month, null, {
     nav: 'navAvailCal', click: 'adminToggleDate'
-  });
+  }, { disableClosed: false });
 }
 
 function renderAvailabilityTimeGrid(dateStr) {

@@ -14,153 +14,300 @@ const FIREBASE_CONFIG = {
 };
 
 // ══════════════════════════════════════
-// FIREBASE INIT + STORAGE
+// SETTINGS
 // ══════════════════════════════════════
-let _db         = null;
-let _bookingsCache = [];
-let _fbReady    = false;
-let _fbConnected = false;
+const OPEN_HOUR      = 9;            // first slot 09:00
+const LAST_HOUR      = 19;           // last slot 19:00 (carries the R20 late fee)
+const MIN_NOTICE_MIN = 60;           // slots starting within 60 min can't be booked online
+const TZ_OFFSET      = '+02:00';     // South Africa (SAST — no daylight saving)
+const TERMS_VERSION  = '2026-08-24'; // keep in sync with "Last updated" on the Terms page
+const STATUSES       = ['pending', 'confirmed', 'cancelled'];
 
+// ══════════════════════════════════════
+// SAFETY HELPERS
+// ══════════════════════════════════════
+// Escape anything user-supplied before it goes into innerHTML.
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g,
+    c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+// IDs end up inside inline onclick="…" attributes, so keep them to safe characters.
+function safeId(id) { return String(id ?? '').replace(/[^A-Za-z0-9_-]/g, ''); }
+// encodeURIComponent leaves ' untouched, which breaks onclick="window.open('…')" strings.
+function waEnc(msg) { return encodeURIComponent(msg).replace(/'/g, '%27'); }
+
+// Coerce a record from the database into something safe to render. Returns null if unusable.
+function cleanBooking(b) {
+  if (!b || typeof b !== 'object' || !/^PB[A-Z0-9]+$/.test(String(b.id || ''))) return null;
+  const out = {
+    ...b,
+    id:         String(b.id),
+    name:       String(b.name ?? ''),
+    phone:      String(b.phone ?? ''),
+    email:      String(b.email ?? ''),
+    service:    String(b.service ?? ''),
+    date:       String(b.date ?? ''),
+    dateStr:    String(b.dateStr ?? ''),
+    time:       /^\d{2}:\d{2}$/.test(String(b.time)) ? String(b.time) : '00:00',
+    status:     STATUSES.includes(b.status) ? b.status : 'pending',
+    totalPrice: Number(b.totalPrice) || 0,
+    createdAt:  Number(b.createdAt) || 0
+  };
+  out.dateKey = b.dateKey || normalizeDateStr(out.dateStr);
+  return out;
+}
+function bookingKey(b) { return b.dateKey || normalizeDateStr(b.dateStr); }
+
+// "2026-11-07" + "09:00" → ms, always interpreted in South African time
+function slotMs(dateKey, time) { return new Date(`${dateKey}T${time}:00${TZ_OFFSET}`).getTime(); }
+
+// ══════════════════════════════════════
+// FIREBASE STATE
+// ══════════════════════════════════════
+let _db            = null;
+let _auth          = null;
+let _fbReady       = false;   // slot data has loaded
+let _fbConnected   = false;
+let _loadFailed    = false;
+let _slotsMap      = {};      // { "2026-11-07": Set(["09:00", ...]) }  ← public, times only (no personal data)
+let _closedDates   = new Set();
+let _closedSlots   = {};      // { "2026-11-07": Set(["09:00"]) }
+let _availSelectedDate = null;
+
+let _bookingsCache = [];      // ADMIN ONLY — filled after admin sign-in
+let _adminRef      = null;
+let _adminFirstSnap = true;
+let _locksSynced   = false;
+
+let _myBookings    = {};      // bookings this device created / looked up, keyed by id
+const _myWatchers  = {};
+let _bookingInFlight = false;
+
+// ── Bookings this device knows about (IDs only are kept in localStorage) ───
+function getMyIds() {
+  try {
+    return JSON.parse(localStorage.getItem('pb_my_ids') || '[]').filter(id => /^PB[A-Z0-9]+$/.test(id));
+  } catch { return []; }
+}
+function addMyId(id) {
+  const ids = getMyIds();
+  if (!ids.includes(id)) { ids.push(id); localStorage.setItem('pb_my_ids', JSON.stringify(ids)); }
+  watchMyBooking(id);
+}
+function watchMyBooking(id) {
+  if (!_db || _myWatchers[id]) return;
+  const ref = _db.ref('pb_bookings/' + id);
+  const cb = snap => {
+    const b = cleanBooking(snap.val());
+    if (b) _myBookings[id] = b; else delete _myBookings[id];
+    if (state.currentPage === 'bookings') renderMyBookings();
+  };
+  ref.on('value', cb, err => console.warn('Could not read booking', id, err.code));
+  _myWatchers[id] = { ref, cb };
+}
+function unwatchAllMine() {
+  Object.keys(_myWatchers).forEach(k => { _myWatchers[k].ref.off('value', _myWatchers[k].cb); delete _myWatchers[k]; });
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
 function initFirebase() {
   try {
+    localStorage.removeItem('pb_bookings');   // purge customer data cached by the old version
     if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
-    _db = firebase.database();
+    _db   = firebase.database();
+    _auth = firebase.auth();
+    window._auth = _auth;
 
-    _db.ref('pb_bookings').on('value', (snapshot) => {
-      const raw      = snapshot.val();
-      const incoming = raw ? Object.values(raw) : [];
-      const cachedIds = new Set(_bookingsCache.map(b => b.id));
-      const added    = incoming.filter(b => !cachedIds.has(b.id));
-
-      _bookingsCache = incoming;
-      _fbReady       = true;
-      _fbConnected   = true;
-
-      if (state.currentPage === 'booking' && state.booking.step === 2 && state.booking.date) {
-    buildTimeGrid('time-grid', state.booking.date.toDateString(), state.booking.time, 'selectTime');
-  }
-
-      localStorage.setItem('pb_bookings', JSON.stringify(_bookingsCache));
-
-      added.forEach(b => {
-        if (!_justCreatedIds.has(b.id)) pushLiveAlert(b);
-        _justCreatedIds.delete(b.id);
+    // PUBLIC: which time slots are taken (no names / phones / emails)
+    _db.ref('pb_slots').on('value', snap => {
+      const val = snap.val() || {};
+      _slotsMap = {};
+      Object.keys(val).forEach(dk => {
+        _slotsMap[dk] = new Set(Object.keys(val[dk] || {}).map(t => t.slice(0, 2) + ':' + t.slice(2)));
       });
+      _fbReady = true; _loadFailed = false;
+      refreshOpenGrids();
+    }, err => { console.warn('Slots read failed', err); _loadFailed = true; refreshOpenGrids(); });
 
-      updateAdminBadge();
-
-      if (adminLoggedIn && state.currentPage === 'admin') renderAdminDashboard();
-      if (state.currentPage === 'bookings') {
-        const email = document.getElementById('lookup-email').value.trim();
-        if (email) lookupBookings();
-      }
-    });
-
-    _db.ref('.info/connected').on('value', (snap) => {
+    _db.ref('.info/connected').on('value', snap => {
       _fbConnected = snap.val() === true;
       updateConnectionBadge(_fbConnected);
     });
 
-_db.ref('pb_closed_dates').on('value', (snap) => {
-  const val = snap.val() || {};
-  // ✅ Keys are already "2026-06-02" — use directly
-  _closedDates = new Set(Object.keys(val).filter(k => val[k] === true));
-  if (state.currentPage === 'booking') {
-    renderBookingCalendar();
-    if (state.booking.step === 2 && state.booking.date) {
-      buildTimeGrid('time-grid', state.booking.date, state.booking.time, 'selectTime');
-    }
-  }
-});
+    _db.ref('pb_closed_dates').on('value', snap => {
+      const val = snap.val() || {};
+      _closedDates = new Set(Object.keys(val).filter(k => val[k] === true));
+      if (state.currentPage === 'booking') renderBookingCalendar();
+      refreshOpenGrids();
+    });
 
-_db.ref('pb_closed_slots').on('value', (snap) => {
-  const val = snap.val() || {};
-  _closedSlots = {};
-  Object.keys(val).forEach(dateKey => {
-    // Keys are already "2026-06-02" — use directly, no conversion needed
-    _closedSlots[dateKey] = new Set(
-      Object.keys(val[dateKey])
-        .filter(t => val[dateKey][t] === true)
-        .map(t => t.slice(0, 2) + ':' + t.slice(2))
-    );
-  });
-  if (state.currentPage === 'booking') {
-    renderBookingCalendar();
-    if (state.booking.step === 2 && state.booking.date) {
-      buildTimeGrid('time-grid', state.booking.date, state.booking.time, 'selectTime');
-    }
-  }
-  if (state.reschedule.date) {
-    buildTimeGrid('reschedule-time-grid', state.reschedule.date, state.reschedule.time, 'selectRescheduleTime');
-  }
-});
+    _db.ref('pb_closed_slots').on('value', snap => {
+      const val = snap.val() || {};
+      _closedSlots = {};
+      Object.keys(val).forEach(dateKey => {
+        _closedSlots[dateKey] = new Set(
+          Object.keys(val[dateKey]).filter(t => val[dateKey][t] === true).map(t => t.slice(0, 2) + ':' + t.slice(2))
+        );
+      });
+      if (state.currentPage === 'booking') renderBookingCalendar();
+      refreshOpenGrids();
+    });
 
-    console.log('🔥 Firebase connected');
-    window._auth = firebase.auth();
+    // If availability hasn't loaded after 10s, say so instead of spinning forever
+    setTimeout(() => { if (!_fbReady) { _loadFailed = true; refreshOpenGrids(); } }, 10000);
+
     startAuthWatcher();
-
   } catch (err) {
-    console.warn('Firebase init failed — using localStorage fallback', err);
-    _fbConnected = false;
+    console.warn('Firebase init failed', err);
+    _fbConnected = false; _loadFailed = true;
     updateConnectionBadge(false);
   }
 }
 
-// Track IDs we just created so we don't double-alert ourselves
-const _justCreatedIds = new Set();
-
-// ── Read bookings ─────────────────────────────────────────────────────────
-function getBookings() {
-  if (_fbReady) return _bookingsCache;
-  return JSON.parse(localStorage.getItem('pb_bookings') || '[]');
-}
-
-// ── Write all bookings ────────────────────────────────────────────────────
-function saveBookings(list) {
-  _bookingsCache = list;
-  localStorage.setItem('pb_bookings', JSON.stringify(list));
-  if (_db) {
-    const updates = {};
-    list.forEach(b => { updates[`pb_bookings/${b.id}`] = b; });
-    _db.ref('/').update(updates).catch(err => console.warn('Firebase write failed', err));
+// Re-draw any time grid that is currently on screen
+function refreshOpenGrids() {
+  const b = state.booking;
+  if (state.currentPage === 'booking' && b.step === 2 && b.date) {
+    if (b.time && !isSlotAvailable(dateToKey(b.date), b.time)) {
+      b.time = null; b.lateFee = false;
+      const n = document.getElementById('next-2'); if (n) n.disabled = true;
+    }
+    buildTimeGrid('time-grid', b.date, b.time, 'selectTime');
+  }
+  const rm = document.getElementById('reschedule-modal');
+  if (rm && rm.classList.contains('open') && state.reschedule.date) {
+    buildTimeGrid('reschedule-time-grid', state.reschedule.date, state.reschedule.time, 'selectRescheduleTime');
+  }
+  const mm = document.getElementById('manual-booking-modal');
+  if (mm && mm.classList.contains('open') && state.manualBooking.date) {
+    buildTimeGrid('manual-time-grid', state.manualBooking.date, state.manualBooking.time, 'selectManualTime', { ignoreNotice: true });
+  }
+  if (adminLoggedIn && _availSelectedDate) {
+    renderAvailabilityCalendar();
+    renderAvailabilityTimeGrid(_availSelectedDate);
   }
 }
 
-// ── Update a single booking's status ─────────────────────────────────────
-function saveBookingStatus(id, status) {
-  const bookings = getBookings();
-  const idx = bookings.findIndex(b => b.id === id);
-  if (idx === -1) return;
-  bookings[idx].status = status;
-  _bookingsCache = bookings;
-  localStorage.setItem('pb_bookings', JSON.stringify(bookings));
-  if (_db) {
-    _db.ref(`pb_bookings/${id}/status`).set(status)
-      .catch(err => console.warn('Firebase status update failed', err));
+// ── Slot availability ─────────────────────────────────────────────────────
+function getBookedSlots(dateKey) { return Array.from(_slotsMap[dateKey] || []); }
+
+function isSlotAvailable(dateKey, time, opts = {}) {
+  if (_closedDates.has(dateKey)) return false;
+  if ((_closedSlots[dateKey] || new Set()).has(time)) return false;
+  if (getBookedSlots(dateKey).includes(time)) return false;
+  if (!opts.ignoreNotice && slotMs(dateKey, time) < Date.now() + MIN_NOTICE_MIN * 60000) return false;
+  return true;
+}
+
+// ── Admin: live bookings (only runs while an admin is signed in) ──────────
+function startAdminSync() {
+  if (!_db || _adminRef) return;
+  _adminFirstSnap = true;
+  _adminRef = _db.ref('pb_bookings');
+  _adminRef.on('value', snap => {
+    const raw      = snap.val();
+    const incoming = raw ? Object.values(raw).map(cleanBooking).filter(Boolean) : [];
+    const known    = new Set(_bookingsCache.map(b => b.id));
+    const added    = _adminFirstSnap ? [] : incoming.filter(b => !known.has(b.id));
+    _bookingsCache = incoming;
+    if (_adminFirstSnap) { _adminFirstSnap = false; syncSlotLocks(); }
+    added.forEach(b => pushLiveAlert(b));
+    updateAdminBadge();
+    if (adminLoggedIn && state.currentPage === 'admin') renderAdminDashboard();
+  }, err => {
+    console.warn('Admin bookings read failed', err);
+    toast('Cannot read bookings — check the database rules (admin UID).', 'error', '🚫');
+  });
+}
+
+function stopAdminSync() {
+  if (_adminRef) { _adminRef.off(); _adminRef = null; }
+  _bookingsCache = []; _locksSynced = false;
+  liveAlerts.length = 0;
+  ['admin-bookings-list', 'admin-stats', 'admin-live-alerts'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.innerHTML = '';
+  });
+  updateAdminBadge();
+}
+
+// One-time per admin session: make sure every existing booking has a slot lock and a dateKey
+// (bookings created before this update don't have them).
+async function syncSlotLocks() {
+  if (_locksSynced || !_db) return;
+  _locksSynced = true;
+  for (const b of _bookingsCache) {
+    try {
+      const key = bookingKey(b);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) continue;
+      if (!b.dateKey) await _db.ref(`pb_bookings/${b.id}/dateKey`).set(key);
+      if (b.status === 'cancelled' || slotMs(key, b.time) < Date.now() - 86400000) continue;
+      await _db.ref(`pb_slots/${key}/${b.time.replace(':', '')}`)
+        .transaction(cur => cur === null ? b.id : undefined);
+    } catch (e) { console.warn('Slot sync skipped for', b.id, e.code || e.message); }
   }
 }
 
-// ── Connection status dot ─────────────────────────────────────────────────
+function getBookings() { return _bookingsCache; }                       // admin view
+function findBooking(id) { return _bookingsCache.find(b => b.id === id) || _myBookings[id] || null; }
+
+// ── Writes ────────────────────────────────────────────────────────────────
+async function ensureAuth() {
+  if (!_auth) throw new Error('NO_AUTH');
+  if (_auth.currentUser) return _auth.currentUser;
+  return (await _auth.signInAnonymously()).user;
+}
+
+// Claim the slot atomically, then save the booking. If two people click at the same
+// moment, exactly one transaction commits and the other gets SLOT_TAKEN.
+async function createBookingWithLock(booking) {
+  await ensureAuth();
+  const lock = _db.ref(`pb_slots/${booking.dateKey}/${booking.time.replace(':', '')}`);
+  const res  = await lock.transaction(cur => cur === null ? booking.id : undefined);
+  if (!res.committed) throw new Error('SLOT_TAKEN');
+  try {
+    await _db.ref(`pb_bookings/${booking.id}`).set(booking);
+  } catch (e) {
+    await lock.remove().catch(() => {});
+    throw e;
+  }
+}
+
+function releaseLock(dateKey, time, id) {
+  return _db.ref(`pb_slots/${dateKey}/${time.replace(':', '')}`)
+    .transaction(cur => cur === id ? null : undefined)
+    .catch(e => console.warn('Lock release failed', e));
+}
+
+function updateBooking(id, patch) { return _db.ref('pb_bookings/' + id).update(patch); }
+
+// Admin: change status; cancelling frees the slot again
+async function saveBookingStatus(id, status) {
+  const b = _bookingsCache.find(x => x.id === id);
+  if (!b || !_db) return;
+  try {
+    await _db.ref(`pb_bookings/${id}/status`).set(status);
+    if (status === 'cancelled') await releaseLock(bookingKey(b), b.time, id);
+  } catch (e) {
+    console.error(e);
+    toast('Update failed: ' + (e.code || e.message), 'error', '⚠️');
+  }
+}
+
+// ── Connection status dot (admin only) ────────────────────────────────────
 function updateConnectionBadge(connected) {
   const dot = document.getElementById('fb-status-dot');
   if (!dot) return;
-  dot.title = connected ? 'Live sync: Online' : 'Live sync: Offline (localStorage only)';
+  dot.style.display    = adminLoggedIn ? 'block' : 'none';
+  dot.title            = connected ? 'Live sync: Online' : 'Live sync: Offline';
   dot.style.background = connected ? '#27ae60' : '#e05252';
 }
-
-let _closedDates      = new Set();
-let _closedSlots      = {};        // { "Mon May 26 2026": Set(["09:00","14:00"]) }
-let _availSelectedDate = null;
-
-// Start Firebase
-initFirebase();
 
 
 // ══════════════════════════════════════
 // AVAILABILITY TOGGLES
 // ══════════════════════════════════════
 function toggleClosedDate(dateStr) {
-  const key = dateToKey(new Date(dateStr));
+  const key = dateToKey(dateStr);
   const isCurrentlyClosed = _closedDates.has(key);
   const newValue = isCurrentlyClosed ? null : true;
 
@@ -192,7 +339,7 @@ function toggleClosedDate(dateStr) {
 }
 
 function toggleClosedSlot(dateStr, time) {
-  const key = dateToKey(new Date(dateStr));
+  const key = dateToKey(dateStr);
   const slots = _closedSlots[key] || new Set();
   const isClosed = slots.has(time);
   const newValue = isClosed ? null : true;
@@ -269,7 +416,7 @@ function buildCustomerConfirmMsg(booking) {
 
 function buildAdminCancelMsg(booking) {
   return `Hello ${booking.name} 👋, this is *PRIVATE BARBER 💈*.\n\n` +
-    `Unfortunately, your booking for *${booking.service}* on *${booking.date}* at *${booking.time}* has been *cancelled* because the schedule is full.\n\n` +
+    `Unfortunately, your booking for *${booking.service}* on *${booking.date}* at *${booking.time}* has been *cancelled*.\n\n` +
     `Please choose another available time — we apologise for the inconvenience and hope to see you soon! 🙏`;
 }
 
@@ -309,7 +456,8 @@ const state = {
   manualBooking: { date: null, time: null, service: null, calYear: 0, calMonth: 0 },
   cancelTarget:     null,
   cancelFeeApplied: false,   // FIX: declared here, not dynamically assigned later
-  adminFilter: 'all'
+  adminFilter: 'all',
+  termsReturn: null          // 'booking' when the Terms page was opened from the booking modal
 };
 
 
@@ -324,8 +472,9 @@ function showPage(name) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
   if (name === 'booking')  initBookingPage();
   if (name === 'bookings') {
-    document.getElementById('bookings-results').innerHTML = '';
+    const li = document.getElementById('lookup-id'); if (li) li.value = '';
     document.getElementById('lookup-email').value = '';
+    renderMyBookings();
   }
   if (name === 'admin') { initAdminPage(); clearLiveAlerts(); }
   if (name === 'home')  initReveal();
@@ -365,7 +514,9 @@ function toast(msg, type = 'default', icon = '💬') {
   const container = document.getElementById('toast-container');
   const el = document.createElement('div');
   el.className = `toast ${type}`;
-  el.innerHTML = `<span class="toast-icon">${icon}</span><span>${msg}</span>`;
+  const ic = document.createElement('span'); ic.className = 'toast-icon'; ic.textContent = icon;
+  const tx = document.createElement('span'); tx.textContent = msg;
+  el.append(ic, tx);
   container.appendChild(el);
   setTimeout(() => {
     el.style.animation = 'toastOut 0.3s forwards';
@@ -391,8 +542,11 @@ function formatDateShort(d) {
   return `${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()}`;
 }
 
+// Unguessable: the Booking ID is what lets a customer open / change their own booking.
 function generateId() {
-  return 'PB' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 5).toUpperCase();
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';       // 32 chars → no modulo bias
+  const bytes = crypto.getRandomValues(new Uint8Array(14));
+  return 'PB' + Array.from(bytes, b => chars[b % 32]).join('');
 }
 
 function getServiceLabel(svc) { return svc === 'dye' ? 'Haircut with Dye' : 'Haircut without Dye'; }
@@ -402,22 +556,15 @@ function getServicePrice(svc) { return svc === 'dye' ? 100 : 80; }
 // Ensures Safari/Chrome/Android all produce identical keys for Firebase lookups
 // ✅ Produces "2026-06-02" format — consistent on every browser/device
 function normalizeDateStr(dateStr) {
+  if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;  // already a key
   const d = new Date(dateStr);
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
 // ✅ Use this when you already have a Date object (year, month, day)
 // Never parses a string — 100% consistent on every device
-function dateToKey(date) {
-  const d = new Date(date);
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-}
+function dateToKey(date) { return normalizeDateStr(date); }   // accepts a Date, a key, or a toDateString()
 
-function getBookedSlots(dateKey) {
-  return getBookings()
-    .filter(b => dateToKey(new Date(b.dateStr)) === dateKey && b.status !== 'cancelled')
-    .map(b => b.time);
-}
 
 // ══════════════════════════════════════
 // CALENDAR
@@ -437,9 +584,9 @@ function buildCalendar(containerId, year, month, selectedDate, onSelect, opts = 
                   'July','August','September','October','November','December'];
 
   let html = `<div class="cal-header">
-    <button class="cal-nav" onclick="${onSelect.nav}(-1)">‹</button>
+    <button class="cal-nav" aria-label="Previous month" onclick="${onSelect.nav}(-1)">‹</button>
     <div class="cal-month">${months[month]} ${year}</div>
-    <button class="cal-nav" onclick="${onSelect.nav}(1)">›</button>
+    <button class="cal-nav" aria-label="Next month" onclick="${onSelect.nav}(1)">›</button>
   </div>
   <div class="cal-grid">
     <div class="cal-day-label">Su</div><div class="cal-day-label">Mo</div>
@@ -464,7 +611,7 @@ const isClosed = _closedDates && _closedDates.has(dateToKey(thisDate));
       isSel                 ? 'selected'   : '',
       isClosed && !isPast   ? 'closed-day' : ''
     ].filter(Boolean).join(' ');
-    const click = disabled ? '' : `onclick="${onSelect.click}(${year},${month},${d})"`;
+    const click = disabled ? 'aria-disabled="true"' : `role="button" tabindex="0" onclick="${onSelect.click}(${year},${month},${d})"`;
     html += `<div class="${cls}" ${click}>${d}</div>`;
   }
   html += '</div>';
@@ -509,17 +656,18 @@ function renderAvailabilityTimeGrid(dateStr) {
   const container = document.getElementById('availability-time-grid');
   if (!container) return;
 
-  const key         = dateToKey(new Date(dateStr));
+  const key         = dateToKey(dateStr);
   const bookedSlots = getBookedSlots(key);
   const closedSlots = _closedSlots[key] || new Set();
   const isDayClosed = _closedDates.has(key);
 
-  const d      = new Date(dateStr);
+  const [ky, km, kd] = key.split('-').map(Number);
+  const d      = new Date(ky, km - 1, kd);
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const dateLabel = `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
 
   const slots = [];
-  for (let h = 8; h <= 19; h++) slots.push(`${pad2(h)}:00`);
+  for (let h = OPEN_HOUR; h <= LAST_HOUR; h++) slots.push(`${pad2(h)}:00`);
 
   let html = `
     <div class="avail-date-heading">📅 ${dateLabel}</div>
@@ -551,7 +699,7 @@ function renderAvailabilityTimeGrid(dateStr) {
     }
 
     const clickable = !isBooked && !isDayClosed;
-    const onclick   = clickable ? `onclick="toggleClosedSlot('${key}','${slot}')"` : '';
+    const onclick   = clickable ? `role="button" tabindex="0" onclick="toggleClosedSlot('${key}','${slot}')"` : '';
 
     html += `<div ${onclick} class="avail-slot ${stateClass}${clickable ? '' : ' avail-slot-disabled'}">${slotLabel}</div>`;
   });
@@ -588,41 +736,41 @@ function adminToggleDate(y, m, d) {
 // FIX: removed inner <div class="time-grid"> wrapper — the container
 // already has the class in HTML for #time-grid.
 // For #reschedule-time-grid: add class="time-grid" to that element in index.html.
-function buildTimeGrid(containerId, date, selectedTime, onSelect) {
+function buildTimeGrid(containerId, date, selectedTime, onSelect, opts = {}) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
   if (!_fbReady) {
-    document.getElementById(containerId).innerHTML =
-      '<div style="text-align:center;padding:20px;color:var(--gold)">⏳ Loading slots...</div>';
+    el.innerHTML = _loadFailed
+      ? '<div style="text-align:center;padding:20px;color:#e07060">⚠️ Couldn’t load availability. Check your connection and refresh the page.</div>'
+      : '<div style="text-align:center;padding:20px;color:var(--gold)">⏳ Loading slots...</div>';
     return;
   }
 
-  // ✅ Always derive key from Date object — never from a string
-  const dateKey     = dateToKey(new Date(date));
-  const booked      = getBookedSlots(dateKey);
+  const dateKey     = dateToKey(date);
+  const taken       = getBookedSlots(dateKey);
   const isDayClosed = _closedDates.has(dateKey);
   const closedSet   = _closedSlots[dateKey] || new Set();
-  const slots       = [];
-
-  for (let h = 8; h <= 19; h++) slots.push(`${pad2(h)}:00`);
 
   let html = '';
-  slots.forEach(slot => {
-    const isClientBooked = booked.includes(slot);
+  for (let h = OPEN_HOUR; h <= LAST_HOUR; h++) {
+    const slot           = `${pad2(h)}:00`;
+    const isClientBooked = taken.includes(slot);
     const isSlotClosed   = isDayClosed || closedSet.has(slot);
-    const unavailable    = isClientBooked || isSlotClosed;
-    const isLate         = isLateSlot(slot);
+    const isPast         = !opts.ignoreNotice && slotMs(dateKey, slot) < Date.now() + MIN_NOTICE_MIN * 60000;
+    const unavailable    = isClientBooked || isSlotClosed || isPast;
     const isSel          = slot === selectedTime;
 
-    const cls   = ['time-slot', unavailable ? 'booked' : '', isSel ? 'selected' : ''].filter(Boolean).join(' ');
-    const click = unavailable ? '' : `onclick="${onSelect}('${slot}')"`;
+    const cls = ['time-slot', unavailable ? 'booked' : '', isSel ? 'selected' : ''].filter(Boolean).join(' ');
+    const attrs = unavailable ? 'aria-disabled="true"' : `role="button" tabindex="0" onclick="${onSelect}('${slot}')"`;
 
     let badge = '';
-    if (isSlotClosed && !isClientBooked) badge = `<span class="late-badge">Closed</span>`;
-    else if (isLate && !unavailable)     badge = `<span class="late-badge">+R20 late</span>`;
+    if (isSlotClosed && !isClientBooked)      badge = `<span class="late-badge">Closed</span>`;
+    else if (isPast && !isClientBooked)       badge = `<span class="late-badge">Past</span>`;
+    else if (isLateSlot(slot) && !unavailable) badge = `<span class="late-badge">+R20 late</span>`;
 
-    html += `<div class="${cls}" ${click}>${slot}${badge}</div>`;
-  });
-
-  document.getElementById(containerId).innerHTML = html;
+    html += `<div class="${cls}" ${attrs}>${slot}${badge}</div>`;
+  }
+  el.innerHTML = html;
 }
 
 function isLateSlot(slot) {
@@ -764,127 +912,158 @@ function acceptTermsAndBook() {
   confirmBooking();
 }
 
-function confirmBooking() {
-  const b       = state.booking;
-  const name    = b.name;
-  const phone   = b.phone;
-  const email   = b.email;
-  const id      = generateId();
-  const dateStr = b.date.toDateString();
+function setBookingBusy(busy) {
+  const n4 = document.getElementById('next-4');
+  if (n4) { n4.disabled = busy; n4.textContent = busy ? 'Booking…' : 'Confirm Booking ✓'; }
+}
 
+async function confirmBooking() {
+  if (_bookingInFlight) return;
+  const b = state.booking;
+  if (!b.date || !b.time || !b.service) { toast('Please complete all steps.', 'error', '⚠️'); return; }
+
+  const dateKey = dateToKey(b.date);
+  if (!isSlotAvailable(dateKey, b.time)) {
+    toast('That slot is no longer available — please pick another.', 'error', '⚠️');
+    b.time = null; b.lateFee = false; goStep(2); return;
+  }
+
+  const id      = generateId();
+  const lateFee = isLateSlot(b.time);
   const booking = {
-    id, name, phone, email,
+    id, name: b.name, phone: b.phone, email: b.email,
     date:       formatDate(b.date),
-    dateStr,
+    dateStr:    b.date.toDateString(),
+    dateKey,
     time:       b.time,
     service:    getServiceLabel(b.service),
     serviceKey: b.service,
-    lateFee:    b.lateFee,
-    totalPrice: b.totalPrice,
+    lateFee,
+    totalPrice: getServicePrice(b.service) + (lateFee ? 20 : 0),
     status:     'pending',
     createdAt:  Date.now(),
     termsAccepted:   true,
-    termsAcceptedAt: Date.now()
+    termsAcceptedAt: Date.now(),
+    termsVersion:    TERMS_VERSION
   };
 
-  _justCreatedIds.add(id);
-  _bookingsCache.push(booking);
-  localStorage.setItem('pb_bookings', JSON.stringify(_bookingsCache));
-  if (_db) {
-    _db.ref(`pb_bookings/${id}`).set(booking)
-      .catch(err => console.warn('Firebase write failed', err));
+  _bookingInFlight = true; setBookingBusy(true);
+  try {
+    await createBookingWithLock(booking);
+  } catch (err) {
+    if (err.message === 'SLOT_TAKEN') {
+      toast('Sorry — that slot was just taken. Please pick another.', 'error', '⚠️');
+      b.time = null; b.lateFee = false; goStep(2);
+    } else {
+      console.error('Booking failed', err);
+      toast('Could not save your booking. Check your connection and try again.', 'error', '⚠️');
+    }
+    return;
+  } finally {
+    _bookingInFlight = false; setBookingBusy(false);
   }
+
+  addMyId(id);
+  b.totalPrice = booking.totalPrice;
 
   document.getElementById('confirm-id').textContent = id;
   document.getElementById('confirm-summary').innerHTML = `
-    <div class="summary-row"><span>👤 Name</span><span>${name}</span></div>
-    <div class="summary-row"><span>📞 Phone</span><span>${phone}</span></div>
-    <div class="summary-row"><span>📅 Date</span><span>${booking.date}</span></div>
-    <div class="summary-row"><span>🕐 Time</span><span>${b.time}</span></div>
-    <div class="summary-row"><span>✂️ Service</span><span>${booking.service}</span></div>
-    ${b.lateFee ? `<div class="summary-row"><span>🌙 Late Fee</span><span>+R20</span></div>` : ''}
-    <div class="summary-row total"><span>Total</span><span>R${b.totalPrice}</span></div>
+    <div class="summary-row"><span>👤 Name</span><span>${esc(booking.name)}</span></div>
+    <div class="summary-row"><span>📞 Phone</span><span>${esc(booking.phone)}</span></div>
+    <div class="summary-row"><span>📅 Date</span><span>${esc(booking.date)}</span></div>
+    <div class="summary-row"><span>🕐 Time</span><span>${esc(booking.time)}</span></div>
+    <div class="summary-row"><span>✂️ Service</span><span>${esc(booking.service)}</span></div>
+    ${lateFee ? `<div class="summary-row"><span>🌙 Late Fee</span><span>+R20</span></div>` : ''}
+    <div class="summary-row total"><span>Total</span><span>R${booking.totalPrice}</span></div>
   `;
 
-  const waAdminMsg  = encodeURIComponent(buildNewBookingMsg(booking));
-  const waClientMsg = encodeURIComponent(buildCustomerConfirmMsg(booking));
-  const clientWaNum = formatWANumber(phone);
+  const waAdminMsg  = waEnc(buildNewBookingMsg(booking));
+  const waClientMsg = waEnc(buildCustomerConfirmMsg(booking));
+  const clientWaNum = formatWANumber(booking.phone);
 
   document.getElementById('confirm-wa-buttons').innerHTML = `
     <button class="btn-wa btn-wa-confirm"
       style="width:100%;justify-content:center;margin-bottom:8px;padding:12px 16px;font-size:0.8rem;"
-      onclick="window.open('https://wa.me/${ADMIN_WA}?text=${waAdminMsg}','_blank')">
+      onclick="window.open('https://wa.me/${ADMIN_WA}?text=${waAdminMsg}','_blank','noopener')">
       📲 Notify Barber via WhatsApp
     </button>
     <button class="btn-wa btn-wa-reschedule"
       style="width:100%;justify-content:center;padding:12px 16px;font-size:0.8rem;"
-      onclick="window.open('https://wa.me/${clientWaNum}?text=${waClientMsg}','_blank')">
+      onclick="window.open('https://wa.me/${clientWaNum}?text=${waClientMsg}','_blank','noopener')">
       💬 Send Booking Details to Myself
     </button>
   `;
 
   goStep(5);
   toast('Booking confirmed! 🎉', 'success', '✅');
-  pushLiveAlert(booking);
-  updateAdminBadge();
 }
 
 
 // ══════════════════════════════════════
 // MY BOOKINGS
+// Bookings made on this device show automatically. On another device the
+// customer enters Booking ID + email (the ID is the secret, the email a 2nd check).
 // ══════════════════════════════════════
-function lookupBookings() {
-  const email = document.getElementById('lookup-email').value.trim().toLowerCase();
-  if (!email) { toast('Please enter your email.', 'error', '⚠️'); return; }
-
-  const all       = getBookings().filter(b => b.email.toLowerCase() === email);
+function renderMyBookings() {
   const container = document.getElementById('bookings-results');
+  if (!container) return;
+  const list = Object.values(_myBookings).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  container.innerHTML = list.length
+    ? list.map(buildBookingCard).join('')
+    : `<div class="empty-state"><div class="icon">📭</div>No bookings saved on this device yet.<br>Have a Booking ID? Enter it above with your email.</div>`;
+}
 
-  if (all.length === 0) {
-    container.innerHTML = `<div class="empty-state"><div class="icon">📭</div>No bookings found for this email address.</div>`;
-    return;
+async function lookupBookings() {
+  const id    = (document.getElementById('lookup-id')?.value || '').trim().toUpperCase();
+  const email = document.getElementById('lookup-email').value.trim().toLowerCase();
+  if (!id && !email) { renderMyBookings(); return; }
+  if (!id || !email) { toast('Enter both your Booking ID and email.', 'error', '⚠️'); return; }
+  if (!/^PB[A-Z0-9]+$/.test(id)) { toast('That Booking ID doesn’t look right.', 'error', '⚠️'); return; }
+  try {
+    await ensureAuth();
+    const b = cleanBooking((await _db.ref('pb_bookings/' + id).once('value')).val());
+    if (!b || b.email.toLowerCase() !== email) { toast('No booking found for that ID and email.', 'error', '⚠️'); return; }
+    _myBookings[id] = b;
+    addMyId(id);
+    renderMyBookings();
+  } catch (e) {
+    console.error(e);
+    toast('Lookup failed. Please try again.', 'error', '⚠️');
   }
-
-  all.sort((a, b) => b.createdAt - a.createdAt);
-  container.innerHTML = all.map(b => buildBookingCard(b)).join('');
 }
 
 function buildBookingCard(b) {
-  const now      = Date.now();
-  const apptTime = parseDateTimeMs(b.dateStr, b.time);
-  const isFuture = apptTime > now;
-  const isActive = b.status !== 'cancelled' && isFuture;
-  // REMOVED: isPast — was declared but never used
+  const isActive = b.status !== 'cancelled' && parseDateTimeMs(b.dateStr, b.time) > Date.now();
+  const id = safeId(b.id);
+  const st = STATUSES.includes(b.status) ? b.status : 'pending';
 
   const actions = isActive ? `
-    <button class="btn-sm btn-sm-reschedule" onclick="openReschedule('${b.id}')">🔁 Reschedule</button>
-    <button class="btn-sm btn-sm-cancel"     onclick="openCancel('${b.id}')">✕ Cancel</button>
+    <button class="btn-sm btn-sm-reschedule" onclick="openReschedule('${id}')">🔁 Reschedule</button>
+    <button class="btn-sm btn-sm-cancel"     onclick="openCancel('${id}')">✕ Cancel</button>
   ` : '';
 
-  return `<div class="booking-card" id="bc-${b.id}">
+  return `<div class="booking-card" id="bc-${id}">
     <div class="bc-header">
       <div>
-        <div class="bc-id">ID: ${b.id}</div>
-        <div class="bc-name">${b.name}</div>
+        <div class="bc-id">ID: ${esc(b.id)}</div>
+        <div class="bc-name">${esc(b.name)}</div>
       </div>
-      <div class="status-badge ${b.status}">${b.status.charAt(0).toUpperCase()+b.status.slice(1)}</div>
+      <div class="status-badge ${st}">${st.charAt(0).toUpperCase() + st.slice(1)}</div>
     </div>
     <div class="bc-details">
-      <div class="bc-detail">📅 <strong>${b.date}</strong></div>
-      <div class="bc-detail">🕐 <strong>${b.time}</strong></div>
-      <div class="bc-detail">✂️ <strong>${b.service}</strong></div>
-      <div class="bc-detail">📧 <strong>${b.email}</strong></div>
+      <div class="bc-detail">📅 <strong>${esc(b.date)}</strong></div>
+      <div class="bc-detail">🕐 <strong>${esc(b.time)}</strong></div>
+      <div class="bc-detail">✂️ <strong>${esc(b.service)}</strong></div>
+      <div class="bc-detail">📧 <strong>${esc(b.email)}</strong></div>
     </div>
     <div class="bc-price">Total: R${b.totalPrice}</div>
     ${actions ? `<div class="bc-actions">${actions}</div>` : ''}
   </div>`;
 }
 
+// Works with a "YYYY-MM-DD" key or a legacy toDateString(); always South African time.
 function parseDateTimeMs(dateStr, time) {
-  const d      = new Date(dateStr);
-  const [h, m] = time.split(':').map(Number);
-  d.setHours(h, m, 0, 0);
-  return d.getTime();
+  return slotMs(normalizeDateStr(dateStr), time);
 }
 
 
@@ -892,11 +1071,10 @@ function parseDateTimeMs(dateStr, time) {
 // CANCEL
 // ══════════════════════════════════════
 function openCancel(id) {
+  const b = findBooking(id);
+  if (!b) { toast('Booking not found.', 'error', '⚠️'); return; }
   state.cancelTarget = id;
-  const b          = getBookings().find(x => x.id === id);
-  const apptMs     = parseDateTimeMs(b.dateStr, b.time);
-  const now        = Date.now();
-  const hoursUntil = (apptMs - now) / (1000 * 60 * 60);
+  const hoursUntil = (parseDateTimeMs(b.dateStr, b.time) - Date.now()) / (1000 * 60 * 60);
   const within5    = hoursUntil < 5 && hoursUntil > 0;
 
   document.getElementById('cancel-warning-text').textContent =
@@ -906,22 +1084,28 @@ function openCancel(id) {
   state.cancelFeeApplied = within5;
 }
 
-function proceedCancel() {
-  const bookings = getBookings();
-  const idx      = bookings.findIndex(b => b.id === state.cancelTarget);
-  if (idx > -1) {
-    bookings[idx].status = 'cancelled';
-    if (state.cancelFeeApplied) {
-      bookings[idx].cancellationFee = 20;
-      toast('Booking cancelled. R20 fee applied.', 'warning', '⚠️');
-    } else {
-      toast('Booking cancelled successfully.', 'default', '✓');
-    }
-    saveBookings(bookings);
+async function proceedCancel() {
+  const b = findBooking(state.cancelTarget);
+  if (!b) { closeModal('cancel-modal'); return; }
+
+  // Re-check at click time (the modal may have been open a while)
+  const hoursUntil = (parseDateTimeMs(b.dateStr, b.time) - Date.now()) / (1000 * 60 * 60);
+  const withFee    = hoursUntil < 5 && hoursUntil > 0;
+  const patch      = { status: 'cancelled', cancelledAt: Date.now() };
+  if (withFee) patch.cancellationFee = 20;
+
+  try {
+    await ensureAuth();
+    await updateBooking(b.id, patch);
+    await releaseLock(bookingKey(b), b.time, b.id);
+    toast(withFee ? 'Booking cancelled. R20 fee applies.' : 'Booking cancelled successfully.',
+          withFee ? 'warning' : 'default', withFee ? '⚠️' : '✓');
+  } catch (e) {
+    console.error(e);
+    toast('Could not cancel — please try again or message us on WhatsApp.', 'error', '⚠️');
   }
   closeModal('cancel-modal');
-  const email = document.getElementById('lookup-email').value.trim();
-  if (email) lookupBookings();
+  renderMyBookings();
 }
 
 
@@ -929,6 +1113,13 @@ function proceedCancel() {
 // RESCHEDULE
 // ══════════════════════════════════════
 function openReschedule(id) {
+  const b = findBooking(id);
+  if (!b) { toast('Booking not found.', 'error', '⚠️'); return; }
+  const hoursUntil = (parseDateTimeMs(b.dateStr, b.time) - Date.now()) / (1000 * 60 * 60);
+  if (hoursUntil < 5) {
+    toast('Within 5 hours of your appointment — please WhatsApp us, or cancel (R20 fee applies).', 'error', '⚠️');
+    return;
+  }
   state.reschedule.bookingId = id;
   state.reschedule.date      = null;
   state.reschedule.time      = null;
@@ -966,25 +1157,47 @@ function selectRescheduleTime(slot) {
   buildTimeGrid('reschedule-time-grid', dateStr, slot, 'selectRescheduleTime');
 }
 
-function confirmReschedule() {
-  if (!state.reschedule.date || !state.reschedule.time) {
-    toast('Please select a new date and time.', 'error', '⚠️'); return;
+async function confirmReschedule() {
+  const r = state.reschedule;
+  if (!r.date || !r.time) { toast('Please select a new date and time.', 'error', '⚠️'); return; }
+  const b = findBooking(r.bookingId);
+  if (!b) return;
+
+  const newKey = dateToKey(r.date), oldKey = bookingKey(b);
+  if (newKey === oldKey && r.time === b.time) { toast('That is already your current slot.', 'default', 'ℹ️'); return; }
+  if (!isSlotAvailable(newKey, r.time)) {
+    toast('That slot is no longer available — please pick another.', 'error', '⚠️');
+    r.time = null;
+    buildTimeGrid('reschedule-time-grid', r.date, null, 'selectRescheduleTime');
+    return;
   }
-  const bookings = getBookings();
-  const idx      = bookings.findIndex(b => b.id === state.reschedule.bookingId);
-  if (idx > -1) {
-    bookings[idx].dateStr     = state.reschedule.date.toDateString();
-    bookings[idx].date        = formatDate(state.reschedule.date);
-    bookings[idx].time        = state.reschedule.time;
-    bookings[idx].lateFee     = isLateSlot(state.reschedule.time);
-    const basePrice           = bookings[idx].serviceKey === 'dye' ? 100 : 80;
-    bookings[idx].totalPrice  = basePrice + (bookings[idx].lateFee ? 20 : 0);
-    bookings[idx].status      = 'pending';
-    saveBookings(bookings);
+
+  const lateFee = isLateSlot(r.time);
+  const patch = {
+    dateStr: r.date.toDateString(), dateKey: newKey, date: formatDate(r.date), time: r.time,
+    lateFee, totalPrice: getServicePrice(b.serviceKey) + (lateFee ? 20 : 0),
+    status: 'pending'
+  };
+  const newLock = _db.ref(`pb_slots/${newKey}/${r.time.replace(':', '')}`);
+
+  try {
+    await ensureAuth();
+    const res = await newLock.transaction(cur => cur === null ? b.id : undefined);
+    if (!res.committed) {
+      toast('Sorry — that slot was just taken. Please pick another.', 'error', '⚠️');
+      r.time = null;
+      buildTimeGrid('reschedule-time-grid', r.date, null, 'selectRescheduleTime');
+      return;
+    }
+    try { await updateBooking(b.id, patch); }
+    catch (e) { await newLock.remove().catch(() => {}); throw e; }
+    await releaseLock(oldKey, b.time, b.id);        // free the old slot only after the move succeeded
     toast('Booking rescheduled! ✓', 'success', '🔁');
     closeModal('reschedule-modal');
-    const email = document.getElementById('lookup-email').value.trim();
-    if (email) lookupBookings();
+    renderMyBookings();
+  } catch (e) {
+    console.error(e);
+    toast('Could not reschedule — please try again.', 'error', '⚠️');
   }
 }
 
@@ -1024,13 +1237,13 @@ function selectManualDate(y, m, d) {
   state.manualBooking.date = new Date(y, m, d);
   state.manualBooking.time = null;
   renderManualCalendar();
-  buildTimeGrid('manual-time-grid', state.manualBooking.date.toDateString(), null, 'selectManualTime');
+  buildTimeGrid('manual-time-grid', state.manualBooking.date.toDateString(), null, 'selectManualTime', { ignoreNotice: true });
 }
 
 function selectManualTime(slot) {
   state.manualBooking.time = slot;
   const dateStr = state.manualBooking.date ? state.manualBooking.date.toDateString() : '';
-  buildTimeGrid('manual-time-grid', dateStr, slot, 'selectManualTime');
+  buildTimeGrid('manual-time-grid', dateStr, slot, 'selectManualTime', { ignoreNotice: true });
 }
 
 function selectManualService(svc) {
@@ -1039,7 +1252,7 @@ function selectManualService(svc) {
   document.getElementById('manual-svc-' + svc).classList.add('selected');
 }
 
-function confirmManualBooking() {
+async function confirmManualBooking() {
   const mb    = state.manualBooking;
   const name  = document.getElementById('manual-inp-name').value.trim();
   const phone = document.getElementById('manual-inp-phone').value.trim();
@@ -1058,15 +1271,11 @@ function confirmManualBooking() {
     toast('Please enter a valid email address.', 'error', '⚠️'); return;
   }
 
-  // Re-check the slot is still free (in case it got booked while this modal was open)
-  const dateKey       = dateToKey(mb.date);
-  const alreadyBooked = getBookedSlots(dateKey).includes(mb.time);
-  const isDayClosed   = _closedDates.has(dateKey);
-  const isSlotClosed  = (_closedSlots[dateKey] || new Set()).has(mb.time);
-  if (alreadyBooked || isDayClosed || isSlotClosed) {
+  const dateKey = dateToKey(mb.date);
+  if (!isSlotAvailable(dateKey, mb.time, { ignoreNotice: true })) {
     toast('That slot is no longer available — please pick another.', 'error', '⚠️');
     mb.time = null;
-    buildTimeGrid('manual-time-grid', mb.date.toDateString(), null, 'selectManualTime');
+    buildTimeGrid('manual-time-grid', mb.date, null, 'selectManualTime', { ignoreNotice: true });
     return;
   }
 
@@ -1079,6 +1288,7 @@ function confirmManualBooking() {
     email:      email || `no-email-${id.toLowerCase()}@privatebarber.local`,
     date:       formatDate(mb.date),
     dateStr:    mb.date.toDateString(),
+    dateKey,
     time:       mb.time,
     service:    getServiceLabel(mb.service),
     serviceKey: mb.service,
@@ -1089,17 +1299,22 @@ function confirmManualBooking() {
     manualEntry: true
   };
 
-  _justCreatedIds.add(id);
-  _bookingsCache.push(booking);
-  localStorage.setItem('pb_bookings', JSON.stringify(_bookingsCache));
-  if (_db) {
-    _db.ref(`pb_bookings/${id}`).set(booking)
-      .catch(err => console.warn('Firebase write failed', err));
+  try {
+    await createBookingWithLock(booking);
+  } catch (err) {
+    if (err.message === 'SLOT_TAKEN') {
+      toast('That slot was just taken — please pick another.', 'error', '⚠️');
+      mb.time = null;
+      buildTimeGrid('manual-time-grid', mb.date, null, 'selectManualTime', { ignoreNotice: true });
+    } else {
+      console.error(err);
+      toast('Could not save booking: ' + (err.code || err.message), 'error', '⚠️');
+    }
+    return;
   }
 
   toast(`Booking added for ${name}.`, 'success', '✅');
   closeModal('manual-booking-modal');
-  renderAdminDashboard();
 }
 
 
@@ -1135,7 +1350,7 @@ function initAdminPage() {
 
 async function adminLogin() {
   const email    = document.getElementById('admin-email').value.trim();
-  const password = document.getElementById('admin-password').value.trim();
+  const password = document.getElementById('admin-password').value;
   if (!email || !password) { toast('Please enter your email and password.', 'error'); return; }
   try {
     await window._auth.signInWithEmailAndPassword(email, password);
@@ -1157,13 +1372,22 @@ async function adminLogout() {
 }
 
 function startAuthWatcher() {
-  window._auth.onAuthStateChanged((user) => {
-    if (user) { adminLoggedIn = true;  showAdminDashboard(); }
-    else       { adminLoggedIn = false; showAdminLoginForm(); }
+  _auth.onAuthStateChanged(user => {
+    adminLoggedIn = !!user && !user.isAnonymous;      // customers are signed in anonymously
+    unwatchAllMine();
+
+    if (adminLoggedIn) { startAdminSync(); showAdminDashboard(); }
+    else               { stopAdminSync();  showAdminLoginForm(); }
+
+    if (user) getMyIds().forEach(watchMyBooking);
+    else _auth.signInAnonymously().catch(err => console.warn('Anonymous sign-in failed', err));
+
+    updateConnectionBadge(_fbConnected);
   });
 }
 
 function renderAdminDashboard() {
+  if (!adminLoggedIn) return;
   const bookings = getBookings();
   const now      = Date.now();
   const todayStr = normalizeDateStr(new Date().toDateString());
@@ -1175,7 +1399,7 @@ function renderAdminDashboard() {
   // Split revenue: completed (appointment time already passed) vs upcoming (still to happen)
   const nonCancelled   = bookings.filter(b => b.status !== 'cancelled');
   const revenueDone    = nonCancelled
-    .filter(b => parseDateTimeMs(b.dateStr, b.time) <= now)
+    .filter(b => b.status === 'confirmed' && parseDateTimeMs(b.dateStr, b.time) <= now)
     .reduce((s, b) => s + b.totalPrice, 0);
   const revenueUpcoming = nonCancelled
     .filter(b => parseDateTimeMs(b.dateStr, b.time) > now)
@@ -1202,6 +1426,7 @@ function adminFilter(f) {
 }
 
 function renderAdminBookings() {
+  if (!adminLoggedIn) return;
   let bookings = getBookings();
   if (state.adminFilter !== 'all') bookings = bookings.filter(b => b.status === state.adminFilter);
 
@@ -1220,65 +1445,67 @@ function renderAdminBookings() {
   const container = document.getElementById('admin-bookings-list');
   if (bookings.length === 0) {
     container.innerHTML = query
-      ? `<div class="empty-state"><div class="icon">🔍</div>No bookings match "${searchInput.value}".</div>`
+      ? `<div class="empty-state"><div class="icon">🔍</div>No bookings match "${esc(searchInput.value)}".</div>`
       : `<div class="empty-state"><div class="icon">📋</div>No bookings found.</div>`;
     return;
   }
 
   container.innerHTML = bookings.map(b => {
+    const id         = safeId(b.id);
     const clientNum  = formatWANumber(b.phone);
     const confirmMsg = encodeURIComponent(buildAdminConfirmMsg(b));
     const cancelMsg  = encodeURIComponent(buildAdminCancelMsg(b));
     const reschedMsg = encodeURIComponent(buildAdminReschedMsg(b));
-
-    const now      = Date.now();
-    const isFuture = parseDateTimeMs(b.dateStr, b.time) > now;
+    const isFuture   = parseDateTimeMs(b.dateStr, b.time) > Date.now();
 
     const actionBtns = (b.status !== 'cancelled' && isFuture) ? `
       <a class="btn-wa btn-wa-confirm"
-         href="https://wa.me/${clientNum}?text=${confirmMsg}" target="_blank"
-         onclick="adminUpdateStatus('${b.id}','confirmed')">✅ Confirm</a>
+         href="https://wa.me/${clientNum}?text=${confirmMsg}" target="_blank" rel="noopener noreferrer"
+         onclick="return adminAction('${id}','confirmed')">✅ Confirm</a>
       <a class="btn-wa btn-wa-reschedule"
-         href="https://wa.me/${clientNum}?text=${reschedMsg}" target="_blank">🔁 Reschedule</a>
+         href="https://wa.me/${clientNum}?text=${reschedMsg}" target="_blank" rel="noopener noreferrer">🔁 Reschedule</a>
       <a class="btn-wa btn-wa-cancel"
-         href="https://wa.me/${clientNum}?text=${cancelMsg}" target="_blank"
-         onclick="adminUpdateStatus('${b.id}','cancelled')">❌ Cancel</a>`
+         href="https://wa.me/${clientNum}?text=${cancelMsg}" target="_blank" rel="noopener noreferrer"
+         onclick="return adminAction('${id}','cancelled')">❌ Cancel</a>`
     : `<span style="font-size:0.72rem;color:var(--white3);padding:4px 0">${b.status === 'cancelled' ? '🚫 Cancelled' : '⏰ Past appointment'}</span>`;
 
-    return `<div class="admin-booking-card" id="abc-${b.id}">
+    return `<div class="admin-booking-card" id="abc-${id}">
       <div class="abc-top">
         <div>
-          <div class="abc-name">${b.name}</div>
+          <div class="abc-name">${esc(b.name)}</div>
           <div class="abc-phone">
-            📞 <a href="https://wa.me/${clientNum}" target="_blank"
-                  style="color:var(--gold);text-decoration:none;">${b.phone}</a>
-            &nbsp;·&nbsp; 📧 ${b.email}
+            📞 <a href="https://wa.me/${clientNum}" target="_blank" rel="noopener noreferrer"
+                  style="color:var(--gold);text-decoration:none;">${esc(b.phone)}</a>
+            &nbsp;·&nbsp; 📧 ${esc(b.email)}
           </div>
         </div>
-        <div class="status-badge ${b.status}">${b.status.charAt(0).toUpperCase()+b.status.slice(1)}</div>
+        <div class="status-badge ${b.status}">${b.status.charAt(0).toUpperCase() + b.status.slice(1)}</div>
       </div>
       <div class="abc-info">
-        <span>📅 <strong>${b.date}</strong></span>
-        <span>🕐 <strong>${b.time}</strong></span>
-        <span>✂️ <strong>${b.service}</strong></span>
+        <span>📅 <strong>${esc(b.date)}</strong></span>
+        <span>🕐 <strong>${esc(b.time)}</strong></span>
+        <span>✂️ <strong>${esc(b.service)}</strong></span>
         <span>💰 <strong>R${b.totalPrice}</strong></span>
-        <span>🔖 <strong>${b.id}</strong></span>
+        <span>🔖 <strong>${esc(b.id)}</strong></span>
       </div>
       <div class="abc-actions">${actionBtns}</div>
     </div>`;
   }).join('');
 }
 
-function adminUpdateStatus(id, status) {
-  setTimeout(() => {
-    saveBookingStatus(id, status);
-    renderAdminDashboard();
-  }, 500);
+// Called from the WhatsApp buttons. Cancelling asks first; returning false stops the link opening.
+function adminAction(id, status) {
+  if (status === 'cancelled' && !confirm('Cancel this booking? The time slot will be freed.')) return false;
+  setTimeout(() => saveBookingStatus(id, status), 300);
+  return true;
 }
+function adminUpdateStatus(id, status) { saveBookingStatus(id, status); }
 
 function adminMsgToday() {
-  const todayStr = new Date().toDateString();
-  const todayBookings = getBookings().filter(b => normalizeDateStr(b.dateStr) === todayStr && b.status !== 'cancelled');
+  const todayKey = dateToKey(new Date());
+  const todayBookings = getBookings()
+    .filter(b => bookingKey(b) === todayKey && b.status !== 'cancelled')
+    .sort((a, b) => a.time.localeCompare(b.time));
   if (todayBookings.length === 0) { toast('No appointments today.', 'default', '📅'); return; }
 
   const messages = todayBookings.map(b => {
@@ -1293,10 +1520,12 @@ function adminMsgToday() {
 
 function adminRemindUpcoming() {
   const now = Date.now();
-  const upcoming = getBookings().filter(b => parseDateTimeMs(b.dateStr, b.time) > now && b.status !== 'cancelled');
+  const upcoming = getBookings()
+    .filter(b => parseDateTimeMs(b.dateStr, b.time) > now && b.status !== 'cancelled')
+    .sort((a, b) => parseDateTimeMs(a.dateStr, a.time) - parseDateTimeMs(b.dateStr, b.time));
   if (upcoming.length === 0) { toast('No upcoming appointments.', 'default', '📅'); return; }
 
-  const messages = upcoming.slice(0, 5).map(b => {
+  const messages = upcoming.map(b => {
     const msg = `Hello ${b.name} 👋, this is *PRIVATE BARBER 💈*!\n\n` +
       `🔔 Friendly reminder of your upcoming appointment:\n` +
       `📅 *Date:* ${b.date}\n🕐 *Time:* ${b.time}\n✂️ *Service:* ${b.service}\n\n` +
@@ -1319,7 +1548,7 @@ function showBulkWhatsAppModal(title, messages) {
     overlay.id = 'bulk-wa-modal';
     overlay.className = 'modal-overlay';
     overlay.innerHTML = `
-      <div class="modal">
+      <div class="modal" role="dialog" aria-modal="true">
         <button class="modal-close" onclick="closeModal('bulk-wa-modal')">✕</button>
         <div class="modal-title" id="bulk-wa-title"></div>
         <div class="modal-sub">Click each button below to send — browsers block auto-sending multiple messages at once.</div>
@@ -1335,8 +1564,8 @@ function showBulkWhatsAppModal(title, messages) {
     const encoded = encodeURIComponent(msg);
     return `
       <a class="btn-wa btn-wa-confirm" style="justify-content:space-between"
-         href="https://wa.me/${num}?text=${encoded}" target="_blank">
-        <span>📲 ${booking.name} — ${booking.time}</span>
+         href="https://wa.me/${num}?text=${encoded}" target="_blank" rel="noopener noreferrer">
+        <span>📲 ${esc(booking.name)} — ${esc(booking.time)}</span>
         <span>Send →</span>
       </a>`;
   }).join('');
@@ -1371,10 +1600,10 @@ function renderLiveAlerts() {
       <div class="live-dot"></div>
       <div class="lba-icon">🆕</div>
       <div class="lba-body">
-        <div class="lba-title">New Booking — ${b.name}</div>
+        <div class="lba-title">New Booking — ${esc(b.name)}</div>
         <div class="lba-meta">
-          ✂️ ${b.service} &nbsp;·&nbsp; 📅 ${b.date} at ${b.time}<br>
-          📞 ${b.phone} &nbsp;·&nbsp; 💰 R${b.totalPrice} &nbsp;·&nbsp; 🔖 ${b.id}
+          ✂️ ${esc(b.service)} &nbsp;·&nbsp; 📅 ${esc(b.date)} at ${esc(b.time)}<br>
+          📞 ${esc(b.phone)} &nbsp;·&nbsp; 💰 R${b.totalPrice} &nbsp;·&nbsp; 🔖 ${esc(b.id)}
         </div>
       </div>
       <button class="lba-dismiss" onclick="dismissAlert(${idx})" title="Dismiss">✕</button>
@@ -1410,3 +1639,30 @@ function updateAdminBadge() {
 }
 
 updateAdminBadge();
+
+// ══════════════════════════════════════
+// TERMS PAGE NAVIGATION
+// (opened from the booking modal → "Back" returns to step 4 with everything still filled in)
+// ══════════════════════════════════════
+function openTerms(fromBooking) {
+  state.termsReturn = fromBooking ? 'booking' : null;
+  closeModal('terms-modal');
+  showPage('terms');
+}
+function closeTerms() {
+  if (state.termsReturn === 'booking') { state.termsReturn = null; showPage('booking'); goStep(4); }
+  else showPage('home');
+}
+
+// ══════════════════════════════════════
+// KEYBOARD ACCESSIBILITY
+// ══════════════════════════════════════
+document.addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('[role="button"]')) {
+    e.preventDefault(); e.target.click();
+  }
+  if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(o => o.classList.remove('open'));
+});
+
+// Start Firebase last, once every function/const above exists
+initFirebase();

@@ -20,8 +20,11 @@ const OPEN_HOUR      = 9;            // first slot 09:00
 const LAST_HOUR      = 19;           // last slot 19:00 (carries the R20 late fee)
 const MIN_NOTICE_MIN = 60;           // slots starting within 60 min can't be booked online
 const TZ_OFFSET      = '+02:00';     // South Africa (SAST — no daylight saving)
-const TERMS_VERSION  = '2026-08-24'; // keep in sync with "Last updated" on the Terms page
+const TERMS_VERSION  = '2026-11-08'; // keep in sync with "Last updated" on the Terms page
 const STATUSES       = ['pending', 'confirmed', 'cancelled'];
+const CANCEL_FEE        = 50;   // late-cancellation fee (within 5 hours)
+const ARRIVAL_OPEN_MIN  = 20;   // "I'm still coming" opens this many minutes before the appointment
+const GRACE_MIN         = 20;   // grace period after the appointment time
 
 // ══════════════════════════════════════
 // SAFETY HELPERS
@@ -51,12 +54,44 @@ function cleanBooking(b) {
     time:       /^\d{2}:\d{2}$/.test(String(b.time)) ? String(b.time) : '00:00',
     status:     STATUSES.includes(b.status) ? b.status : 'pending',
     totalPrice: Number(b.totalPrice) || 0,
-    createdAt:  Number(b.createdAt) || 0
+    createdAt:  Number(b.createdAt) || 0,
+    arrivalPolicy:    b.arrivalPolicy === true,
+    arrivalConfirmed: b.arrivalConfirmed === true,
+    autoCancelled:    b.autoCancelled === true
   };
   out.dateKey = b.dateKey || normalizeDateStr(out.dateStr);
   return out;
 }
 function bookingKey(b) { return b.dateKey || normalizeDateStr(b.dateStr); }
+function bookingMs(b) { return slotMs(bookingKey(b), b.time); }
+
+// A booking made under the arrival policy that wasn't confirmed by the end of the grace
+// period counts as cancelled — shown that way immediately, saved by the admin sweep below.
+function effectiveStatus(b) {
+  if (b.status === 'cancelled') return 'cancelled';
+  if (b.arrivalPolicy && !b.arrivalConfirmed && Date.now() > bookingMs(b) + GRACE_MIN * 60000) return 'cancelled';
+  return STATUSES.includes(b.status) ? b.status : 'pending';
+}
+// null | 'early' | 'open' | 'confirmed'
+function arrivalState(b) {
+  if (!b.arrivalPolicy || effectiveStatus(b) === 'cancelled') return null;
+  if (b.arrivalConfirmed) return 'confirmed';
+  const ms = bookingMs(b), now = Date.now();
+  if (now < ms - ARRIVAL_OPEN_MIN * 60000) return 'early';
+  if (now <= ms + GRACE_MIN * 60000) return 'open';
+  return null;
+}
+function statusBadge(b) {
+  const stt = effectiveStatus(b);
+  return `<div class="status-badge ${stt}">${stt.charAt(0).toUpperCase() + stt.slice(1)}</div>`;
+}
+function arrivalBadge(b) {
+  if (!b.arrivalPolicy) return '';
+  if (b.status === 'cancelled' && !b.autoCancelled) return '';
+  if (b.autoCancelled || effectiveStatus(b) === 'cancelled') return '<span>🚫 <strong>No-show (auto-cancelled)</strong></span>';
+  if (b.arrivalConfirmed) return '<span>✅ <strong>Arrival confirmed</strong></span>';
+  return '<span>⏳ <strong>Awaiting arrival confirmation</strong></span>';
+}
 
 // "2026-11-07" + "09:00" → ms, always interpreted in South African time
 function slotMs(dateKey, time) { return new Date(`${dateKey}T${time}:00${TZ_OFFSET}`).getTime(); }
@@ -210,7 +245,7 @@ function startAdminSync() {
     const known    = new Set(_bookingsCache.map(b => b.id));
     const added    = _adminFirstSnap ? [] : incoming.filter(b => !known.has(b.id));
     _bookingsCache = incoming;
-    if (_adminFirstSnap) { _adminFirstSnap = false; syncSlotLocks(); }
+    if (_adminFirstSnap) { _adminFirstSnap = false; syncSlotLocks(); autoCancelNoShows(); }
     added.forEach(b => pushLiveAlert(b));
     updateAdminBadge();
     if (adminLoggedIn && state.currentPage === 'admin') renderAdminDashboard();
@@ -411,7 +446,7 @@ function buildCustomerConfirmMsg(booking) {
     `🕐 *Time:* ${booking.time}\n` +
     `💰 *Total:* R${booking.totalPrice}\n` +
     `🔖 *Booking ID:* ${booking.id}\n\n` +
-    `We look forward to seeing you! If you need to reschedule, please contact us. 😊`;
+    `We look forward to seeing you! If you need to reschedule, please contact us. 😊\n\n⏰ *Appointment policy:* please arrive 15–20 minutes early and, from ${ARRIVAL_OPEN_MIN} minutes before your time, tap *“I’m still coming”* under My Bookings on our website. If you haven’t arrived or confirmed within ${GRACE_MIN} minutes after your appointment time, it is cancelled automatically. Cancelling within 5 hours costs R${CANCEL_FEE}.`;
 }
 
 function buildAdminCancelMsg(booking) {
@@ -944,7 +979,8 @@ async function confirmBooking() {
     createdAt:  Date.now(),
     termsAccepted:   true,
     termsAcceptedAt: Date.now(),
-    termsVersion:    TERMS_VERSION
+    termsVersion:    TERMS_VERSION,
+    arrivalPolicy:   true
   };
 
   _bookingInFlight = true; setBookingBusy(true);
@@ -976,6 +1012,13 @@ async function confirmBooking() {
     ${lateFee ? `<div class="summary-row"><span>🌙 Late Fee</span><span>+R20</span></div>` : ''}
     <div class="summary-row total"><span>Total</span><span>R${booking.totalPrice}</span></div>
   `;
+
+  document.getElementById('confirm-summary').insertAdjacentHTML('beforeend',
+    `<div style="margin-top:14px;padding:12px 14px;border:1px solid rgba(201,168,76,0.4);border-radius:8px;font-size:0.8rem;line-height:1.6;color:var(--white2)">
+      ⏰ <strong style="color:var(--gold)">Appointment policy:</strong> arrive 15–20 minutes early. From ${ARRIVAL_OPEN_MIN} minutes before your time,
+      open <strong>My Bookings</strong> and tap <strong>“I’m still coming”</strong>. If you haven’t confirmed or arrived within
+      ${GRACE_MIN} minutes after your appointment time, it is cancelled automatically.
+    </div>`);
 
   const waAdminMsg  = waEnc(buildNewBookingMsg(booking));
   const waClientMsg = waEnc(buildCustomerConfirmMsg(booking));
@@ -1033,9 +1076,16 @@ async function lookupBookings() {
 }
 
 function buildBookingCard(b) {
-  const isActive = b.status !== 'cancelled' && parseDateTimeMs(b.dateStr, b.time) > Date.now();
+  const isActive = effectiveStatus(b) !== 'cancelled' && parseDateTimeMs(b.dateStr, b.time) > Date.now();
   const id = safeId(b.id);
-  const st = STATUSES.includes(b.status) ? b.status : 'pending';
+  const st = effectiveStatus(b);
+  const arr = arrivalState(b);
+
+  let arrivalHtml = '';
+  if (arr === 'open') arrivalHtml = `<div class="bc-actions" style="margin-bottom:10px"><button class="btn-sm" style="background:var(--gold);color:#000;font-weight:600;padding:12px 16px" onclick="confirmArrival('${id}')">✅ I’m still coming</button></div>`;
+  else if (arr === 'confirmed') arrivalHtml = `<div class="bc-detail" style="margin-top:8px">✅ <strong>Arrival confirmed — see you soon!</strong></div>`;
+  else if (arr === 'early') arrivalHtml = `<div class="bc-detail" style="margin-top:8px">ℹ️ Tap “I’m still coming” here from ${ARRIVAL_OPEN_MIN} minutes before your appointment.</div>`;
+  else if (b.arrivalPolicy && st === 'cancelled' && b.status !== 'cancelled') arrivalHtml = `<div class="bc-detail" style="margin-top:8px;color:#e07060">🚫 Not confirmed within the ${GRACE_MIN}-minute grace period, so this appointment was cancelled.</div>`;
 
   const actions = isActive ? `
     <button class="btn-sm btn-sm-reschedule" onclick="openReschedule('${id}')">🔁 Reschedule</button>
@@ -1048,7 +1098,7 @@ function buildBookingCard(b) {
         <div class="bc-id">ID: ${esc(b.id)}</div>
         <div class="bc-name">${esc(b.name)}</div>
       </div>
-      <div class="status-badge ${st}">${st.charAt(0).toUpperCase() + st.slice(1)}</div>
+      ${statusBadge(b)}
     </div>
     <div class="bc-details">
       <div class="bc-detail">📅 <strong>${esc(b.date)}</strong></div>
@@ -1057,6 +1107,7 @@ function buildBookingCard(b) {
       <div class="bc-detail">📧 <strong>${esc(b.email)}</strong></div>
     </div>
     <div class="bc-price">Total: R${b.totalPrice}</div>
+    ${arrivalHtml}
     ${actions ? `<div class="bc-actions">${actions}</div>` : ''}
   </div>`;
 }
@@ -1092,13 +1143,13 @@ async function proceedCancel() {
   const hoursUntil = (parseDateTimeMs(b.dateStr, b.time) - Date.now()) / (1000 * 60 * 60);
   const withFee    = hoursUntil < 5 && hoursUntil > 0;
   const patch      = { status: 'cancelled', cancelledAt: Date.now() };
-  if (withFee) patch.cancellationFee = 20;
+  if (withFee) patch.cancellationFee = CANCEL_FEE;
 
   try {
     await ensureAuth();
     await updateBooking(b.id, patch);
     await releaseLock(bookingKey(b), b.time, b.id);
-    toast(withFee ? 'Booking cancelled. R20 fee applies.' : 'Booking cancelled successfully.',
+    toast(withFee ? `Booking cancelled. R${CANCEL_FEE} fee applies.` : 'Booking cancelled successfully.',
           withFee ? 'warning' : 'default', withFee ? '⚠️' : '✓');
   } catch (e) {
     console.error(e);
@@ -1117,7 +1168,7 @@ function openReschedule(id) {
   if (!b) { toast('Booking not found.', 'error', '⚠️'); return; }
   const hoursUntil = (parseDateTimeMs(b.dateStr, b.time) - Date.now()) / (1000 * 60 * 60);
   if (hoursUntil < 5) {
-    toast('Within 5 hours of your appointment — please WhatsApp us, or cancel (R20 fee applies).', 'error', '⚠️');
+    toast(`Within 5 hours of your appointment — please WhatsApp us, or cancel (R${CANCEL_FEE} fee applies).`, 'error', '⚠️');
     return;
   }
   state.reschedule.bookingId = id;
@@ -1479,7 +1530,7 @@ function renderAdminBookings() {
             &nbsp;·&nbsp; 📧 ${esc(b.email)}
           </div>
         </div>
-        <div class="status-badge ${b.status}">${b.status.charAt(0).toUpperCase() + b.status.slice(1)}</div>
+        ${statusBadge(b)}
       </div>
       <div class="abc-info">
         <span>📅 <strong>${esc(b.date)}</strong></span>
@@ -1487,6 +1538,7 @@ function renderAdminBookings() {
         <span>✂️ <strong>${esc(b.service)}</strong></span>
         <span>💰 <strong>R${b.totalPrice}</strong></span>
         <span>🔖 <strong>${esc(b.id)}</strong></span>
+        ${arrivalBadge(b)}
       </div>
       <div class="abc-actions">${actionBtns}</div>
     </div>`;
@@ -1511,7 +1563,7 @@ function adminMsgToday() {
   const messages = todayBookings.map(b => {
     const msg = `Hello ${b.name} 👋, this is *PRIVATE BARBER 💈*!\n\n` +
       `Just a reminder that your appointment is *TODAY* 🎉\n` +
-      `🕐 *Time:* ${b.time}\n✂️ *Service:* ${b.service}\n\nSee you soon! 💈`;
+      `🕐 *Time:* ${b.time}\n✂️ *Service:* ${b.service}\n\n👉 Please confirm on our website (My Bookings → “I’m still coming”) from ${ARRIVAL_OPEN_MIN} minutes before your time and arrive 15–20 minutes early. After a ${GRACE_MIN}-minute grace period the appointment is cancelled automatically.\n\nSee you soon! 💈`;
     return { booking: b, msg };
   });
 
@@ -1663,6 +1715,48 @@ document.addEventListener('keydown', e => {
   }
   if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(o => o.classList.remove('open'));
 });
+
+// ══════════════════════════════════════
+// ARRIVAL CONFIRMATION + AUTO-CANCEL
+// ══════════════════════════════════════
+async function confirmArrival(id) {
+  const b = findBooking(id);
+  if (!b || arrivalState(b) !== 'open') {
+    toast('Confirmation isn’t open right now.', 'error', '⚠️');
+    renderMyBookings(); return;
+  }
+  try {
+    await ensureAuth();
+    await updateBooking(id, { arrivalConfirmed: true, arrivalConfirmedAt: Date.now() });
+    toast('Thanks — see you soon! ✅', 'success', '✅');
+  } catch (e) {
+    console.error(e);
+    toast('Could not confirm. Please message us on WhatsApp.', 'error', '⚠️');
+  }
+}
+
+// Runs in the admin's browser (no server needed): saves the cancellation for bookings that
+// weren't confirmed by the end of the grace period. Only touches bookings made under the new policy.
+async function autoCancelNoShows() {
+  if (!adminLoggedIn || !_db) return;
+  const now = Date.now();
+  for (const b of _bookingsCache) {
+    if (!b.arrivalPolicy || b.arrivalConfirmed || b.status === 'cancelled') continue;
+    const ms = bookingMs(b);
+    if (now <= ms + GRACE_MIN * 60000 || now > ms + 86400000) continue;
+    try {
+      await updateBooking(b.id, { status: 'cancelled', autoCancelled: true, cancelledAt: now });
+      await releaseLock(bookingKey(b), b.time, b.id);
+    } catch (e) { console.warn('Auto-cancel failed for', b.id, e.code || e.message); }
+  }
+}
+setInterval(autoCancelNoShows, 60000);
+
+// Keep the confirm button / statuses fresh without a page reload
+setInterval(() => {
+  if (state.currentPage === 'bookings') renderMyBookings();
+  if (adminLoggedIn && state.currentPage === 'admin') renderAdminBookings();
+}, 30000);
 
 // Start Firebase last, once every function/const above exists
 initFirebase();

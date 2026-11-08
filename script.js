@@ -269,6 +269,9 @@ function startAdminSync(attempt = 0) {
       setTimeout(() => startAdminSync(attempt + 1), 1000 * (attempt + 1));
     } else if (adminLoggedIn) {
       toast('Cannot read bookings — check the database rules (admin UID).', 'error', '🚫');
+      const uid = (_auth && _auth.currentUser) ? _auth.currentUser.uid : '?';
+      const box = document.getElementById('admin-live-alerts');
+      if (box) box.innerHTML = `<div style="margin-bottom:16px;padding:14px 16px;border:1px solid #e05252;border-radius:8px;color:#e07060;font-size:0.82rem;line-height:1.6">🚫 Can’t read bookings (${esc(err.code || 'error')}).<br>You are signed in with UID <strong style="word-break:break-all">${esc(uid)}</strong>.<br>This must match the UID in your Firebase rules.</div>`;
     }
   });
 }
@@ -1104,6 +1107,49 @@ async function lookupBookings() {
     toast('Lookup failed. Please try again.', 'error', '⚠️');
   }
 }
+
+function buildBookingCard(b) {
+  const isActive = effectiveStatus(b) !== 'cancelled' && parseDateTimeMs(b.dateStr, b.time) > Date.now();
+  const id = safeId(b.id);
+  const st = effectiveStatus(b);
+  const arr = arrivalState(b);
+
+  let arrivalHtml = '';
+  if (arr === 'open') arrivalHtml = `<div class="bc-actions" style="margin-bottom:10px"><button class="btn-sm" style="background:var(--gold);color:#000;font-weight:600;padding:12px 16px" onclick="confirmArrival('${id}')">✅ I’m still coming</button></div>`;
+  else if (arr === 'confirmed') arrivalHtml = `<div class="bc-detail" style="margin-top:8px">✅ <strong>Arrival confirmed — see you soon!</strong></div>`;
+  else if (arr === 'early') arrivalHtml = `<div class="bc-detail" style="margin-top:8px">ℹ️ Tap “I’m still coming” here from ${ARRIVAL_OPEN_MIN} minutes before your appointment.</div>`;
+  else if (b.arrivalPolicy && st === 'cancelled' && b.status !== 'cancelled') arrivalHtml = `<div class="bc-detail" style="margin-top:8px;color:#e07060">🚫 Not confirmed within the ${GRACE_MIN}-minute grace period, so this appointment was cancelled.</div>`;
+
+  const actions = isActive ? `
+    <button class="btn-sm btn-sm-reschedule" onclick="openReschedule('${id}')">🔁 Reschedule</button>
+    <button class="btn-sm btn-sm-cancel"     onclick="openCancel('${id}')">✕ Cancel</button>
+  ` : '';
+
+  return `<div class="booking-card" id="bc-${id}">
+    <div class="bc-header">
+      <div>
+        <div class="bc-id">ID: ${esc(b.id)}</div>
+        <div class="bc-name">${esc(b.name)}</div>
+      </div>
+      ${statusBadge(b)}
+    </div>
+    <div class="bc-details">
+      <div class="bc-detail">📅 <strong>${esc(b.date)}</strong></div>
+      <div class="bc-detail">🕐 <strong>${esc(b.time)}</strong></div>
+      <div class="bc-detail">✂️ <strong>${esc(b.service)}</strong></div>
+      <div class="bc-detail">📧 <strong>${esc(b.email)}</strong></div>
+    </div>
+    <div class="bc-price">Total: R${b.totalPrice}</div>
+    ${arrivalHtml}
+    ${actions ? `<div class="bc-actions">${actions}</div>` : ''}
+  </div>`;
+}
+
+// Works with a "YYYY-MM-DD" key or a legacy toDateString(); always South African time.
+function parseDateTimeMs(dateStr, time) {
+  return slotMs(normalizeDateStr(dateStr), time);
+}
+
 
 // ══════════════════════════════════════
 // CANCEL

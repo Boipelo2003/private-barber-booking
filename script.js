@@ -93,6 +93,14 @@ function arrivalBadge(b) {
   return '<span>⏳ <strong>Awaiting arrival confirmation</strong></span>';
 }
 
+// Hash of an email address — the "My Bookings" lookup index is keyed by this, never by the plain email.
+async function emailHash(email) {
+  const data = new TextEncoder().encode(String(email).trim().toLowerCase());
+  const buf  = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(buf), b => b.toString(16).padStart(2, '0')).join('');
+}
+function isRealEmail(e) { return !/@privatebarber\.local$/i.test(String(e)); }
+
 // "2026-11-07" + "09:00" → ms, always interpreted in South African time
 function slotMs(dateKey, time) { return new Date(`${dateKey}T${time}:00${TZ_OFFSET}`).getTime(); }
 
@@ -113,6 +121,7 @@ let _bookingsCache = [];      // ADMIN ONLY — filled after admin sign-in
 let _adminRef      = null;
 let _adminFirstSnap = true;
 let _locksSynced   = false;
+let _idxDone       = new Set(JSON.parse(localStorage.getItem('pb_idx_done') || '[]'));
 
 let _myBookings    = {};      // bookings this device created / looked up, keyed by id
 const _myWatchers  = {};
@@ -275,6 +284,11 @@ async function syncSlotLocks() {
       const key = bookingKey(b);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) continue;
       if (!b.dateKey) await _db.ref(`pb_bookings/${b.id}/dateKey`).set(key);
+      if (isRealEmail(b.email) && slotMs(key, b.time) > Date.now() - 30 * 86400000 && !_idxDone.has(b.id)) {
+        await _db.ref(`pb_by_email/${await emailHash(b.email)}/${b.id}`).set(true);
+        _idxDone.add(b.id);
+        localStorage.setItem('pb_idx_done', JSON.stringify([..._idxDone].slice(-500)));
+      }
       if (b.status === 'cancelled' || slotMs(key, b.time) < Date.now() - 86400000) continue;
       await _db.ref(`pb_slots/${key}/${b.time.replace(':', '')}`)
         .transaction(cur => cur === null ? b.id : undefined);
@@ -300,7 +314,10 @@ async function createBookingWithLock(booking) {
   const res  = await lock.transaction(cur => cur === null ? booking.id : undefined);
   if (!res.committed) throw new Error('SLOT_TAKEN');
   try {
-    await _db.ref(`pb_bookings/${booking.id}`).set(booking);
+    const updates = {};
+    updates[`pb_bookings/${booking.id}`] = booking;
+    if (isRealEmail(booking.email)) updates[`pb_by_email/${await emailHash(booking.email)}/${booking.id}`] = true;
+    await _db.ref().update(updates);
   } catch (e) {
     await lock.remove().catch(() => {});
     throw e;
@@ -1046,7 +1063,7 @@ async function confirmBooking() {
 // ══════════════════════════════════════
 // MY BOOKINGS
 // Bookings made on this device show automatically. On another device the
-// customer enters Booking ID + email (the ID is the secret, the email a 2nd check).
+// customer enters the email they booked with (looked up through a hashed email index).
 // ══════════════════════════════════════
 function renderMyBookings() {
   const container = document.getElementById('bookings-results');
@@ -1054,70 +1071,30 @@ function renderMyBookings() {
   const list = Object.values(_myBookings).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   container.innerHTML = list.length
     ? list.map(buildBookingCard).join('')
-    : `<div class="empty-state"><div class="icon">📭</div>No bookings saved on this device yet.<br>Have a Booking ID? Enter it above with your email.</div>`;
+    : `<div class="empty-state"><div class="icon">📭</div>No bookings saved on this device yet.<br>Enter the email you booked with above to find them.</div>`;
 }
 
 async function lookupBookings() {
-  const id    = (document.getElementById('lookup-id')?.value || '').trim().toUpperCase();
-  const email = document.getElementById('lookup-email').value.trim().toLowerCase();
-  if (!id && !email) { renderMyBookings(); return; }
-  if (!id || !email) { toast('Enter both your Booking ID and email.', 'error', '⚠️'); return; }
-  if (!/^PB[A-Z0-9]+$/.test(id)) { toast('That Booking ID doesn’t look right.', 'error', '⚠️'); return; }
+  const email = (document.getElementById('lookup-email').value || '').trim().toLowerCase();
+  if (!email) { renderMyBookings(); return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast('Please enter a valid email address.', 'error', '⚠️'); return; }
   try {
     await ensureAuth();
-    const b = cleanBooking((await _db.ref('pb_bookings/' + id).once('value')).val());
-    if (!b || b.email.toLowerCase() !== email) { toast('No booking found for that ID and email.', 'error', '⚠️'); return; }
-    _myBookings[id] = b;
-    addMyId(id);
+    const idx = (await _db.ref('pb_by_email/' + await emailHash(email)).once('value')).val() || {};
+    const ids = Object.keys(idx).filter(id => /^PB[A-Z0-9]+$/.test(id)).slice(0, 50);
+    const found = [];
+    for (const id of ids) {
+      const b = cleanBooking((await _db.ref('pb_bookings/' + id).once('value')).val());
+      if (b && b.email.toLowerCase() === email) { _myBookings[id] = b; found.push(id); }
+    }
+    if (!found.length) { toast('No bookings found for that email.', 'error', '⚠️'); return; }
+    found.forEach(addMyId);
     renderMyBookings();
   } catch (e) {
     console.error(e);
     toast('Lookup failed. Please try again.', 'error', '⚠️');
   }
 }
-
-function buildBookingCard(b) {
-  const isActive = effectiveStatus(b) !== 'cancelled' && parseDateTimeMs(b.dateStr, b.time) > Date.now();
-  const id = safeId(b.id);
-  const st = effectiveStatus(b);
-  const arr = arrivalState(b);
-
-  let arrivalHtml = '';
-  if (arr === 'open') arrivalHtml = `<div class="bc-actions" style="margin-bottom:10px"><button class="btn-sm" style="background:var(--gold);color:#000;font-weight:600;padding:12px 16px" onclick="confirmArrival('${id}')">✅ I’m still coming</button></div>`;
-  else if (arr === 'confirmed') arrivalHtml = `<div class="bc-detail" style="margin-top:8px">✅ <strong>Arrival confirmed — see you soon!</strong></div>`;
-  else if (arr === 'early') arrivalHtml = `<div class="bc-detail" style="margin-top:8px">ℹ️ Tap “I’m still coming” here from ${ARRIVAL_OPEN_MIN} minutes before your appointment.</div>`;
-  else if (b.arrivalPolicy && st === 'cancelled' && b.status !== 'cancelled') arrivalHtml = `<div class="bc-detail" style="margin-top:8px;color:#e07060">🚫 Not confirmed within the ${GRACE_MIN}-minute grace period, so this appointment was cancelled.</div>`;
-
-  const actions = isActive ? `
-    <button class="btn-sm btn-sm-reschedule" onclick="openReschedule('${id}')">🔁 Reschedule</button>
-    <button class="btn-sm btn-sm-cancel"     onclick="openCancel('${id}')">✕ Cancel</button>
-  ` : '';
-
-  return `<div class="booking-card" id="bc-${id}">
-    <div class="bc-header">
-      <div>
-        <div class="bc-id">ID: ${esc(b.id)}</div>
-        <div class="bc-name">${esc(b.name)}</div>
-      </div>
-      ${statusBadge(b)}
-    </div>
-    <div class="bc-details">
-      <div class="bc-detail">📅 <strong>${esc(b.date)}</strong></div>
-      <div class="bc-detail">🕐 <strong>${esc(b.time)}</strong></div>
-      <div class="bc-detail">✂️ <strong>${esc(b.service)}</strong></div>
-      <div class="bc-detail">📧 <strong>${esc(b.email)}</strong></div>
-    </div>
-    <div class="bc-price">Total: R${b.totalPrice}</div>
-    ${arrivalHtml}
-    ${actions ? `<div class="bc-actions">${actions}</div>` : ''}
-  </div>`;
-}
-
-// Works with a "YYYY-MM-DD" key or a legacy toDateString(); always South African time.
-function parseDateTimeMs(dateStr, time) {
-  return slotMs(normalizeDateStr(dateStr), time);
-}
-
 
 // ══════════════════════════════════════
 // CANCEL

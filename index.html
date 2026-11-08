@@ -314,12 +314,11 @@
   <div>
     <div class="section-label">My Appointments</div>
     <h2 class="step-title" style="margin-bottom:8px">My Bookings</h2>
-    <p class="step-subtitle" style="margin-bottom:28px">Bookings made on this device appear below</p>
+    <p class="step-subtitle" style="margin-bottom:28px">Enter your email to view your appointments</p>
 
     <div class="email-lookup">
       <div class="email-lookup-title">Find Your Bookings</div>
-      <div class="email-lookup-sub">On another device? Enter your Booking ID and the email you booked with.</div>
-      <input type="text" class="form-input" id="lookup-id" placeholder="Booking ID e.g. PBX7K2…" autocomplete="off" style="margin-bottom:10px;text-transform:uppercase" onkeydown="if(event.key==='Enter')lookupBookings()">
+      <div class="email-lookup-sub">Enter the email you used when booking.</div>
       <div class="email-lookup-row">
         <input type="email" class="form-input" id="lookup-email" autocomplete="email" placeholder="your@email.com" onkeydown="if(event.key==='Enter')lookupBookings()">
         <button class="btn-gold" onclick="lookupBookings()">Search</button>

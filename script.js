@@ -16,13 +16,13 @@ const FIREBASE_CONFIG = {
 // ══════════════════════════════════════
 // SETTINGS
 // ══════════════════════════════════════
-const OPEN_HOUR      = 9;            // first slot 09:00
-const LAST_HOUR      = 19;           // last slot 19:00 (carries the R20 late fee)
+const OPEN_HOUR      = 8;            // first slot 08:00
+const LAST_HOUR      = 19;           // last slot 19:00 (carries the late-slot fee)
 const MIN_NOTICE_MIN = 60;           // slots starting within 60 min can't be booked online
 const TZ_OFFSET      = '+02:00';     // South Africa (SAST — no daylight saving)
-const TERMS_VERSION  = '2026-11-08'; // keep in sync with "Last updated" on the Terms page
+const TERMS_VERSION  = '2026-11-08b'; // keep in sync with "Last updated" on the Terms page
 const STATUSES       = ['pending', 'confirmed', 'cancelled'];
-const CANCEL_FEE        = 50;   // late-cancellation fee (within 5 hours)
+const LATE_FEE          = 50;   // extra charged for the 19:00 slot
 const ARRIVAL_OPEN_MIN  = 20;   // "I'm still coming" opens this many minutes before the appointment
 const GRACE_MIN         = 20;   // grace period after the appointment time
 
@@ -426,7 +426,7 @@ function openWhatsApp(number, message) {
 }
 
 function buildNewBookingMsg(booking) {
-  const late = booking.lateFee ? '\n🌙 Late Fee: +R20' : '';
+  const late = booking.lateFee ? `\n🌙 Late Fee: +R${LATE_FEE}` : '';
   return `🆕 *NEW BOOKING — PRIVATE BARBER 💈*\n\n` +
     `👤 *Name:* ${booking.name}\n` +
     `📞 *Phone:* ${booking.phone}\n` +
@@ -446,7 +446,7 @@ function buildCustomerConfirmMsg(booking) {
     `🕐 *Time:* ${booking.time}\n` +
     `💰 *Total:* R${booking.totalPrice}\n` +
     `🔖 *Booking ID:* ${booking.id}\n\n` +
-    `We look forward to seeing you! If you need to reschedule, please contact us. 😊\n\n⏰ *Appointment policy:* please arrive 15–20 minutes early and, from ${ARRIVAL_OPEN_MIN} minutes before your time, tap *“I’m still coming”* under My Bookings on our website. If you haven’t arrived or confirmed within ${GRACE_MIN} minutes after your appointment time, it is cancelled automatically. Cancelling within 5 hours costs R${CANCEL_FEE}.`;
+    `We look forward to seeing you! If you need to reschedule, please contact us. 😊\n\n⏰ *Appointment policy:* please arrive 15–20 minutes early and, from ${ARRIVAL_OPEN_MIN} minutes before your time, tap *“I’m still coming”* under My Bookings on our website. If you haven’t arrived or confirmed within ${GRACE_MIN} minutes after your appointment time, it is cancelled automatically.`;
 }
 
 function buildAdminCancelMsg(booking) {
@@ -730,7 +730,7 @@ function renderAvailabilityTimeGrid(dateStr) {
       slotLabel  = `${slot}<br><span class="avail-slot-sub">Closed</span>`;
     } else {
       stateClass = 'avail-slot-open';
-      slotLabel  = `${slot}${isLate ? '<br><span class="avail-slot-sub">+R20</span>' : ''}`;
+      slotLabel  = `${slot}${isLate ? '<br><span class="avail-slot-sub">+R' + LATE_FEE + '</span>' : ''}`;
     }
 
     const clickable = !isBooked && !isDayClosed;
@@ -801,7 +801,7 @@ function buildTimeGrid(containerId, date, selectedTime, onSelect, opts = {}) {
     let badge = '';
     if (isSlotClosed && !isClientBooked)      badge = `<span class="late-badge">Closed</span>`;
     else if (isPast && !isClientBooked)       badge = `<span class="late-badge">Past</span>`;
-    else if (isLateSlot(slot) && !unavailable) badge = `<span class="late-badge">+R20 late</span>`;
+    else if (isLateSlot(slot) && !unavailable) badge = `<span class="late-badge">+R${LATE_FEE} late</span>`;
 
     html += `<div class="${cls}" ${attrs}>${slot}${badge}</div>`;
   }
@@ -845,7 +845,8 @@ function updateSummary() {
   document.getElementById('sum-price').textContent   = b.service ? `R${price}` : '—';
   const lateRow = document.getElementById('sum-late-row');
   lateRow.style.display = b.lateFee ? 'flex' : 'none';
-  const total = price + (b.lateFee ? 20 : 0);
+  const total = price + (b.lateFee ? LATE_FEE : 0);
+  const sl = document.getElementById('sum-late'); if (sl) sl.textContent = '+R' + LATE_FEE;
   state.booking.totalPrice = total;
   document.getElementById('sum-total').textContent   = b.service ? `R${total}` : '—';
 }
@@ -974,7 +975,7 @@ async function confirmBooking() {
     service:    getServiceLabel(b.service),
     serviceKey: b.service,
     lateFee,
-    totalPrice: getServicePrice(b.service) + (lateFee ? 20 : 0),
+    totalPrice: getServicePrice(b.service) + (lateFee ? LATE_FEE : 0),
     status:     'pending',
     createdAt:  Date.now(),
     termsAccepted:   true,
@@ -1009,7 +1010,7 @@ async function confirmBooking() {
     <div class="summary-row"><span>📅 Date</span><span>${esc(booking.date)}</span></div>
     <div class="summary-row"><span>🕐 Time</span><span>${esc(booking.time)}</span></div>
     <div class="summary-row"><span>✂️ Service</span><span>${esc(booking.service)}</span></div>
-    ${lateFee ? `<div class="summary-row"><span>🌙 Late Fee</span><span>+R20</span></div>` : ''}
+    ${lateFee ? `<div class="summary-row"><span>🌙 Late Fee</span><span>+R${LATE_FEE}</span></div>` : ''}
     <div class="summary-row total"><span>Total</span><span>R${booking.totalPrice}</span></div>
   `;
 
@@ -1125,32 +1126,20 @@ function openCancel(id) {
   const b = findBooking(id);
   if (!b) { toast('Booking not found.', 'error', '⚠️'); return; }
   state.cancelTarget = id;
-  const hoursUntil = (parseDateTimeMs(b.dateStr, b.time) - Date.now()) / (1000 * 60 * 60);
-  const within5    = hoursUntil < 5 && hoursUntil > 0;
-
   document.getElementById('cancel-warning-text').textContent =
     `Are you sure you want to cancel your ${b.service} on ${b.date} at ${b.time}?`;
-  document.getElementById('cancel-fee-warning').style.display = within5 ? 'flex' : 'none';
+  const fw = document.getElementById('cancel-fee-warning'); if (fw) fw.style.display = 'none';
   openModal('cancel-modal');
-  state.cancelFeeApplied = within5;
 }
 
 async function proceedCancel() {
   const b = findBooking(state.cancelTarget);
   if (!b) { closeModal('cancel-modal'); return; }
-
-  // Re-check at click time (the modal may have been open a while)
-  const hoursUntil = (parseDateTimeMs(b.dateStr, b.time) - Date.now()) / (1000 * 60 * 60);
-  const withFee    = hoursUntil < 5 && hoursUntil > 0;
-  const patch      = { status: 'cancelled', cancelledAt: Date.now() };
-  if (withFee) patch.cancellationFee = CANCEL_FEE;
-
   try {
     await ensureAuth();
-    await updateBooking(b.id, patch);
+    await updateBooking(b.id, { status: 'cancelled', cancelledAt: Date.now() });
     await releaseLock(bookingKey(b), b.time, b.id);
-    toast(withFee ? `Booking cancelled. R${CANCEL_FEE} fee applies.` : 'Booking cancelled successfully.',
-          withFee ? 'warning' : 'default', withFee ? '⚠️' : '✓');
+    toast('Booking cancelled successfully.', 'default', '✓');
   } catch (e) {
     console.error(e);
     toast('Could not cancel — please try again or message us on WhatsApp.', 'error', '⚠️');
@@ -1166,11 +1155,6 @@ async function proceedCancel() {
 function openReschedule(id) {
   const b = findBooking(id);
   if (!b) { toast('Booking not found.', 'error', '⚠️'); return; }
-  const hoursUntil = (parseDateTimeMs(b.dateStr, b.time) - Date.now()) / (1000 * 60 * 60);
-  if (hoursUntil < 5) {
-    toast(`Within 5 hours of your appointment — please WhatsApp us, or cancel (R${CANCEL_FEE} fee applies).`, 'error', '⚠️');
-    return;
-  }
   state.reschedule.bookingId = id;
   state.reschedule.date      = null;
   state.reschedule.time      = null;
@@ -1226,7 +1210,7 @@ async function confirmReschedule() {
   const lateFee = isLateSlot(r.time);
   const patch = {
     dateStr: r.date.toDateString(), dateKey: newKey, date: formatDate(r.date), time: r.time,
-    lateFee, totalPrice: getServicePrice(b.serviceKey) + (lateFee ? 20 : 0),
+    lateFee, totalPrice: getServicePrice(b.serviceKey) + (lateFee ? LATE_FEE : 0),
     status: 'pending'
   };
   const newLock = _db.ref(`pb_slots/${newKey}/${r.time.replace(':', '')}`);
@@ -1331,7 +1315,7 @@ async function confirmManualBooking() {
   }
 
   const lateFee    = isLateSlot(mb.time);
-  const totalPrice = getServicePrice(mb.service) + (lateFee ? 20 : 0);
+  const totalPrice = getServicePrice(mb.service) + (lateFee ? LATE_FEE : 0);
   const id         = generateId();
 
   const booking = {

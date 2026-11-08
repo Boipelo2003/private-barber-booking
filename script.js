@@ -244,11 +244,12 @@ function isSlotAvailable(dateKey, time, opts = {}) {
 }
 
 // ── Admin: live bookings (only runs while an admin is signed in) ──────────
-function startAdminSync() {
+function startAdminSync(attempt = 0) {
   if (!_db || _adminRef) return;
   _adminFirstSnap = true;
-  _adminRef = _db.ref('pb_bookings');
-  _adminRef.on('value', snap => {
+  const ref = _db.ref('pb_bookings');
+  _adminRef = ref;
+  ref.on('value', snap => {
     const raw      = snap.val();
     const incoming = raw ? Object.values(raw).map(cleanBooking).filter(Boolean) : [];
     const known    = new Set(_bookingsCache.map(b => b.id));
@@ -257,10 +258,18 @@ function startAdminSync() {
     if (_adminFirstSnap) { _adminFirstSnap = false; syncSlotLocks(); autoCancelNoShows(); }
     added.forEach(b => pushLiveAlert(b));
     updateAdminBadge();
-    if (adminLoggedIn && state.currentPage === 'admin') renderAdminDashboard();
+    if (adminLoggedIn) renderAdminDashboard();
   }, err => {
-    console.warn('Admin bookings read failed', err);
-    toast('Cannot read bookings — check the database rules (admin UID).', 'error', '🚫');
+    // Right after sign-in the database can still be using the old (anonymous) login for a moment,
+    // which makes this read fail once. Detach and retry a few times before giving up.
+    console.warn('Admin bookings read failed (attempt ' + (attempt + 1) + ')', err.code || err);
+    ref.off();
+    if (_adminRef === ref) _adminRef = null;
+    if (adminLoggedIn && attempt < 4) {
+      setTimeout(() => startAdminSync(attempt + 1), 1000 * (attempt + 1));
+    } else if (adminLoggedIn) {
+      toast('Cannot read bookings — check the database rules (admin UID).', 'error', '🚫');
+    }
   });
 }
 
@@ -1357,7 +1366,8 @@ function showAdminDashboard() {
 }
 
 function initAdminPage() {
-  // onAuthStateChanged watcher handles show/hide automatically
+  // onAuthStateChanged watcher handles show/hide; just make sure the numbers are current
+  if (adminLoggedIn) renderAdminDashboard();
 }
 
 async function adminLogin() {

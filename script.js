@@ -52,7 +52,8 @@ function cleanBooking(b) {
     time:       /^\d{2}:\d{2}$/.test(String(b.time)) ? String(b.time) : '00:00',
     status:     STATUSES.includes(b.status) ? b.status : 'pending',
     totalPrice: Number(b.totalPrice) || 0,
-    createdAt:  Number(b.createdAt) || 0
+    createdAt:  Number(b.createdAt) || 0,
+    cutStatus:  ['cutting', 'done', 'skipped'].includes(b.cutStatus) ? b.cutStatus : ''
   };
   out.dateKey = b.dateKey || normalizeDateStr(out.dateStr);
   return out;
@@ -61,9 +62,16 @@ function bookingKey(b) { return b.dateKey || normalizeDateStr(b.dateStr); }
 function bookingMs(b) { return slotMs(bookingKey(b), b.time); }
 
 function effectiveStatus(b) { return STATUSES.includes(b.status) ? b.status : 'pending'; }
-function statusBadge(b) {
-  const stt = effectiveStatus(b);
-  return `<div class="status-badge ${stt}">${stt.charAt(0).toUpperCase() + stt.slice(1)}</div>`;
+function statusBadge(b, admin = false) {
+  let cls = effectiveStatus(b);
+  let label = cls.charAt(0).toUpperCase() + cls.slice(1);
+  if (admin && b.status !== 'cancelled') {
+    if (b.cutStatus === 'done')         { cls = 'confirmed'; label = 'Done'; }
+    else if (b.cutStatus === 'cutting') { cls = 'pending';   label = 'Cutting now'; }
+    else if (b.cutStatus === 'skipped') { cls = 'cancelled'; label = 'Not cut'; }
+    else if (bookingMs(b) <= Date.now()) { cls = 'pending';  label = 'Not done'; }
+  }
+  return `<div class="status-badge ${cls}">${label}</div>`;
 }
 
 // Hash of an email address — the "My Bookings" lookup index is keyed by this, never by the plain email.
@@ -89,6 +97,7 @@ let _slotsMap      = {};      // { "2026-11-07": Set(["09:00", ...]) }  ← publ
 let _closedDates   = new Set();
 let _closedSlots   = {};      // { "2026-11-07": Set(["09:00"]) }
 let _availSelectedDate = null;
+let _slotState    = {};      // { "2026-11-08": { "1300": "done" | "cutting" | "skipped" } }  ← public, set by the admin
 
 let _bookingsCache = [];      // ADMIN ONLY — filled after admin sign-in
 let _adminRef      = null;
@@ -167,6 +176,11 @@ function initFirebase() {
         );
       });
       if (state.currentPage === 'booking') renderBookingCalendar();
+      refreshOpenGrids();
+    });
+
+    _db.ref('pb_slotstate').on('value', snap => {
+      _slotState = snap.val() || {};
       refreshOpenGrids();
     });
 
@@ -269,10 +283,10 @@ async function syncSlotLocks() {
       const key = bookingKey(b);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) continue;
       if (!b.dateKey) await _db.ref(`pb_bookings/${b.id}/dateKey`).set(key);
-      if (isRealEmail(b.email) && slotMs(key, b.time) > Date.now() - 30 * 86400000 && !_idxDone.has(b.id)) {
+      if (isRealEmail(b.email) && !_idxDone.has(b.id)) {
         await _db.ref(`pb_by_email/${await emailHash(b.email)}/${b.id}`).set(true);
         _idxDone.add(b.id);
-        localStorage.setItem('pb_idx_done', JSON.stringify([..._idxDone].slice(-500)));
+        localStorage.setItem('pb_idx_done', JSON.stringify([..._idxDone].slice(-5000)));
       }
       if (b.status === 'cancelled' || slotMs(key, b.time) < Date.now() - 86400000) continue;
       await _db.ref(`pb_slots/${key}/${b.time.replace(':', '')}`)
@@ -323,10 +337,30 @@ async function saveBookingStatus(id, status) {
   if (!b || !_db) return;
   try {
     await _db.ref(`pb_bookings/${id}/status`).set(status);
-    if (status === 'cancelled') await releaseLock(bookingKey(b), b.time, id);
+    if (status === 'cancelled') {
+      await releaseLock(bookingKey(b), b.time, id);
+      await _db.ref(`pb_slotstate/${bookingKey(b)}/${b.time.replace(':', '')}`).remove().catch(() => {});
+    }
   } catch (e) {
     console.error(e);
     toast('Update failed: ' + (e.code || e.message), 'error', '⚠️');
+  }
+}
+
+// Admin: mark progress on a booking. Click the active button again to clear it.
+async function setCutStatus(id, state) {
+  const b = _bookingsCache.find(x => x.id === id);
+  if (!b || !_db) return;
+  const next = b.cutStatus === state ? null : state;
+  const slotPath = `pb_slotstate/${bookingKey(b)}/${b.time.replace(':', '')}`;
+  try {
+    await _db.ref().update({ [`pb_bookings/${id}/cutStatus`]: next, [slotPath]: next });
+    if (next === 'done')         toast(`Done with ${b.name} ✓`, 'success', '✅');
+    else if (next === 'cutting') toast(`Still cutting ${b.name}`, 'default', '✂️');
+    else if (next === 'skipped') toast(`Marked not cutting ${b.name}`, 'default', '🚫');
+  } catch (e) {
+    console.error(e);
+    toast('Could not update: ' + (e.code || e.message), 'error', '⚠️');
   }
 }
 
@@ -801,7 +835,11 @@ function buildTimeGrid(containerId, date, selectedTime, onSelect, opts = {}) {
     const attrs = unavailable ? 'aria-disabled="true"' : `role="button" tabindex="0" onclick="${onSelect}('${slot}')"`;
 
     let badge = '';
-    if (isSlotClosed && !isClientBooked)      badge = `<span class="late-badge">Closed</span>`;
+    if (isClientBooked && slotMs(dateKey, slot) <= Date.now()) {
+      const st = (_slotState[dateKey] || {})[slot.replace(':', '')];
+      badge = `<span class="late-badge">${st === 'done' ? 'Done ✓' : st === 'cutting' ? 'Still cutting' : st === 'skipped' ? 'Skipped' : 'Not done'}</span>`;
+    }
+    else if (isSlotClosed && !isClientBooked)      badge = `<span class="late-badge">Closed</span>`;
     else if (isPast && !isClientBooked)       badge = `<span class="late-badge">Past</span>`;
     else if (isLateSlot(slot) && !unavailable) badge = `<span class="late-badge">+R${LATE_FEE} late</span>`;
 
@@ -1424,7 +1462,7 @@ function renderAdminDashboard() {
   // Split revenue: completed (appointment time already passed) vs upcoming (still to happen)
   const nonCancelled   = bookings.filter(b => b.status !== 'cancelled');
   const revenueDone    = nonCancelled
-    .filter(b => b.status === 'confirmed' && parseDateTimeMs(b.dateStr, b.time) <= now)
+    .filter(b => b.cutStatus === 'done')
     .reduce((s, b) => s + b.totalPrice, 0);
   const revenueUpcoming = nonCancelled
     .filter(b => parseDateTimeMs(b.dateStr, b.time) > now)
@@ -1446,14 +1484,27 @@ if (document.getElementById('availability-calendar')) renderAvailabilityCalendar
 function adminFilter(f) {
   state.adminFilter = f;
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('af-' + f).classList.add('active');
+  const fb = document.getElementById('af-' + f); if (fb) fb.classList.add('active');
   renderAdminBookings();
+}
+
+// "Still cutting" / "Done" / "Not cutting" buttons — shown for today's and earlier bookings
+function adminCutRow(b) {
+  if (b.status === 'cancelled' || bookingKey(b) > dateToKey(new Date())) return '';
+  const id  = safeId(b.id);
+  const btn = (st, cls, label) =>
+    `<button class="btn-wa ${cls}" style="${b.cutStatus === st ? 'box-shadow:0 0 0 2px var(--gold);' : ''}" onclick="setCutStatus('${id}','${st}')">${b.cutStatus === st ? '● ' : ''}${label}</button>`;
+  return `<div class="abc-actions" style="margin-top:8px">${btn('cutting', 'btn-wa-reschedule', '✂️ Still cutting')}${btn('done', 'btn-wa-confirm', '✅ Done')}${btn('skipped', 'btn-wa-cancel', '🚫 Not cutting')}</div>`;
 }
 
 function renderAdminBookings() {
   if (!adminLoggedIn) return;
   let bookings = getBookings();
-  if (state.adminFilter !== 'all') bookings = bookings.filter(b => b.status === state.adminFilter);
+  if (state.adminFilter === 'notdone') {
+    bookings = bookings.filter(b => b.status !== 'cancelled' && bookingMs(b) <= Date.now() && b.cutStatus !== 'done' && b.cutStatus !== 'skipped');
+  } else if (state.adminFilter !== 'all') {
+    bookings = bookings.filter(b => b.status === state.adminFilter);
+  }
 
   const searchInput = document.getElementById('admin-search');
   const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
@@ -1504,7 +1555,7 @@ function renderAdminBookings() {
             &nbsp;·&nbsp; 📧 ${esc(b.email)}
           </div>
         </div>
-        ${statusBadge(b)}
+        ${statusBadge(b, true)}
       </div>
       <div class="abc-info">
         <span>📅 <strong>${esc(b.date)}</strong></span>
@@ -1513,7 +1564,7 @@ function renderAdminBookings() {
         <span>💰 <strong>R${b.totalPrice}</strong></span>
         <span>🔖 <strong>${esc(b.id)}</strong></span>
       </div>
-      <div class="abc-actions">${actionBtns}</div>
+      <div class="abc-actions">${actionBtns}</div>${adminCutRow(b)}
     </div>`;
   }).join('');
 }

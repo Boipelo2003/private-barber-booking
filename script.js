@@ -52,7 +52,7 @@ function cleanBooking(b) {
     status:     STATUSES.includes(b.status) ? b.status : 'pending',
     totalPrice: Number(b.totalPrice) || 0,
     createdAt:  Number(b.createdAt) || 0,
-    cutStatus:  ['cutting', 'done', 'skipped'].includes(b.cutStatus) ? b.cutStatus : ''
+    cutStatus:  ['done', 'noshow'].includes(b.cutStatus) ? b.cutStatus : ''
   };
   out.dateKey = b.dateKey || normalizeDateStr(out.dateStr);
   return out;
@@ -64,11 +64,10 @@ function effectiveStatus(b) { return STATUSES.includes(b.status) ? b.status : 'p
 function statusBadge(b, admin = false) {
   let cls = effectiveStatus(b);
   let label = cls.charAt(0).toUpperCase() + cls.slice(1);
-  if (admin && b.status !== 'cancelled') {
-    if (b.cutStatus === 'done')         { cls = 'confirmed'; label = 'Done'; }
-    else if (b.cutStatus === 'cutting') { cls = 'pending';   label = 'Cutting now'; }
-    else if (b.cutStatus === 'skipped') { cls = 'cancelled'; label = 'Not cut'; }
-    else if (bookingMs(b) <= Date.now()) { cls = 'pending';  label = 'Not done'; }
+  if (admin && b.cutStatus === 'noshow') { cls = 'cancelled'; label = 'Didn’t come'; }
+  else if (admin && b.status !== 'cancelled') {
+    if (b.cutStatus === 'done')          { cls = 'confirmed'; label = 'Done'; }
+    else if (bookingMs(b) <= Date.now()) { cls = 'pending';   label = 'Not done'; }
   }
   return `<div class="status-badge ${cls}">${label}</div>`;
 }
@@ -96,7 +95,7 @@ let _slotsMap      = {};      // { "2026-11-07": Set(["09:00", ...]) }  ← publ
 let _closedDates   = new Set();
 let _closedSlots   = {};      // { "2026-11-07": Set(["09:00"]) }
 let _availSelectedDate = null;
-let _slotState    = {};      // { "2026-11-08": { "1300": "done" | "cutting" | "skipped" } }  ← public, set by the admin
+let _slotState    = {};      // { "2026-11-08": { "1300": "done" } }  ← public, set by the admin
 
 let _bookingsCache = [];      // ADMIN ONLY — filled after admin sign-in
 let _adminRef      = null;
@@ -345,17 +344,27 @@ async function saveBookingStatus(id, status) {
   }
 }
 
-// Admin: mark progress on a booking. Click the active button again to clear it.
+// Admin: "done" (click again to undo) or "noshow" (client didn't come → booking cancelled, slot reopened)
 async function setCutStatus(id, state) {
   const b = _bookingsCache.find(x => x.id === id);
   if (!b || !_db) return;
-  const next = b.cutStatus === state ? null : state;
-  const slotPath = `pb_slotstate/${bookingKey(b)}/${b.time.replace(':', '')}`;
+  const key = bookingKey(b), t4 = b.time.replace(':', '');
   try {
-    await _db.ref().update({ [`pb_bookings/${id}/cutStatus`]: next, [slotPath]: next });
-    if (next === 'done')         toast(`Done with ${b.name} ✓`, 'success', '✅');
-    else if (next === 'cutting') toast(`Still cutting ${b.name}`, 'default', '✂️');
-    else if (next === 'skipped') toast(`Marked not cutting ${b.name}`, 'default', '🚫');
+    if (state === 'noshow') {
+      if (!confirm(`Mark ${b.name} as not coming?\n\nThis reopens the ${b.time} slot so other customers can book it.`)) return;
+      await _db.ref().update({
+        [`pb_bookings/${id}/status`]:      'cancelled',
+        [`pb_bookings/${id}/cutStatus`]:   'noshow',
+        [`pb_bookings/${id}/cancelledAt`]: Date.now(),
+        [`pb_slotstate/${key}/${t4}`]:     null
+      });
+      await releaseLock(key, b.time, id);
+      toast(`${b.name} didn’t come — the ${b.time} slot is open again.`, 'success', '🔓');
+    } else {
+      const next = b.cutStatus === 'done' ? null : 'done';
+      await _db.ref().update({ [`pb_bookings/${id}/cutStatus`]: next, [`pb_slotstate/${key}/${t4}`]: next });
+      if (next) toast(`Done cutting ${b.name} ✓`, 'success', '✅');
+    }
   } catch (e) {
     console.error(e);
     toast('Could not update: ' + (e.code || e.message), 'error', '⚠️');
@@ -834,7 +843,7 @@ function buildTimeGrid(containerId, date, selectedTime, onSelect, opts = {}) {
     let badge = '';
     if (isClientBooked && slotMs(dateKey, slot) <= Date.now()) {
       const st = (_slotState[dateKey] || {})[slot.replace(':', '')];
-      badge = `<span class="late-badge">${st === 'done' ? 'Done ✓' : st === 'cutting' ? 'Still cutting' : st === 'skipped' ? 'Skipped' : 'Not done'}</span>`;
+      badge = `<span class="late-badge">${st === 'done' ? 'Done ✓' : 'Not done'}</span>`;
     }
     else if (isSlotClosed && !isClientBooked)      badge = `<span class="late-badge">Closed</span>`;
     else if (isLateSlot(slot) && !unavailable) badge = `<span class="late-badge">+R${LATE_FEE} late</span>`;
@@ -1484,20 +1493,21 @@ function adminFilter(f) {
   renderAdminBookings();
 }
 
-// "Still cutting" / "Done" / "Not cutting" buttons — shown for today's and earlier bookings
+// Two buttons on today's and earlier bookings: "I'm done cutting" and "Client didn't come" (reopens the slot)
 function adminCutRow(b) {
   if (b.status === 'cancelled' || bookingKey(b) > dateToKey(new Date())) return '';
-  const id  = safeId(b.id);
-  const btn = (st, cls, label) =>
-    `<button class="btn-wa ${cls}" style="${b.cutStatus === st ? 'box-shadow:0 0 0 2px var(--gold);' : ''}" onclick="setCutStatus('${id}','${st}')">${b.cutStatus === st ? '● ' : ''}${label}</button>`;
-  return `<div class="abc-actions" style="margin-top:8px">${btn('cutting', 'btn-wa-reschedule', '✂️ Still cutting')}${btn('done', 'btn-wa-confirm', '✅ Done')}${btn('skipped', 'btn-wa-cancel', '🚫 Not cutting')}</div>`;
+  const id   = safeId(b.id);
+  const done = b.cutStatus === 'done';
+  const doneBtn = `<button class="btn-wa btn-wa-confirm" style="${done ? 'box-shadow:0 0 0 2px var(--gold);' : ''}" onclick="setCutStatus('${id}','done')">${done ? '● ' : ''}✅ I’m done cutting</button>`;
+  const noBtn   = done ? '' : `<button class="btn-wa btn-wa-cancel" onclick="setCutStatus('${id}','noshow')">🚫 Client didn’t come</button>`;
+  return `<div class="abc-actions" style="margin-top:8px">${doneBtn}${noBtn}</div>`;
 }
 
 function renderAdminBookings() {
   if (!adminLoggedIn) return;
   let bookings = getBookings();
   if (state.adminFilter === 'notdone') {
-    bookings = bookings.filter(b => b.status !== 'cancelled' && bookingMs(b) <= Date.now() && b.cutStatus !== 'done' && b.cutStatus !== 'skipped');
+    bookings = bookings.filter(b => b.status !== 'cancelled' && bookingMs(b) <= Date.now() && b.cutStatus !== 'done');
   } else if (state.adminFilter !== 'all') {
     bookings = bookings.filter(b => b.status === state.adminFilter);
   }

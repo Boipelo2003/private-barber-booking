@@ -18,7 +18,6 @@ const FIREBASE_CONFIG = {
 // ══════════════════════════════════════
 const OPEN_HOUR      = 8;            // first slot 08:00
 const LAST_HOUR      = 19;           // last slot 19:00 (carries the late-slot fee)
-const MIN_NOTICE_MIN = 60;           // slots starting within 60 min can't be booked online
 const TZ_OFFSET      = '+02:00';     // South Africa (SAST — no daylight saving)
 const TERMS_VERSION  = '2026-11-08c'; // keep in sync with "Last updated" on the Terms page
 const STATUSES       = ['pending', 'confirmed', 'cancelled'];
@@ -226,7 +225,6 @@ function isSlotAvailable(dateKey, time, opts = {}) {
   if (_closedDates.has(dateKey)) return false;
   if ((_closedSlots[dateKey] || new Set()).has(time)) return false;
   if (getBookedSlots(dateKey).includes(time)) return false;
-  if (!opts.ignoreNotice && slotMs(dateKey, time) < Date.now() + MIN_NOTICE_MIN * 60000) return false;
   return true;
 }
 
@@ -827,8 +825,7 @@ function buildTimeGrid(containerId, date, selectedTime, onSelect, opts = {}) {
     const slot           = `${pad2(h)}:00`;
     const isClientBooked = taken.includes(slot);
     const isSlotClosed   = isDayClosed || closedSet.has(slot);
-    const isPast         = !opts.ignoreNotice && slotMs(dateKey, slot) < Date.now() + MIN_NOTICE_MIN * 60000;
-    const unavailable    = isClientBooked || isSlotClosed || isPast;
+    const unavailable    = isClientBooked || isSlotClosed;
     const isSel          = slot === selectedTime;
 
     const cls = ['time-slot', unavailable ? 'booked' : '', isSel ? 'selected' : ''].filter(Boolean).join(' ');
@@ -840,7 +837,6 @@ function buildTimeGrid(containerId, date, selectedTime, onSelect, opts = {}) {
       badge = `<span class="late-badge">${st === 'done' ? 'Done ✓' : st === 'cutting' ? 'Still cutting' : st === 'skipped' ? 'Skipped' : 'Not done'}</span>`;
     }
     else if (isSlotClosed && !isClientBooked)      badge = `<span class="late-badge">Closed</span>`;
-    else if (isPast && !isClientBooked)       badge = `<span class="late-badge">Past</span>`;
     else if (isLateSlot(slot) && !unavailable) badge = `<span class="late-badge">+R${LATE_FEE} late</span>`;
 
     html += `<div class="${cls}" ${attrs}>${slot}${badge}</div>`;

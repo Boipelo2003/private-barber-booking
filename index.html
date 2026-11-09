@@ -115,8 +115,7 @@
     </div>
     <div class="reveal" style="max-width:640px;font-size:0.9rem;line-height:1.8;color:var(--white2)">
       <p style="margin-bottom:12px">Please arrive <strong style="color:var(--gold)">15–20 minutes</strong> before your scheduled appointment.</p>
-      <p style="margin-bottom:12px">From 20 minutes before your time, open <strong>My Bookings</strong> and tap <strong>“I’m still coming”</strong> to confirm.</p>
-      <p style="margin-bottom:12px">A <strong style="color:var(--gold)">20-minute grace period</strong> is allowed after your appointment time. If you have not confirmed or arrived within this period, your appointment will be <strong>automatically cancelled</strong>.</p>
+<p style="margin-bottom:12px">A <strong style="color:var(--gold)">15-minute grace period</strong> is allowed after your appointment time. If you have not arrived within this period, your appointment may be <strong>cancelled</strong> and the slot given to another client.</p>
       <p>Our last slot, <strong>19:00</strong>, carries an extra <strong style="color:var(--gold)">R50</strong> late-slot fee.</p>
     </div>
   </div>
@@ -281,7 +280,7 @@
       </div>
 
       <div class="warning-box">
-        ⚠️ <span>Please arrive <strong>15–20 minutes</strong> before your appointment. From 20 minutes before your time, open <strong>My Bookings</strong> and tap <strong>“I’m still coming”</strong>. A <strong>20-minute grace period</strong> applies after your appointment time — if you haven’t confirmed or arrived by then, your appointment is cancelled automatically.</span>
+        ⚠️ <span>Please arrive <strong>15–20 minutes</strong> before your appointment. A <strong>15-minute grace period</strong> applies after your appointment time — if you haven’t arrived by then, your appointment may be cancelled and the slot given to another client.</span>
       </div>
 
       <div class="step-nav">
@@ -352,8 +351,8 @@
       <h3 style="font-family:'Cormorant Garamond',serif;color:var(--gold);font-size:1.2rem;margin:28px 0 10px">3. Cancellations &amp; Rescheduling</h3>
       <p style="margin-bottom:20px">You may cancel or reschedule your appointment at any time via the "My Bookings" section of this website. There is no fee for cancelling or rescheduling.</p>
 
-      <h3 style="font-family:'Cormorant Garamond',serif;color:var(--gold);font-size:1.2rem;margin:28px 0 10px">4. Arrival, Confirmation &amp; No-Shows</h3>
-      <p style="margin-bottom:20px">Please arrive 15–20 minutes before your scheduled appointment and, from 20 minutes before your appointment time, confirm on this website (My Bookings → “I’m still coming”) that you are still coming. A 20-minute grace period applies after your appointment time. If you have not confirmed or arrived within this period, your appointment will be automatically cancelled. We may decline future bookings from repeat no-shows.</p>
+      <h3 style="font-family:'Cormorant Garamond',serif;color:var(--gold);font-size:1.2rem;margin:28px 0 10px">4. Arrival &amp; No-Shows</h3>
+      <p style="margin-bottom:20px">Please arrive 15–20 minutes before your scheduled appointment. A 15-minute grace period applies after your appointment time. If you have not arrived within this period, we may cancel your appointment and offer the slot to another client. We may decline future bookings from repeat no-shows.</p>
 
       <h3 style="font-family:'Cormorant Garamond',serif;color:var(--gold);font-size:1.2rem;margin:28px 0 10px">5. Health, Allergies &amp; Patch Testing</h3>
       <p style="margin-bottom:20px">If you book a service involving hair dye or colour treatment, it is your responsibility to inform us in advance of any known allergies, sensitivities, or scalp conditions. We recommend a patch test at least 48 hours before any colour service if you have not used a similar product before or have sensitive skin. We are not liable for allergic reactions arising from undisclosed conditions or a client's decision to forgo a recommended patch test.</p>
@@ -458,7 +457,6 @@
         <button class="filter-btn" id="af-confirmed" onclick="adminFilter('confirmed')">Confirmed</button>
         <button class="filter-btn" id="af-cancelled" onclick="adminFilter('cancelled')">Cancelled</button>
         <button class="filter-btn" id="af-notdone" onclick="adminFilter('notdone')">Not done</button>
-        <button class="filter-btn" id="af-notdone" onclick="adminFilter('notdone')">Not done</button>
       </div>
     </div>
     <input type="text" class="form-input" id="admin-search"
@@ -536,7 +534,7 @@
 
     <div id="terms-scroll-box" style="max-height:280px;overflow-y:auto;background:var(--black);border:1px solid rgba(255,255,255,0.1);border-radius:var(--radius2);padding:18px 20px;margin-bottom:16px;font-size:0.78rem;line-height:1.7;color:var(--white2)">
       <p style="margin-bottom:14px"><strong style="color:var(--gold)">Cancellations:</strong> You can cancel or reschedule any time from My Bookings — there is no cancellation fee. Our 19:00 slot carries an extra R50 late-slot fee.</p>
-      <p style="margin-bottom:14px"><strong style="color:var(--gold)">Arrival &amp; confirmation:</strong> Arrive 15–20 minutes early and confirm on this website (My Bookings → “I’m still coming”) from 20 minutes before your appointment. A 20-minute grace period applies after your appointment time; if you have not confirmed or arrived by then, your appointment is cancelled automatically.</p>
+      <p style="margin-bottom:14px"><strong style="color:var(--gold)">Arrival:</strong> Please arrive 15–20 minutes before your appointment. A 15-minute grace period applies after your appointment time; if you have not arrived by then, your appointment may be cancelled and the slot reopened for other clients.</p>
       <p style="margin-bottom:14px"><strong style="color:var(--gold)">Bookings:</strong> Each slot is for one person only. Please ensure your name, phone, and email are accurate — we use these to contact you about your appointment.</p>
       <p style="margin-bottom:14px"><strong style="color:var(--gold)">Colour treatments:</strong> Please tell us in advance about any allergies or sensitivities. We recommend a patch test 48 hours before any dye service if you haven't used the product before.</p>
       <p style="margin-bottom:14px"><strong style="color:var(--gold)">Your information:</strong> We use your details only to manage this booking and contact you about it (including via WhatsApp), in line with POPIA. We don't sell or share your information.</p>

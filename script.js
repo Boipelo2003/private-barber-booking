@@ -104,6 +104,7 @@ let _adminFirstSnap = true;
 let _locksSynced   = false;
 let _idxDone       = new Set(JSON.parse(localStorage.getItem('pb_idx_done') || '[]'));
 
+let _lastBooking   = null;    // the booking just made (for the confirmation screen's calendar buttons)
 let _myBookings    = {};      // bookings this device created / looked up, keyed by id
 const _myWatchers  = {};
 let _bookingInFlight = false;
@@ -1081,6 +1082,11 @@ async function confirmBooking() {
     </button>
   `;
 
+  _lastBooking = booking;
+  document.getElementById('confirm-wa-buttons').insertAdjacentHTML('afterbegin',
+    `<button class="btn-gold" style="width:100%;justify-content:center;margin-bottom:8px" onclick="addToCalendar('${safeId(id)}')">📅 Add to Calendar</button>
+     <button class="btn-outline" style="width:100%;margin-bottom:14px" onclick="addToGoogleCalendar('${safeId(id)}')">Open in Google Calendar</button>`);
+
   goStep(5);
   toast('Booking confirmed! 🎉', 'success', '✅');
 }
@@ -1128,6 +1134,7 @@ function buildBookingCard(b) {
   const st = effectiveStatus(b);
 
   const actions = isActive ? `
+    <button class="btn-sm btn-sm-reschedule" onclick="addToCalendar('${id}')">📅 Calendar</button>
     <button class="btn-sm btn-sm-reschedule" onclick="openReschedule('${id}')">🔁 Reschedule</button>
     <button class="btn-sm btn-sm-cancel"     onclick="openCancel('${id}')">✕ Cancel</button>
   ` : '';
@@ -1831,6 +1838,70 @@ async function removeNotice(id) {
     console.error(e);
     toast('Could not remove: ' + (e.code || e.message), 'error', '⚠️');
   }
+}
+
+// ══════════════════════════════════════
+// ADD TO CALENDAR
+// Downloads an .ics file (iPhone, Android, Outlook, Apple Calendar) with reminders 1 day and 2 hours before,
+// or opens a pre-filled Google Calendar event.
+// ══════════════════════════════════════
+const SHOP_ADDRESS = '924 Mosidisi St, Ikageng, Potchefstroom, 2539, South Africa';
+
+function calendarBooking(id) {
+  const b = findBooking(id) || (_lastBooking && _lastBooking.id === id ? cleanBooking(_lastBooking) : null);
+  if (!b) { toast('Booking not found.', 'error', '⚠️'); return null; }
+  return b;
+}
+function icsStamp(ms) { return new Date(ms).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, ''); }   // 20261110T080000Z
+function icsText(t)   { return String(t).replace(/\\/g, '\\\\').replace(/\r?\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;'); }
+function icsFold(line) {                                  // lines must be ≤75 bytes; continue on the next line with a space
+  const out = []; let rest = line;
+  while (rest.length > 60) { out.push(rest.slice(0, 60)); rest = ' ' + rest.slice(60); }
+  out.push(rest);
+  return out.join('\r\n');
+}
+function calendarDetails(b) {
+  return `${b.service} — R${b.totalPrice}\nBooking ID: ${b.id}\nPlease arrive 15–20 minutes before your appointment.\nPrivate Barber, ${SHOP_ADDRESS}`;
+}
+function buildIcs(b) {
+  const start = bookingMs(b), end = start + 60 * 60000;
+  const lines = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Private Barber//Booking//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:${b.id}@private-barber`,
+    `DTSTAMP:${icsStamp(Date.now())}`,
+    `DTSTART:${icsStamp(start)}`,
+    `DTEND:${icsStamp(end)}`,
+    `SUMMARY:${icsText('Haircut at Private Barber')}`,
+    `LOCATION:${icsText(SHOP_ADDRESS)}`,
+    `DESCRIPTION:${icsText(calendarDetails(b))}`,
+    'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${icsText('Haircut tomorrow at ' + b.time)}`, 'TRIGGER:-P1D', 'END:VALARM',
+    'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${icsText('Haircut in 2 hours (' + b.time + ')')}`, 'TRIGGER:-PT2H', 'END:VALARM',
+    'END:VEVENT', 'END:VCALENDAR'
+  ];
+  return lines.map(icsFold).join('\r\n') + '\r\n';
+}
+function addToCalendar(id) {
+  const b = calendarBooking(id); if (!b) return;
+  const blob = new Blob([buildIcs(b)], { type: 'text/calendar;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'private-barber-appointment.ics';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  toast('Open the downloaded file to add it to your calendar.', 'success', '📅');
+}
+function googleCalendarUrl(b) {
+  const start = bookingMs(b), end = start + 60 * 60000;
+  return 'https://calendar.google.com/calendar/render?action=TEMPLATE'
+    + '&text='     + encodeURIComponent('Haircut at Private Barber')
+    + '&dates='    + icsStamp(start) + '/' + icsStamp(end)
+    + '&details='  + encodeURIComponent(calendarDetails(b))
+    + '&location=' + encodeURIComponent(SHOP_ADDRESS);
+}
+function addToGoogleCalendar(id) {
+  const b = calendarBooking(id); if (!b) return;
+  window.open(googleCalendarUrl(b), '_blank', 'noopener');
 }
 
 // Start Firebase last, once every function/const above exists

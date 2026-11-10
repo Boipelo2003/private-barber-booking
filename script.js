@@ -95,6 +95,7 @@ let _slotsMap      = {};      // { "2026-11-07": Set(["09:00", ...]) }  ← publ
 let _closedDates   = new Set();
 let _closedSlots   = {};      // { "2026-11-07": Set(["09:00"]) }
 let _availSelectedDate = null;
+let _notices      = {};      // notice board: { id: { text, createdAt } }  ← public, written by the admin
 let _slotState    = {};      // { "2026-11-08": { "1300": "done" } }  ← public, set by the admin
 
 let _bookingsCache = [];      // ADMIN ONLY — filled after admin sign-in
@@ -180,6 +181,11 @@ function initFirebase() {
     _db.ref('pb_slotstate').on('value', snap => {
       _slotState = snap.val() || {};
       refreshOpenGrids();
+    });
+
+    _db.ref('pb_notices').on('value', snap => {
+      _notices = snap.val() || {};
+      renderNotices();
     });
 
     // If availability hasn't loaded after 10s, say so instead of spinning forever
@@ -1745,6 +1751,87 @@ document.addEventListener('keydown', e => {
   }
   if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(o => o.classList.remove('open'));
 });
+
+// ══════════════════════════════════════
+// NOTICE BOARD
+// The admin writes notices in the Admin page; they appear on the home page and booking page.
+// ══════════════════════════════════════
+function noticeList() {
+  return Object.entries(_notices)
+    .filter(([id, n]) => n && typeof n.text === 'string' && n.text.trim())
+    .map(([id, n]) => ({ id, text: n.text, createdAt: Number(n.createdAt) || 0 }))
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+function noticeDate(ms) {
+  return new Date(ms).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function renderNotices() {
+  const list = noticeList();
+
+  const card = n => `<div style="border:1px solid rgba(201,168,76,0.35);border-left:3px solid var(--gold);border-radius:10px;padding:14px 18px;margin-bottom:10px;background:rgba(201,168,76,0.05)">
+      <div style="font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--gold);margin-bottom:6px">📢 ${esc(noticeDate(n.createdAt))}</div>
+      <div style="white-space:pre-wrap;line-height:1.7;color:var(--white2);font-size:0.9rem">${esc(n.text)}</div>
+    </div>`;
+
+  const home = document.getElementById('notice-board-home');
+  if (home) {
+    home.innerHTML = list.length
+      ? `<div style="max-width:720px;margin:40px auto 0;padding:0 5%">
+           <div class="section-label" style="margin-bottom:14px">Notice Board</div>
+           ${list.slice(0, 5).map(card).join('')}
+         </div>`
+      : '';
+  }
+
+  const booking = document.getElementById('notice-board-booking');
+  if (booking) {
+    booking.innerHTML = list.length
+      ? `<div style="margin-bottom:20px">${list.slice(0, 2).map(card).join('')}</div>`
+      : '';
+  }
+
+  const admin = document.getElementById('admin-notices-list');
+  if (admin) {
+    admin.innerHTML = list.length
+      ? list.map(n => `<div style="display:flex;gap:12px;align-items:flex-start;justify-content:space-between;padding:12px 0;border-top:1px solid rgba(255,255,255,0.08)">
+            <div style="min-width:0">
+              <div style="font-size:0.7rem;color:var(--white3);margin-bottom:4px">${esc(noticeDate(n.createdAt))}</div>
+              <div style="white-space:pre-wrap;line-height:1.6;font-size:0.85rem;word-break:break-word">${esc(n.text)}</div>
+            </div>
+            <button class="btn-sm btn-sm-cancel" onclick="removeNotice('${safeId(n.id)}')">✕ Remove</button>
+          </div>`).join('')
+      : `<div style="font-size:0.82rem;color:var(--white3)">No notices posted. Clients see nothing until you post one.</div>`;
+  }
+}
+
+async function postNotice() {
+  const input = document.getElementById('notice-input');
+  const text  = (input ? input.value : '').trim();
+  if (!adminLoggedIn || !_db) { toast('Please sign in as admin first.', 'error', '⚠️'); return; }
+  if (!text)                  { toast('Write your notice first.', 'error', '⚠️'); return; }
+  if (text.length > 400)      { toast('Please keep notices under 400 characters.', 'error', '⚠️'); return; }
+  try {
+    await _db.ref('pb_notices').push({ text, createdAt: Date.now() });
+    input.value = '';
+    toast('Notice posted — clients can see it now.', 'success', '📢');
+  } catch (e) {
+    console.error(e);
+    toast('Could not post: ' + (e.code || e.message), 'error', '⚠️');
+  }
+}
+
+async function removeNotice(id) {
+  if (!adminLoggedIn || !_db) return;
+  if (!confirm('Remove this notice from the client side?')) return;
+  try {
+    await _db.ref('pb_notices/' + id).remove();
+    toast('Notice removed.', 'default', '✓');
+  } catch (e) {
+    console.error(e);
+    toast('Could not remove: ' + (e.code || e.message), 'error', '⚠️');
+  }
+}
 
 // Start Firebase last, once every function/const above exists
 initFirebase();

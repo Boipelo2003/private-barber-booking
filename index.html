@@ -80,6 +80,8 @@
 
   <div class="gold-divider"></div>
 
+  <div id="notice-board-home"></div>
+
   <!-- SERVICES -->
   <div class="section">
     <div class="reveal">
@@ -169,6 +171,7 @@
       <div class="section-label" style="margin-bottom:6px">New Appointment</div>
       <h2 class="step-title" id="bookingMainTitle">Book Your Session</h2>
     </div>
+    <div id="notice-board-booking"></div>
     <!-- STEP INDICATOR -->
     <div class="step-indicator">
       <div class="step-dot active" id="sdot-1">1</div>
@@ -426,7 +429,14 @@
       <button class="btn-outline" onclick="adminRemindUpcoming()">🔔 Remind Upcoming Bookings</button>
       <button class="btn-outline" onclick="openManualBooking()">➕ Add Walk-in / Manual Booking</button>
     </div>
-<div class="admin-section-title" style="margin-top:32px">Manage Availability</div>
+<div class="admin-section-title" style="margin-top:32px">Notice Board</div>
+    <div style="background:var(--black2);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px;margin-bottom:8px">
+      <label class="form-label" for="notice-input">Write a notice for your clients</label>
+      <textarea class="form-input" id="notice-input" rows="3" maxlength="400" placeholder="e.g. Closed this Friday. Back on Saturday at 08:00." style="resize:vertical;margin-bottom:12px"></textarea>
+      <button class="btn-gold" onclick="postNotice()">📢 Post Notice</button>
+      <div id="admin-notices-list" style="margin-top:16px"></div>
+    </div>
+    <div class="admin-section-title" style="margin-top:32px">Manage Availability</div>
 
   <!-- Calendar + time slots -->
   <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">

@@ -436,6 +436,21 @@
       <button class="btn-gold" onclick="postNotice()">📢 Post Notice</button>
       <div id="admin-notices-list" style="margin-top:16px"></div>
     </div>
+    <div class="admin-section-title" style="margin-top:32px">Money Owed <span id="debt-total" style="font-size:0.8rem;color:#e07060;font-family:inherit"></span></div>
+    <div style="background:var(--black2);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px;margin-bottom:8px">
+      <label class="form-label" for="debt-email">Client email</label>
+      <input type="email" class="form-input" id="debt-email" placeholder="client@email.com" autocomplete="off" oninput="debtCheck()" style="margin-bottom:10px">
+      <div id="debt-status" style="font-size:0.85rem;margin-bottom:12px;min-height:22px"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <input type="number" class="form-input" id="debt-amount" placeholder="Amount owed (R)" min="1" inputmode="numeric" style="flex:1;min-width:150px">
+        <input type="text" class="form-input" id="debt-note" maxlength="120" placeholder="Note (optional)" style="flex:2;min-width:180px">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
+        <button class="btn-gold" onclick="debtSave()">⚠️ They owe</button>
+        <button class="btn-outline" onclick="debtPaid()">✅ Paid in full</button>
+      </div>
+      <div id="debt-list" style="margin-top:18px"></div>
+    </div>
     <div class="admin-section-title" style="margin-top:32px">Manage Availability</div>
 
   <!-- Calendar + time slots -->

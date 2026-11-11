@@ -104,6 +104,9 @@ let _adminFirstSnap = true;
 let _locksSynced   = false;
 let _idxDone       = new Set(JSON.parse(localStorage.getItem('pb_idx_done') || '[]'));
 
+let _debts         = {};      // MONEY OWED (admin only): { emailHash: { email, amount, note, createdAt, updatedAt } }
+let _debtsRef      = null;
+let _debtsLoaded   = false;   // so a card never says "owes nothing" before the list has loaded
 let _lastBooking   = null;    // the booking just made (for the confirmation screen's calendar buttons)
 let _myBookings    = {};      // bookings this device created / looked up, keyed by id
 const _myWatchers  = {};
@@ -248,6 +251,7 @@ function startAdminSync(attempt = 0) {
     _bookingsCache = incoming;
     if (_adminFirstSnap) { _adminFirstSnap = false; syncSlotLocks(); }
     added.forEach(b => pushLiveAlert(b));
+    added.forEach(b => { const d = isRealEmail(b.email) && debtFor(b.email); if (d) toast(`⚠️ ${b.name} still owes R${d.amount}`, 'error', '💸'); });
     updateAdminBadge();
     if (adminLoggedIn) renderAdminDashboard();
   }, err => {
@@ -1457,8 +1461,8 @@ function startAuthWatcher() {
     adminLoggedIn = !!user && !user.isAnonymous;      // customers are signed in anonymously
     unwatchAllMine();
 
-    if (adminLoggedIn) { startAdminSync(); showAdminDashboard(); }
-    else               { stopAdminSync();  showAdminLoginForm(); }
+    if (adminLoggedIn) { startAdminSync(); startDebtSync(); showAdminDashboard(); }
+    else               { stopAdminSync();  stopDebtSync();  showAdminLoginForm(); }
 
     if (user) getMyIds().forEach(watchMyBooking);
     else _auth.signInAnonymously().catch(err => console.warn('Anonymous sign-in failed', err));
@@ -1583,7 +1587,8 @@ function renderAdminBookings() {
         <span>💰 <strong>R${b.totalPrice}</strong></span>
         <span>🔖 <strong>${esc(b.id)}</strong></span>
       </div>
-      <div class="abc-actions">${actionBtns}</div>${adminCutRow(b)}
+      ${debtBanner(b)}
+      <div class="abc-actions">${actionBtns}</div>${adminCutRow(b)}${adminDebtRow(b)}
     </div>`;
   }).join('');
 }
@@ -1902,6 +1907,164 @@ function googleCalendarUrl(b) {
 function addToGoogleCalendar(id) {
   const b = calendarBooking(id); if (!b) return;
   window.open(googleCalendarUrl(b), '_blank', 'noopener');
+}
+
+// ══════════════════════════════════════
+// MONEY OWED  (admin only — clients never see this)
+// Matched by email. When a client who owes books again, their booking card shows a red "Owes R__" banner.
+// ══════════════════════════════════════
+function debtFor(email) {
+  const e = String(email || '').trim().toLowerCase();
+  if (!e) return null;
+  return Object.values(_debts).find(d => d && String(d.email).toLowerCase() === e) || null;
+}
+
+function startDebtSync(attempt = 0) {
+  if (!_db || _debtsRef) return;
+  const ref = _db.ref('pb_debts');
+  _debtsRef = ref;
+  ref.on('value', snap => {
+    _debts = snap.val() || {};
+    _debtsLoaded = true;
+    renderDebts();
+    if (adminLoggedIn && state.currentPage === 'admin') renderAdminBookings();
+  }, err => {
+    console.warn('Money-owed read failed (attempt ' + (attempt + 1) + ')', err.code || err);
+    ref.off();
+    if (_debtsRef === ref) _debtsRef = null;
+    if (adminLoggedIn && attempt < 4) setTimeout(() => startDebtSync(attempt + 1), 1000 * (attempt + 1));
+  });
+}
+function stopDebtSync() {
+  if (_debtsRef) { _debtsRef.off(); _debtsRef = null; }
+  _debts = {}; _debtsLoaded = false;
+  const l = document.getElementById('debt-list'); if (l) l.innerHTML = '';
+}
+
+function debtBanner(b) {
+  if (!isRealEmail(b.email)) return `<div style="margin:10px 0 2px;font-size:0.74rem;color:var(--white3)">No email saved — can’t track money owed</div>`;
+  if (!_debtsLoaded)         return `<div style="margin:10px 0 2px;font-size:0.74rem;color:var(--white3)">⏳ Checking money owed…</div>`;
+  const d = debtFor(b.email);
+  if (!d) return `<div style="margin:10px 0 2px;font-size:0.8rem;color:#6fcf97">✅ Owes nothing</div>`;
+  return `<div style="margin:12px 0 4px;padding:10px 14px;border:1px solid #e05252;border-radius:8px;background:rgba(224,82,82,0.08);color:#e07060;font-size:0.84rem">⚠️ <strong>Still owes R${Number(d.amount) || 0}</strong>${d.note ? ' — ' + esc(d.note) : ''}</div>`;
+}
+function adminDebtRow(b) {
+  if (!isRealEmail(b.email)) return '';
+  const id = safeId(b.id);
+  const owes = !!debtFor(b.email);
+  return `<div class="abc-actions" style="margin-top:8px">${owes
+    ? `<button class="btn-wa btn-wa-confirm" onclick="debtQuick('${id}')">✅ Mark as paid</button>`
+    : `<button class="btn-wa btn-wa-cancel" onclick="debtQuick('${id}')">💸 They owe</button>`}</div>`;
+}
+
+function renderDebts() {
+  const list  = Object.entries(_debts).filter(([k, d]) => d && d.email).sort((a, b) => (Number(b[1].amount) || 0) - (Number(a[1].amount) || 0));
+  const total = list.reduce((n, [k, d]) => n + (Number(d.amount) || 0), 0);
+  const t = document.getElementById('debt-total'); if (t) t.textContent = list.length ? `· R${total} owed by ${list.length}` : '';
+  const el = document.getElementById('debt-list');
+  if (el) {
+    el.innerHTML = list.length ? list.map(([k, d]) => `<div style="display:flex;gap:12px;align-items:flex-start;justify-content:space-between;padding:12px 0;border-top:1px solid rgba(255,255,255,0.08)">
+        <div style="min-width:0">
+          <div style="font-size:0.88rem;word-break:break-all">${esc(d.email)}</div>
+          <div style="font-size:0.8rem;color:#e07060;margin-top:2px"><strong>R${Number(d.amount) || 0}</strong>${d.note ? ' — ' + esc(d.note) : ''}</div>
+          <div style="font-size:0.7rem;color:var(--white3);margin-top:2px">since ${esc(noticeDate(Number(d.createdAt) || Number(d.updatedAt) || Date.now()))}</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-shrink:0">
+          <button class="btn-sm btn-sm-reschedule" onclick="debtFill('${safeId(k)}')">✎ Edit</button>
+          <button class="btn-sm btn-sm-reschedule" onclick="debtPaidKey('${safeId(k)}')">✅ Paid</button>
+        </div>
+      </div>`).join('')
+      : `<div style="font-size:0.82rem;color:var(--white3)">Nobody owes you anything right now.</div>`;
+  }
+  debtCheck();
+}
+
+// Live status under the email box
+function debtCheck() {
+  const inp = document.getElementById('debt-email'), out = document.getElementById('debt-status');
+  if (!inp || !out) return;
+  const email = inp.value.trim().toLowerCase();
+  if (!email.includes('@')) { out.innerHTML = ''; return; }
+  const d = debtFor(email);
+  out.innerHTML = d
+    ? `⚠️ <strong style="color:#e07060">Owes R${Number(d.amount) || 0}</strong> since ${esc(noticeDate(Number(d.createdAt) || Date.now()))}${d.note ? ' — ' + esc(d.note) : ''}`
+    : `<span style="color:#6fcf97">✅ Owes nothing</span>`;
+}
+function debtFill(key) {
+  const d = _debts[key]; if (!d) return;
+  document.getElementById('debt-email').value  = d.email;
+  document.getElementById('debt-amount').value = d.amount;
+  document.getElementById('debt-note').value   = d.note || '';
+  debtCheck();
+  document.getElementById('debt-email').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+async function debtWrite(email, amount, note) {
+  const key = await emailHash(email);
+  const old = _debts[key];
+  await _db.ref('pb_debts/' + key).set({
+    email, amount, note: String(note || '').slice(0, 120),
+    createdAt: old && old.createdAt ? old.createdAt : Date.now(), updatedAt: Date.now()
+  });
+}
+
+// "They owe" button in the Money Owed box (also updates the amount if they already owe)
+async function debtSave() {
+  if (!adminLoggedIn || !_db) return;
+  const email  = document.getElementById('debt-email').value.trim().toLowerCase();
+  const amount = Math.round(Number(document.getElementById('debt-amount').value));
+  const note   = document.getElementById('debt-note').value.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast('Enter the client’s email address.', 'error', '⚠️'); return; }
+  if (!(amount > 0 && amount <= 100000))          { toast('Enter how much they owe (R).', 'error', '⚠️'); return; }
+  try {
+    await debtWrite(email, amount, note);
+    toast(`${email} owes R${amount}.`, 'success', '💸');
+    document.getElementById('debt-amount').value = '';
+    document.getElementById('debt-note').value   = '';
+  } catch (e) { console.error(e); toast('Could not save: ' + (e.code || e.message), 'error', '⚠️'); }
+}
+
+async function debtRemove(email, key) {
+  try {
+    await _db.ref('pb_debts/' + (key || await emailHash(email))).remove();
+    toast(`${email} is paid up ✅`, 'success', '✅');
+  } catch (e) { console.error(e); toast('Could not update: ' + (e.code || e.message), 'error', '⚠️'); }
+}
+// "Paid in full" button in the Money Owed box
+async function debtPaid() {
+  if (!adminLoggedIn || !_db) return;
+  const email = document.getElementById('debt-email').value.trim().toLowerCase();
+  if (!email.includes('@')) { toast('Enter the client’s email address.', 'error', '⚠️'); return; }
+  const d = debtFor(email);
+  if (!d) { toast('That email doesn’t owe anything.', 'default', 'ℹ️'); return; }
+  if (!confirm(`Mark ${email} as fully paid (R${d.amount})?`)) return;
+  await debtRemove(email);
+  document.getElementById('debt-amount').value = ''; document.getElementById('debt-note').value = '';
+}
+async function debtPaidKey(key) {
+  const d = _debts[key]; if (!d || !adminLoggedIn) return;
+  if (!confirm(`Mark ${d.email} as fully paid (R${d.amount})?`)) return;
+  await debtRemove(d.email, key);
+}
+
+// Button on each booking card
+async function debtQuick(id) {
+  const b = _bookingsCache.find(x => x.id === id);
+  if (!b || !adminLoggedIn || !_db) return;
+  const d = debtFor(b.email);
+  if (d) {
+    if (!confirm(`Mark ${b.email} as fully paid (R${d.amount})?`)) return;
+    await debtRemove(b.email);
+    return;
+  }
+  const raw = prompt(`How much does ${b.name} owe (R)?`, String(b.totalPrice));
+  if (raw === null) return;
+  const amount = Math.round(Number(raw));
+  if (!(amount > 0 && amount <= 100000)) { toast('Enter a valid amount.', 'error', '⚠️'); return; }
+  try {
+    await debtWrite(b.email.trim().toLowerCase(), amount, '');
+    toast(`${b.name} owes R${amount}.`, 'success', '💸');
+  } catch (e) { console.error(e); toast('Could not save: ' + (e.code || e.message), 'error', '⚠️'); }
 }
 
 // Start Firebase last, once every function/const above exists
